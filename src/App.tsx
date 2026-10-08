@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
   Check,
@@ -160,19 +160,17 @@ export default function App() {
       query: audit.title,
       ...(targetPrice > 0 ? { salePrice: targetPrice } : {}),
     });
-    if (audit.competitor_median && targetPrice > 0) {
+    // Solo se cargan las estadísticas que la auditoría guardó. El promedio y los outliers no se guardan:
+    // se muestran como "no disponible" en vez de reconstruirlos. Sin mínimo y máximo no se cargan.
+    if (audit.competitor_median && audit.competitor_min && audit.competitor_max) {
       setStats({
-        min: audit.competitor_min || targetPrice,
+        min: audit.competitor_min,
         median: audit.competitor_median,
-        average: Math.round(
-          ((audit.competitor_min || targetPrice) +
-            (audit.competitor_max || targetPrice) +
-            audit.competitor_median) /
-            3
-        ),
-        max: audit.competitor_max || targetPrice,
-        sampleSize: audit.competitor_count || 1,
-        outliersRemoved: 0,
+        max: audit.competitor_max,
+        average: null,
+        sampleSize: audit.competitor_count ?? 0,
+        outliersRemoved: null,
+        fromCloud: true,
       });
       setMarketSource("mlu");
       setStatus("online");
@@ -276,15 +274,21 @@ export default function App() {
   }, [fetchRate]);
 
   // Handle Search in Mercado Libre Uruguay
+  const searchAbortRef = useRef<AbortController | null>(null);
   const handleSearch = async (query: string) => {
     if (!query) return;
+    // Una búsqueda nueva cancela la anterior: la respuesta vieja no pisa a la nueva.
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
     setSearchLoading(true);
     setStatus("idle");
     setMarketState({ status: "loading", query });
 
     try {
       const res = await fetch(
-        `/api/search-mlu?q=${encodeURIComponent(query)}&rate=${inputs.exchangeRate}`
+        `/api/search-mlu?q=${encodeURIComponent(query)}&rate=${inputs.exchangeRate}`,
+        { signal: controller.signal }
       );
       const data = await res.json();
 
@@ -314,6 +318,7 @@ export default function App() {
         });
       }
     } catch (e) {
+      if (controller.signal.aborted) return; // reemplazada por una búsqueda más nueva
       console.error("Search failed", e);
       setStatus("manual");
       setMarketState({
@@ -322,7 +327,7 @@ export default function App() {
         error: { ok: false, code: "NETWORK", message: "Error de red al consultar Mercado Libre." },
       });
     } finally {
-      setSearchLoading(false);
+      if (searchAbortRef.current === controller) setSearchLoading(false);
     }
   };
 
@@ -475,6 +480,14 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
   };
 
   const rateIsUnreliable = !currentRate || currentRate.stale;
+  // Cotización de más de 48 h: aviso reforzado con fecha y antigüedad (además del ámbar de la cinta).
+  const rateAgeHours = currentRate ? (Date.now() - Date.parse(currentRate.fetchedAt)) / 3_600_000 : 0;
+  const rateIsOld = !rateLoading && !!currentRate && Number.isFinite(rateAgeHours) && rateAgeHours > 48;
+  const rateAgeText =
+    rateAgeHours >= 72 ? `hace ${Math.floor(rateAgeHours / 24)} días` : `hace ${Math.floor(rateAgeHours)} horas`;
+  const rateDateText = currentRate
+    ? new Date(currentRate.referenceDate ? `${currentRate.referenceDate}T12:00:00` : currentRate.fetchedAt).toLocaleDateString("es-UY")
+    : "";
   const rateNote = rateLoading ? "actualizando…" : currentRate ? describeRate(currentRate) : "falta la cotización";
   // Sin cotización, cualquier monto en dólares queda sin poder calcularse.
   const usesUsd = inputs.cost.currency === "USD" || inputs.freight.currency === "USD";
@@ -667,6 +680,18 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             >
               Ingresar cotización
             </button>
+          </div>
+        )}
+
+        {rateIsOld && currentRate && (
+          <div
+            role="alert"
+            className="rounded-xl border-2 border-amber-500 bg-amber-500/15 p-4 text-sm text-amber-900 dark:text-amber-200"
+          >
+            <strong className="font-black">Cotización desactualizada.</strong> Estás usando el dólar a{" "}
+            <span className="num font-bold">{formatRate(currentRate.rate)}</span> ({currentRate.source === "manual" ? "valor manual" : "BCU"}
+            , del <span className="font-bold">{rateDateText}</span>, obtenida {rateAgeText}). Todo monto en dólares se
+            calcula con ese valor. Actualizala con el botón del encabezado o ingresá la de hoy.
           </div>
         )}
 

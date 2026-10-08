@@ -46,6 +46,8 @@ export interface BatchItemResult {
   roi: number;
   /** "unpriced": Mercado Libre returned no market price, so the row cannot be ranked. */
   status: "viable" | "tight" | "loss" | "unpriced";
+  /** Por qué no hay dato de mercado cuando la consulta falló o no devolvió precios. */
+  marketError?: string;
   analysisInputs: AnalysisInputs;
 }
 
@@ -84,6 +86,9 @@ export function BatchAuditor({
   const [savedToCloudCount, setSavedToCloudCount] = useState<number | null>(null);
   const [cloudSaving, setCloudSaving] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "viable" | "loss">("all");
+
+  // Con filas en U$S y sin cotización el costo en pesos no se puede calcular: no se ejecuta.
+  const usdRowsWithoutRate = !(exchangeRate > 0) && items.some((i) => i.currency === "USD");
 
   // Parse raw text or CSV
   const parseRawInput = (text: string) => {
@@ -165,7 +170,7 @@ export function BatchAuditor({
 
   // Run Batch Simulation
   const handleRunBatch = async () => {
-    if (items.length === 0) return;
+    if (items.length === 0 || usdRowsWithoutRate) return;
     setIsProcessing(true);
     setResults([]);
     setSavedToCloudCount(null);
@@ -180,20 +185,26 @@ export function BatchAuditor({
       // Placeholder so the row can be opened in the simulator; sampleSize 0 marks it as not a market price.
       let marketPriceUyu = Math.round(costUyu * 1.5);
       let sampleSize = 0;
+      let marketError: string | undefined;
 
       try {
         const res = await fetch(
           `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`
         );
-        if (res.ok) {
-          const data: MluSearchResponse = await res.json();
-          if (data.ok && data.stats && data.stats.median > 0) {
-            marketPriceUyu = Math.round(data.stats.median);
-            sampleSize = data.stats.sampleSize;
-          }
+        const data: MluSearchResponse | null = await res.json().catch(() => null);
+        if (data?.ok && data.stats && data.stats.median > 0) {
+          marketPriceUyu = Math.round(data.stats.median);
+          sampleSize = data.stats.sampleSize;
+        } else if (data && !data.ok && "message" in data && data.message) {
+          marketError = data.message;
+        } else if (!res.ok) {
+          marketError = `Mercado Libre no respondió (HTTP ${res.status}).`;
+        } else {
+          marketError = "La búsqueda no devolvió precios.";
         }
       } catch (err) {
         console.warn("[batch-auditor] MLU search error for item:", item.name, err);
+        marketError = "No se pudo conectar con el servidor.";
       }
 
       // Financial Engine Simulation
@@ -238,13 +249,21 @@ export function BatchAuditor({
         directMargin,
         roi: winningResult.roi,
         status,
-        analysisInputs: itemInputs,
+        marketError,
+        // Sin dato de mercado no se pasa al simulador un precio provisorio como si fuera de venta.
+        analysisInputs: sampleSize === 0 ? { ...itemInputs, salePrice: 0 } : itemInputs,
       });
 
       // Small delay between queries to respect ML rate limits
       await new Promise((r) => setTimeout(r, 250));
     }
 
+    // Ranking por margen neto del canal ganador; las filas sin dato de mercado van al final, fuera del ranking.
+    const winningMargin = (r: BatchItemResult) => (r.bestChannel === "ml" ? r.mlMargin : r.directMargin);
+    batchResults.sort((a, b) => {
+      if ((a.status === "unpriced") !== (b.status === "unpriced")) return a.status === "unpriced" ? 1 : -1;
+      return a.status === "unpriced" ? 0 : winningMargin(b) - winningMargin(a);
+    });
     setResults(batchResults);
     setIsProcessing(false);
   };
@@ -398,11 +417,21 @@ export function BatchAuditor({
           </div>
         )}
 
+        {usdRowsWithoutRate && (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-bold leading-relaxed text-amber-900 dark:text-amber-200"
+          >
+            Hay productos con costo en dólares y no hay cotización del dólar. Ingresá la cotización en el encabezado
+            para poder auditar el catálogo.
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
             <span>{items.length} productos detectados</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span>Tipo de cambio: {formatRate(exchangeRate)}</span>
+            <span>Tipo de cambio: {exchangeRate > 0 ? formatRate(exchangeRate) : "falta"}</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
             <span>Régimen: {baseInputs.tax.regime === "literal_e" ? "Literal E" : "Régimen General"}</span>
           </div>
@@ -410,7 +439,7 @@ export function BatchAuditor({
           <button
             type="button"
             onClick={handleRunBatch}
-            disabled={isProcessing || items.length === 0}
+            disabled={isProcessing || items.length === 0 || usdRowsWithoutRate}
             className="inline-flex items-center gap-2 rounded-md bg-black hover:bg-zinc-800 text-white dark:bg-white dark:text-black dark:hover:bg-zinc-200 px-5 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-40"
           >
             <Play className={`size-3.5 ${isProcessing ? "animate-spin" : ""}`} />
@@ -466,7 +495,7 @@ export function BatchAuditor({
                     {formatUyu(totalInvestmentUyu)}
                   </span>
                   <span className="text-xs text-zinc-600 dark:text-zinc-400 font-bold">
-                    (≈ USD {Math.round(totalInvestmentUyu / exchangeRate)})
+                    {exchangeRate > 0 ? `(≈ USD ${Math.round(totalInvestmentUyu / exchangeRate)})` : ""}
                   </span>
                 </div>
               </div>
@@ -608,9 +637,16 @@ export function BatchAuditor({
                       </td>
                       <td className="py-3 px-3">
                         {r.status === "unpriced" ? (
-                          <span className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
-                            Sin precio de mercado
-                          </span>
+                          <>
+                            <span className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
+                              Sin dato de mercado
+                            </span>
+                            {r.marketError && (
+                              <span role="alert" className="block text-[11px] text-red-600 dark:text-red-400">
+                                {r.marketError}
+                              </span>
+                            )}
+                          </>
                         ) : (
                           <>
                             <span className="font-bold text-zinc-900 dark:text-zinc-100 num">
@@ -660,7 +696,7 @@ export function BatchAuditor({
                       <td className="py-3 px-3">
                         {r.status === "unpriced" && (
                           <span className="inline-flex rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-black text-zinc-700 dark:text-zinc-300 uppercase">
-                            Sin datos
+                            Sin dato de mercado
                           </span>
                         )}
                         {r.status === "viable" && (

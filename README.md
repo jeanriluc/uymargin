@@ -72,6 +72,7 @@ Todas son opcionales para la calculadora básica. Sin ellas, la función asociad
 | Variable | Para qué |
 |---|---|
 | `PORT` | Puerto del servidor (por defecto 3000; el proyecto usa 3001) |
+| `HOST` | Dirección en la que escucha el servidor (por defecto `127.0.0.1`, solo esta máquina; `0.0.0.0` para exponerlo a la red) |
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Credenciales de una aplicación de Mercado Libre. Necesarias para el radar y "Por enlace" |
 | `ML_ACCESS_TOKEN` | Alternativa a las dos anteriores: un token de acceso ya emitido |
 | `GEMINI_API_KEY` | Copiloto |

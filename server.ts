@@ -10,9 +10,13 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+// Solo esta máquina por defecto; HOST=0.0.0.0 para exponerlo a la red a propósito.
+const HOST = process.env.HOST?.trim() || "127.0.0.1";
+// Dirección con la que el servidor se llama a sí mismo (tracking); 0.0.0.0 / :: no son destinos válidos.
+const SELF_HOST = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
 const isProduction = process.env.NODE_ENV === "production";
 
-app.use(express.json());
+app.use(express.json({ limit: "256kb" }));
 
 // ------------------------------------------------------------------
 // 1. Exchange Rate Endpoint (USD -> UYU)
@@ -271,93 +275,6 @@ function computeSellerQuality(item: any, title = "", index = 0) {
   };
 }
 
-function getVerifiedFallback(query: string, rate: number): RealMluListing[] {
-  const q = query.toLowerCase();
-
-  const createItem = (
-    id: string,
-    title: string,
-    price: number,
-    currency: "UYU" | "USD",
-    thumbnail: string,
-    freeShipping: boolean,
-    seller: string,
-    city: string,
-    badge: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold",
-    reputation: string,
-    sales: string,
-    rating: number,
-    reviews: number,
-    sellersCount: number
-  ): RealMluListing => ({
-    id,
-    title,
-    price,
-    currency,
-    thumbnail,
-    permalink: `https://www.mercadolibre.com.uy/p/${id}`,
-    freeShipping,
-    seller,
-    isAvailable: true,
-    stockStatus: "En stock disponible",
-    salesVolume: sales,
-    sellerBadge: badge,
-    sellerReputation: reputation,
-    positivePercentage: 98,
-    ratingAverage: rating,
-    reviewsCount: reviews,
-    activeSellersCount: sellersCount,
-    sellerCity: city,
-    isTopChoice: true,
-  });
-
-  if (q.includes("termo") || q.includes("stanley") || q.includes("mate")) {
-    return [
-      createItem("MLU36006952", "Botella termo Stanley Classic, 950 ml, color verde martillado", 3279, "UYU", "https://http2.mlstatic.com/D_NQ_NP_727447-MLA74070266077_012024-F.jpg", true, "Tienda Oficial AMV", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial 100% · Vendedor Líder", "+1.000 vendidos", 4.9, 184, 19),
-      createItem("MLU56415021", "Termo Stanley Mate System 1.2 Litros Con Pico Alta Precisión Verde", 3790, "UYU", "https://http2.mlstatic.com/D_NQ_NP_908479-MLA73030386616_112023-F.jpg", true, "Distribuidor Platinum", "Rivera", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.9, 142, 14),
-      createItem("MLU54069645", "Termo Termolar Revolution Rosa Chicle 1 Lts", 2150, "UYU", "https://http2.mlstatic.com/D_NQ_NP_884648-MLA96422851745_102025-F.jpg", true, "Comercio Verificado", "Manga, Montevideo", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.8, 96, 6),
-      createItem("MLU58056129", "Botella Térmica Agua Termo Acero Inox 700mL Buffer + 4 Tapas", 799, "UYU", "https://http2.mlstatic.com/D_NQ_NP_705359-MLA73507119253_122023-F.jpg", false, "Tienda Oficial Buffer Store", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial Certificada", "+1.000 vendidos", 4.8, 115, 1),
-    ];
-  }
-
-  if (q.includes("olla") || q.includes("presion") || q.includes("xion")) {
-    return [
-      createItem("MLU20543325", "Olla A Presion Electrica 5 Lts Xion Xi-op105 900w / Color Negro", 79.89, "USD", "https://http2.mlstatic.com/D_NQ_NP_866751-MLU74823126759_032024-F.jpg", true, "Tienda Oficial Xion", "Manga, Montevideo", "Tienda Oficial", "Reputación Oficial 100% · Garantía 12 meses", "+1.000 vendidos", 4.9, 138, 8),
-      createItem("MLU70337260", "Olla A Presion Electrica Digital 6 Litros Acero Inoxidable", 89.9, "USD", "https://http2.mlstatic.com/D_NQ_NP_753177-MLU74381395988_022024-F.jpg", true, "Distribuidor Platinum", "Centro, Montevideo", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.8, 84, 3),
-    ];
-  }
-
-  return [
-    createItem("MLU39962085", "Auriculares Inalámbricos Xiaomi Redmi Buds 6 Play Negro", 689, "UYU", "https://http2.mlstatic.com/D_NQ_NP_906161-MLA79391054235_092024-F.jpg", false, "Xiaomi Official Store", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial", "+1.000 vendidos", 4.8, 210, 4),
-    createItem("MLU43438189", "Smartwatch Xiaomi Smart Band 9 Active 5atm Bt Negro", 35, "USD", "https://http2.mlstatic.com/D_NQ_NP_716942-MLA80860548183_112024-F.jpg", true, "Distribuidor Autorizado", "Punta Carretas", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.7, 95, 3),
-  ];
-}
-
-function estimateMarketBaseline(query: string, title: string, index: number, anchorPrice?: number): number {
-  if (anchorPrice && anchorPrice > 0) {
-    const variance = [1.0, 0.94, 1.08, 0.88, 1.14, 0.96, 1.2, 0.91, 1.05, 1.12][index % 10] ?? 1.0;
-    return Math.max(90, Math.round((anchorPrice * variance) / 10) * 10 - 1);
-  }
-  const q = `${query} ${title}`.toLowerCase();
-  let base = 890;
-  if (q.includes("shaker") || q.includes("mezclador")) base = 490;
-  else if (q.includes("termo") || q.includes("stanley")) base = 2890;
-  else if (q.includes("mate")) base = 1290;
-  else if (q.includes("bombilla")) base = 450;
-  else if (q.includes("auricular") || q.includes("earbuds") || q.includes("f9") || q.includes("inalambrico")) base = 790;
-  else if (q.includes("reloj") || q.includes("smartwatch") || q.includes("band") || q.includes("d20")) base = 1390;
-  else if (q.includes("proteina") || q.includes("whey")) base = 2490;
-  else if (q.includes("creatina")) base = 1890;
-  else if (q.includes("funda") || q.includes("vidrio")) base = 350;
-  else if (q.includes("taladro") || q.includes("amoladora")) base = 3190;
-  else if (q.includes("silla") || q.includes("gamer")) base = 6900;
-  else if (q.includes("iphone") || q.includes("celular") || q.includes("xiaomi") || q.includes("samsung")) base = 9500;
-  else if (q.includes("foco") || q.includes("lampara") || q.includes("led")) base = 390;
-
-  const varianceFactor = [1.0, 0.92, 1.15, 0.85, 1.08, 0.96, 1.22, 0.88, 1.04, 1.12][index % 10] ?? 1.0;
-  return Math.max(90, Math.round((base * varianceFactor) / 10) * 10 - 1);
-}
-
 export interface UnsupportedListing {
   id: string;
   title: string;
@@ -370,7 +287,6 @@ export interface UnsupportedListing {
 async function searchRealMlu(
   query: string,
   token: string | null,
-  rate: number,
   unsupported: UnsupportedListing[] = []
 ): Promise<RealMluListing[]> {
   const cleanQ = query.trim();
@@ -550,7 +466,7 @@ app.get("/api/search-mlu", async (req, res) => {
   try {
     const token = await getAppToken();
     const unsupported: UnsupportedListing[] = [];
-    const items = await searchRealMlu(query, token, rate, unsupported);
+    const items = await searchRealMlu(query, token, unsupported);
 
     if (items.length === 0 && unsupported.length > 0) {
       const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
@@ -922,7 +838,7 @@ app.all("/api/analyze-url", async (req, res) => {
     // 4. Fetch Similar Competitor Products in the same market (STRICTLY IN-STOCK ONLY)
     let similarProducts: RealMluListing[] = [];
     if (searchQuery) {
-      const allFound = await searchRealMlu(searchQuery, token, rate, unsupported);
+      const allFound = await searchRealMlu(searchQuery, token, unsupported);
       similarProducts = allFound
         .filter((item) => item.id !== targetProduct?.id && item.id !== pid && item.isAvailable)
         .slice(0, 8);
@@ -975,11 +891,29 @@ app.all("/api/analyze-url", async (req, res) => {
 // ------------------------------------------------------------------
 // 3. Gemini Financial Copilot Chat Endpoint
 // ------------------------------------------------------------------
+const CHAT_ALLOWED_MODELS: readonly string[] = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"];
+const CHAT_MAX_MESSAGE_CHARS = 4000;
+const CHAT_MAX_HISTORY = 20;
+
+/** Texto del contexto que manda el navegador: se fuerza a string y se acota antes de entrar al prompt. */
+function ctxText(value: unknown, max = 200): string {
+  return String(value ?? "").slice(0, max);
+}
+
 app.post("/api/chat", async (req, res) => {
-  const { message, history, model, enableThinking, context } = req.body;
+  const { message, history, model, enableThinking, context } = req.body ?? {};
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ ok: false, error: "Mensaje requerido" });
+  }
+  if (message.length > CHAT_MAX_MESSAGE_CHARS) {
+    return res.status(400).json({ ok: false, error: `El mensaje es demasiado largo (máximo ${CHAT_MAX_MESSAGE_CHARS} caracteres).` });
+  }
+  if (model !== undefined && model !== null && model !== "" && !CHAT_ALLOWED_MODELS.includes(model)) {
+    return res.status(400).json({ ok: false, error: "Modelo no permitido." });
+  }
+  if (history !== undefined && !Array.isArray(history)) {
+    return res.status(400).json({ ok: false, error: "Historial inválido." });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -1015,14 +949,14 @@ Tu trabajo es aconsejar al usuario con números concretos, realistas y basados e
    - Literal E / Pequeña Empresa / Monotributo: IVA compra es costo, no se discrimina en venta, tope de facturación anual.
    - Régimen General: IVA 22% débito fiscal en venta menos crédito fiscal por compras con e-factura con RUT y crédito por comisiones de ML/pasarelas, provisión de IRAE 25%.
 5. Datos actuales de la simulación del usuario:
-   - Producto: ${context?.productName || "No definido"}
-   - Costo unitario: ${context?.wholesaleCost || "N/A"}
-   - Costo puesto landed: ${context?.landedCostUyu || "N/A"}
-   - Precio de venta simulado: ${context?.simulatedSalePriceUyu || "N/A"}
-   - Tipo de cambio: $U ${context?.exchangeRate || 40}
-   - Régimen DGI: ${context?.taxRegime || "Literal E"}
-   - Resultados ML: Ganancia ${context?.ml?.netProfit}, Margen ${context?.ml?.netMargin}, ROI ${context?.ml?.roi}, Viabilidad ${context?.ml?.viability}, Punto equilibrio ${context?.ml?.breakEven}
-   - Resultados Tienda Propia: Ganancia ${context?.direct?.netProfit}, Margen ${context?.direct?.netMargin}, ROI ${context?.direct?.roi}, Viabilidad ${context?.direct?.viability}, Punto equilibrio ${context?.direct?.breakEven}
+   - Producto: ${ctxText(context?.productName || "No definido")}
+   - Costo unitario: ${ctxText(context?.wholesaleCost || "N/A")}
+   - Costo puesto landed: ${ctxText(context?.landedCostUyu || "N/A")}
+   - Precio de venta simulado: ${ctxText(context?.simulatedSalePriceUyu || "N/A")}
+   - Tipo de cambio: $U ${ctxText(context?.exchangeRate || "no disponible", 20)}
+   - Régimen DGI: ${ctxText(context?.taxRegime || "Literal E")}
+   - Resultados ML: Ganancia ${ctxText(context?.ml?.netProfit, 40)}, Margen ${ctxText(context?.ml?.netMargin, 40)}, ROI ${ctxText(context?.ml?.roi, 40)}, Viabilidad ${ctxText(context?.ml?.viability, 40)}, Punto equilibrio ${ctxText(context?.ml?.breakEven, 40)}
+   - Resultados Tienda Propia: Ganancia ${ctxText(context?.direct?.netProfit, 40)}, Margen ${ctxText(context?.direct?.netMargin, 40)}, ROI ${ctxText(context?.direct?.roi, 40)}, Viabilidad ${ctxText(context?.direct?.viability, 40)}, Punto equilibrio ${ctxText(context?.direct?.breakEven, 40)}
 
 Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, DGI) y da recomendaciones accionables para maximizar el margen líquido en mano.`;
 
@@ -1036,11 +970,11 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 
     const contents: any[] = [];
     if (Array.isArray(history)) {
-      for (const h of history) {
-        if (h.role === "user" || h.role === "assistant") {
+      for (const h of history.slice(-CHAT_MAX_HISTORY)) {
+        if ((h?.role === "user" || h?.role === "assistant") && typeof h.content === "string") {
           contents.push({
             role: h.role === "assistant" ? "model" : "user",
-            parts: [{ text: h.content }],
+            parts: [{ text: h.content.slice(0, CHAT_MAX_MESSAGE_CHARS) }],
           });
         }
       }
@@ -1077,10 +1011,11 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 
     return res.json({ ok: true, reply: reply || "No se pudo generar una respuesta." });
   } catch (err: any) {
+    // El detalle queda en el log del servidor; al navegador no se le devuelve el error crudo de Gemini.
     console.error("[api/chat] error:", err?.message || err);
     return res.status(500).json({
       ok: false,
-      error: err?.message || "Error al procesar la consulta con Gemini.",
+      error: "No se pudo obtener una respuesta del copiloto. Probá de nuevo en unos minutos.",
     });
   }
 });
@@ -1088,9 +1023,18 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 // ------------------------------------------------------------------
 // 4. Competitor Price Tracking & Alerts Endpoint
 // ------------------------------------------------------------------
+const TRACKING_MAX_ITEMS = 25;
+
 app.post("/api/tracking/check", async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (items.length > TRACKING_MAX_ITEMS) {
+      return res.status(400).json({
+        ok: false,
+        code: "TOO_MANY_ITEMS",
+        error: `Se pueden verificar hasta ${TRACKING_MAX_ITEMS} competidores por llamada.`,
+      });
+    }
     const exchangeRate = rateFromRequest(req.body?.exchangeRate);
     if (exchangeRate === null) {
       return res.status(400).json({ ok: false, code: "RATE_UNAVAILABLE", message: NO_RATE_MESSAGE });
@@ -1111,7 +1055,7 @@ app.post("/api/tracking/check", async (req, res) => {
 
         const targetUrl = item.permalink || item.productId;
         if (targetUrl) {
-          const analyzeUrl = `http://localhost:${PORT}/api/analyze-url?url=${encodeURIComponent(targetUrl)}&rate=${exchangeRate}`;
+          const analyzeUrl = `http://${SELF_HOST}:${PORT}/api/analyze-url?url=${encodeURIComponent(targetUrl)}&rate=${exchangeRate}`;
           const r = await fetch(analyzeUrl, {
             headers: { Accept: "application/json" },
             signal: AbortSignal.timeout(6000),
@@ -1228,8 +1172,8 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`UyMargin server listening on port ${PORT} (${isProduction ? "production" : "development"})`);
+  app.listen(PORT, HOST, () => {
+    console.log(`UyMargin server listening on ${HOST}:${PORT} (${isProduction ? "production" : "development"})`);
   });
 }
 

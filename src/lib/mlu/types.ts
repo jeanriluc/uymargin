@@ -24,14 +24,17 @@ export interface MluItem {
 }
 
 export interface MarketStats {
-  /** Number of prices used for stats after outlier removal. */
+  /** Number of prices used for stats after outlier removal. 0 when a cloud audit did not store it. */
   sampleSize: number;
-  /** Outliers removed by the IQR filter. */
-  outliersRemoved: number;
+  /** Outliers removed by the IQR filter. null = not available (cloud audits do not store it). */
+  outliersRemoved: number | null;
   min: number;
   max: number;
-  average: number;
+  /** null = not available (cloud audits do not store it; it is never reconstructed). */
+  average: number | null;
   median: number;
+  /** True when loaded from a saved cloud audit: only min, median, max and offer count were stored. */
+  fromCloud?: boolean;
 }
 
 export type MluErrorCode =
