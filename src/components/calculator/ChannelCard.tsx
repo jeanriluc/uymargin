@@ -132,7 +132,7 @@ export function ChannelCard({
         </div>
 
         {/* 4 Financial Metrics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <StatBox
             label="MARGEN NETO"
             value={<AnimatedNumber value={r.netMargin} format={formatPct} />}
