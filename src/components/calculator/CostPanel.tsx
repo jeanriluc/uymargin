@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   AlertCircle,
 } from "lucide-react";
-import { formatUsd, formatUyu, formatPct } from "@/lib/format";
+import { formatDecimal, formatRate, formatUsd, formatUyu } from "@/lib/format";
 import type { AnalysisInputs, TaxSettings } from "@/lib/finance/types";
 import type { UnitCosts } from "@/lib/finance/engine";
 import { NumberField } from "@/components/ui/NumberField";
@@ -94,7 +94,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
           }
           hint={
             inputs.cost.currency === "USD"
-              ? `≈ ${formatUyu(costs.merchandise)} al cambio ${inputs.exchangeRate.toFixed(2)}`
+              ? `≈ ${formatUyu(costs.merchandise)} al cambio ${formatRate(inputs.exchangeRate)}`
               : inputs.exchangeRate > 0
                 ? `≈ ${formatUsd(costs.merchandise / inputs.exchangeRate)}`
                 : undefined
@@ -354,7 +354,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                   <span>Vueltas de inventario al año:</span>
                 </span>
                 <span className="font-semibold text-fg">
-                  {(365 / turnoverDays).toFixed(1)} ciclos anuales
+                  {formatDecimal(Math.round((365 / turnoverDays) * 10) / 10)} ciclos anuales
                 </span>
               </div>
             )}

@@ -150,27 +150,27 @@ export function ProfitHeroCard({
 
           {/* Hero Profit Headline */}
           <div className="mt-2.5">
-            <p className="text-2xl sm:text-3xl font-black text-zinc-900 dark:text-zinc-100 tracking-tight leading-tight text-balance">
+            <p className={`font-black text-zinc-900 dark:text-zinc-100 tracking-tight text-balance ${isReady ? "text-xl sm:text-2xl leading-snug" : "text-2xl sm:text-3xl leading-tight"}`}>
               {isReady ? (
                 isLosingMoney ? (
                   <>
                     Perdés{" "}
-                    <span className="num text-red-600 dark:text-red-400">
+                    <span className="num whitespace-nowrap align-baseline text-4xl sm:text-5xl leading-none text-red-600 dark:text-red-400">
                       {formatUyu(Math.abs(winningResult.netProfit))}
                     </span>{" "}
                     por unidad{" "}
-                    <span className="text-lg sm:text-xl font-bold text-zinc-500 dark:text-zinc-400">
+                    <span className="whitespace-nowrap text-base sm:text-lg font-bold text-zinc-600 dark:text-zinc-400">
                       ({formatPct(winningResult.netMargin)} del precio)
                     </span>
                   </>
                 ) : (
                   <>
                     Te quedan{" "}
-                    <span className={`num ${isTightMargin ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    <span className={`num whitespace-nowrap align-baseline text-4xl sm:text-5xl leading-none ${isTightMargin ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                       {formatUyu(winningResult.netProfit)}
                     </span>{" "}
                     en el bolsillo{" "}
-                    <span className="text-lg sm:text-xl font-bold text-zinc-500 dark:text-zinc-400">
+                    <span className="whitespace-nowrap text-base sm:text-lg font-bold text-zinc-600 dark:text-zinc-400">
                       ({formatPct(winningResult.netMargin)} del precio)
                     </span>
                   </>
@@ -242,8 +242,8 @@ export function ProfitHeroCard({
 
             <div className="sm:border-t border-zinc-700 dark:border-zinc-300 sm:pt-2 sm:w-full text-right sm:text-left">
               <span className="text-[10px] opacity-80 block">Diferencia a favor:</span>
-              <span className="num font-black text-sm text-emerald-400 dark:text-emerald-700">
-                +{formatUyu(profitDiff)} por unidad
+              <span className="font-black text-sm text-emerald-400 dark:text-emerald-700">
+                <span className="num">+{formatUyu(profitDiff)}</span> por unidad
               </span>
             </div>
           </div>
@@ -306,7 +306,7 @@ export function ProfitHeroCard({
               className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase"
               title="Reserva estimada descontada por posibles mermas y devoluciones"
             >
-              📦 Reserva: -{formatUyu(winningResult.reservesCost)}
+              📦 Reserva: {formatUyu(-winningResult.reservesCost)}
             </span>
           ) : null}
 

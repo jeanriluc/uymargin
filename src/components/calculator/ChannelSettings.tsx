@@ -3,7 +3,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import { GATEWAYS, ML_DEFAULT_RATES, ML_RATE_RANGES, URUGUAY_CARRIERS } from "@/lib/finance/constants";
 import type { DirectChannelSettings, MlChannelSettings } from "@/lib/finance/types";
-import { formatPct } from "@/lib/format";
+import { formatPct, formatUyu } from "@/lib/format";
 import { NumberField } from "@/components/ui/NumberField";
 import { Segmented } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
@@ -92,7 +92,7 @@ export function MlSettings({ value, onChange }: MlSettingsProps) {
                     : "border-border bg-surface hover:bg-surface-2 text-muted hover:text-foreground"
                 }`}
               >
-                {t.label} ($U {t.cost})
+                {t.label} ({formatUyu(t.cost)})
               </button>
             ))}
           </div>
@@ -197,7 +197,7 @@ export function DirectSettings({ value, onChange }: DirectSettingsProps) {
                   }`}
                   title={c.note}
                 >
-                  {c.name.split(" ")[0]} ($U {c.defaultCost})
+                  {c.name.split(" ")[0]} ({formatUyu(c.defaultCost)})
                 </button>
               ))}
             </div>

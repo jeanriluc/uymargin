@@ -1,5 +1,5 @@
 import { BarChart3, Target, Zap } from "lucide-react";
-import { formatUsd, formatUyu } from "@/lib/format";
+import { formatRate, formatUsd, formatUyu } from "@/lib/format";
 import type { MarketStats } from "@/lib/mlu/types";
 import { NumberField } from "@/components/ui/NumberField";
 import { StepHeader } from "@/components/ui/StepHeader";
@@ -68,7 +68,7 @@ export function PricingBar({
             inputClassName="h-14 text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100"
             hint={
               exchangeRate > 0 && salePrice > 0
-                ? `Equivale a ${formatUsd(salePrice / exchangeRate)} al cambio actual de ${exchangeRate}`
+                ? `Equivale a ${formatUsd(salePrice / exchangeRate)} al cambio de ${formatRate(exchangeRate)}`
                 : "Escribí un precio o tocá uno de los atajos"
             }
           />

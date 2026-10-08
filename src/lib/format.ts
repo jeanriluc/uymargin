@@ -34,6 +34,12 @@ export function formatPct(value: number): string {
   return `${sign(value)}${pctFormatter.format(Math.abs(value))}%`;
 }
 
+/** "41,25" — USD/UYU exchange rate, always two decimals. */
+export function formatRate(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return usdFormatter.format(value);
+}
+
 export function formatDecimal(value: number): string {
   return decimalFormatter.format(value);
 }

@@ -325,7 +325,7 @@ export function CompetitorTrackingDrawer({
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2.5 bg-zinc-50 dark:bg-zinc-900/40">
             <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block">Variación Prom.</span>
             <span className={`text-lg font-black num ${stats.averageVariationPct < 0 ? "text-emerald-600" : "text-zinc-900 dark:text-zinc-100"}`}>
-              {stats.averageVariationPct.toFixed(1)}%
+              {formatPct(stats.averageVariationPct)}
             </span>
           </div>
         </div>
@@ -491,11 +491,11 @@ export function CompetitorTrackingDrawer({
                               <div className="flex items-center gap-1">
                                 {isDropping ? (
                                   <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                    <TrendingDown className="size-3" /> {dropPct.toFixed(1)}%
+                                    <TrendingDown className="size-3" /> {formatPct(dropPct)}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-0.5 text-xs font-black text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded">
-                                    <TrendingUp className="size-3" /> +{dropPct.toFixed(1)}%
+                                    <TrendingUp className="size-3" /> +{formatPct(dropPct)}
                                   </span>
                                 )}
                               </div>
@@ -522,7 +522,7 @@ export function CompetitorTrackingDrawer({
                             )}
                             <span>
                               Si igualas este precio ({formatUyu(item.currentPrice)}), tu margen neto queda en:{" "}
-                              <strong className="font-black">{estMargin.toFixed(1)}%</strong> ({formatUyu(estProfit)} en mano)
+                              <strong className="font-black">{formatPct(estMargin)}</strong> ({formatUyu(estProfit)} en mano)
                             </span>
                           </div>
                         </div>

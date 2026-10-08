@@ -16,7 +16,7 @@ import {
   Sparkles,
   Info,
 } from "lucide-react";
-import { formatUyu, formatUsd, formatPct } from "@/lib/format";
+import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { analyzeAll } from "@/lib/finance/engine";
 import { saveAuditToCloud } from "@/lib/supabase";
 import type { AnalysisInputs } from "@/lib/finance/types";
@@ -254,21 +254,21 @@ export function BatchAuditor({
     const rows = results.map((r) => [
       `"${r.sku}"`,
       `"${r.name.replace(/"/g, '""')}"`,
-      r.cost,
+      String(r.cost).replace(".", ","),
       r.currency,
       Math.round(r.costUyu),
       r.marketPriceUyu,
       r.sampleSize,
       r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia",
-      r.mlMargin.toFixed(1),
+      r.mlMargin.toFixed(1).replace(".", ","),
       Math.round(r.mlProfit),
-      r.directMargin.toFixed(1),
+      r.directMargin.toFixed(1).replace(".", ","),
       Math.round(r.directProfit),
-      r.roi.toFixed(1),
+      r.roi.toFixed(1).replace(".", ","),
       r.status.toUpperCase(),
     ]);
 
-    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row) => row.join(";"))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -368,7 +368,7 @@ export function BatchAuditor({
           <div className="text-xs font-semibold text-zinc-500 flex items-center gap-2">
             <span>{items.length} productos detectados</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
-            <span>Tipo de cambio: $U {exchangeRate.toFixed(2)}</span>
+            <span>Tipo de cambio: {formatRate(exchangeRate)}</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
             <span>Régimen: {baseInputs.tax.regime === "literal_e" ? "Literal E" : "Régimen General"}</span>
           </div>

@@ -1,5 +1,12 @@
 import type { AnalysisInputs, ChannelResult } from "@/lib/finance/types";
-import { formatPct, formatUyu } from "@/lib/format";
+import { formatMoney, formatPct } from "@/lib/format";
+
+const VIABILITY_LABEL = { excellent: "Excelente", tight: "Ajustado", risky: "Riesgoso" } as const;
+
+/** Decimal comma so Excel in es-UY reads the cell as a number. */
+function num(value: number | null | undefined): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(2).replace(".", ",") : "N/A";
+}
 
 export function exportAuditToCsv(
   inputs: AnalysisInputs,
@@ -16,32 +23,32 @@ export function exportAuditToCsv(
     ["UYMARGIN - REPORTE DE RENTABILIDAD MAYORISTA", ""],
     ["Fecha de Generación", new Date().toLocaleString("es-UY")],
     ["Producto", inputs.productName || inputs.query || "Producto"],
-    ["Tipo de Cambio USD/UYU", inputs.exchangeRate.toFixed(2)],
+    ["Tipo de Cambio USD/UYU", num(inputs.exchangeRate)],
     ["Régimen Tributario DGI", inputs.tax.regime === "literal_e" ? "Literal E (Pequeña Empresa)" : "Régimen General"],
     ["", ""],
     ["ESTRUCTURA DE COSTOS Y COMPRA", ""],
-    ["Costo Proveedor Original", `${inputs.cost.currency} ${inputs.cost.amount}`],
-    ["Flete de Importación / Distribución", `${inputs.freight.currency} ${inputs.freight.amount}`],
-    ["Costo Puesto Unitario (Landed UYU)", landedCostUyu.toFixed(2)],
-    ["Precio de Venta Simulado (PVP UYU)", inputs.salePrice.toFixed(2)],
+    ["Costo Proveedor Original", formatMoney(inputs.cost.amount, inputs.cost.currency)],
+    ["Flete de Importación / Distribución", formatMoney(inputs.freight.amount, inputs.freight.currency)],
+    ["Costo Puesto Unitario (Landed UYU)", num(landedCostUyu)],
+    ["Precio de Venta Simulado (PVP UYU)", num(inputs.salePrice)],
     ["", ""],
     ["MÉTRICAS POR CANAL", "MERCADO LIBRE UY", "TIENDA PROPIA / POS"],
-    ["Precio de Venta", inputs.salePrice.toFixed(2), inputs.salePrice.toFixed(2)],
-    ["Costo Puesto (Landed)", landedCostUyu.toFixed(2), landedCostUyu.toFixed(2)],
-    ["Comisiones de Plataforma / Pasarela", mlResult.platformFees.toFixed(2), directResult.platformFees.toFixed(2)],
-    ["Envío / Flete Local", mlResult.shipping.toFixed(2), directResult.shipping.toFixed(2)],
-    ["Impuestos DGI Netos", mlResult.taxes.total.toFixed(2), directResult.taxes.total.toFixed(2)],
-    ["Ganancia Líquida en Bolsillo (UYU)", mlResult.netProfit.toFixed(2), directResult.netProfit.toFixed(2)],
-    ["Ganancia Líquida en USD", mlResult.netProfitUsd.toFixed(2), directResult.netProfitUsd.toFixed(2)],
+    ["Precio de Venta", num(inputs.salePrice), num(inputs.salePrice)],
+    ["Costo Puesto (Landed)", num(landedCostUyu), num(landedCostUyu)],
+    ["Comisiones de Plataforma / Pasarela", num(mlResult.platformFees), num(directResult.platformFees)],
+    ["Envío / Flete Local", num(mlResult.shipping), num(directResult.shipping)],
+    ["Impuestos DGI Netos", num(mlResult.taxes.total), num(directResult.taxes.total)],
+    ["Ganancia Líquida en Bolsillo (UYU)", num(mlResult.netProfit), num(directResult.netProfit)],
+    ["Ganancia Líquida en USD", num(mlResult.netProfitUsd), num(directResult.netProfitUsd)],
     ["Margen Neto (%)", formatPct(mlResult.netMargin), formatPct(directResult.netMargin)],
     ["Retorno sobre Inversión (ROI %)", formatPct(mlResult.roi), formatPct(directResult.roi)],
-    ["Precio de Equilibrio (Break-Even UYU)", mlResult.breakEvenPrice?.toFixed(2) || "N/A", directResult.breakEvenPrice?.toFixed(2) || "N/A"],
-    ["Viabilidad Comercial", mlResult.viability.toUpperCase(), directResult.viability.toUpperCase()],
+    ["Precio de Equilibrio (Break-Even UYU)", num(mlResult.breakEvenPrice), num(directResult.breakEvenPrice)],
+    ["Viabilidad Comercial", VIABILITY_LABEL[mlResult.viability], VIABILITY_LABEL[directResult.viability]],
   ];
 
   const csvContent =
     "data:text/csv;charset=utf-8,\uFEFF" +
-    rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
+    rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
 
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");

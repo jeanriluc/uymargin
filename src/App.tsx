@@ -35,7 +35,7 @@ import { createDefaultInputs } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
-import { formatPct, formatUyu } from "@/lib/format";
+import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
 
 import type {
   AnalysisInputs,
@@ -255,7 +255,7 @@ export default function App() {
 
   const handleCopySummary = () => {
     const summary = `📊 Análisis de Rentabilidad UyMargin (${inputs.productName || inputs.query || "Producto"}):
-- Costo Proveedor: ${inputs.cost.currency} ${inputs.cost.amount} | Landed: ${formatUyu(analysis.costs.landed)}
+- Costo Proveedor: ${formatMoney(inputs.cost.amount, inputs.cost.currency)} | Costo puesto: ${formatUyu(analysis.costs.landed)}
 - Precio Venta Simulado: ${formatUyu(inputs.salePrice)}
 - Ganancia Neta Mercado Libre: ${formatUyu(analysis.ml.netProfit)} (Margen: ${formatPct(analysis.ml.netMargin)})
 - Ganancia Neta Tienda Propia: ${formatUyu(analysis.direct.netProfit)} (Margen: ${formatPct(analysis.direct.netMargin)})
@@ -271,7 +271,7 @@ export default function App() {
     const summary = `📊 *Auditoría UyMargin* - ${inputs.productName || inputs.query || "Producto"}
 🟢 *Resultado:* Te quedan ${formatUyu(winningChannelResult.netProfit)} limpios (${formatPct(winningChannelResult.netMargin)})
 🏆 *Canal Ganador:* ${bestChannel === "ml" ? "Mercado Libre UY" : "Tienda Propia / POS"}
-💰 *Costo Puesto:* ${inputs.cost.currency} ${inputs.cost.amount} (${formatUyu(analysis.costs.landed)})
+💰 *Costo Puesto:* ${formatUyu(analysis.costs.landed)} (proveedor: ${formatMoney(inputs.cost.amount, inputs.cost.currency)})
 🏷 *Precio de Venta:* ${formatUyu(inputs.salePrice)}
 ⚖ *Régimen DGI:* ${inputs.tax.regime === "literal_e" ? "Literal E (Pequeña Empresa)" : "Régimen General"}
 _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
@@ -329,11 +329,11 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                   {inputs.productName || inputs.query || "Producto en Análisis"}
                 </h1>
                 <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-500 font-semibold uppercase tracking-wider">
-                  <span>Costo Landed: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
+                  <span>Costo puesto: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
                   <span>·</span>
                   <span>Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
                   <span>·</span>
-                  <span>USD/UYU: <strong className="text-black dark:text-white num">${inputs.exchangeRate.toFixed(2)}</strong></span>
+                  <span>USD/UYU: <strong className="text-black dark:text-white num">{formatRate(inputs.exchangeRate)}</strong></span>
                 </div>
               </div>
             </div>

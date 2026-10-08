@@ -21,6 +21,8 @@
 .num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  /* A full monospace space between "$U" and the figure reads as a gap; tighten it. */
+  word-spacing: -0.25em;
 }
 
 /* Subtle architectural dot grid inspired by editorial layout */

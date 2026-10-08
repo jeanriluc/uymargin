@@ -64,7 +64,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
             </div>
             <p className="text-xs text-muted mt-0.5">
               {isEligibleForBundleBoost
-                ? `PVP actual ($U ${inputs.salePrice}) < $U 1.200: MLU cobra $U ${baseFixedFee} de cargo fijo por unidad. Armando un pack eliminás esta pérdida.`
+                ? `Tu precio (${formatUyu(inputs.salePrice)}) está por debajo de $U 1.200: MLU cobra ${formatUyu(baseFixedFee)} de cargo fijo por unidad. Armando un pack eliminás esta pérdida.`
                 : "Aumentá el ticket promedio y volumen de venta ofreciendo combos y packs a tus compradores."}
             </p>
           </div>
@@ -117,7 +117,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
                         {opt.label}
                       </span>
                       <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-bold text-muted border border-border">
-                        -{opt.discountPct}% promo
+                        −{opt.discountPct}% promo
                       </span>
                     </div>
 
