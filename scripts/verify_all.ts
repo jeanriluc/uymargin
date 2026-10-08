@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { computeUnitCosts, analyzeAll, analyzeChannel } from "../src/lib/finance/engine";
 import { createMlModel, createDirectModel } from "../src/lib/finance/channels";
@@ -131,8 +132,18 @@ assert(pack3 !== undefined && pack3.bundleAnalysis.netProfit > bundleResult.base
 // -----------------------------------------------------------------
 console.log("\n--- 2. Verificando Conexión y Tablas en Supabase ---");
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "REDACTED";
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "REDACTED";
+// Credenciales solo por variables de entorno (se leen de .env si existe). Sin valores por defecto.
+// Usar la clave pública (publishable / anon), nunca una clave secreta.
+const supabaseUrl = process.env.VITE_SUPABASE_URL?.trim();
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY?.trim();
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    "\n⛔ Faltan VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY. Definilas en .env para correr la verificación de Supabase."
+  );
+  console.error("   No se intentó ninguna conexión.");
+  process.exit(1);
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

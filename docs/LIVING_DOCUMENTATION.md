@@ -41,7 +41,7 @@ A diferencia de calculadoras genéricas de margen de otros países, UyMargin res
 
 ### Sesión 3: Conexión Cloud Supabase (MCP) y Auditoría Estratégica
 - **Petición del Usuario:**
-  - Conectar Supabase oficial (`REDACTED`) mediante MCP.
+  - Conectar Supabase oficial (el proyecto indicado en `VITE_SUPABASE_URL`) mediante MCP.
   - Implementar las recomendaciones clave del documento de auditoría ([`uymargin_auditoria.md`](file:///Users/jeanrivera/.gemini/antigravity/brain/9586cdc2-0cac-4647-a124-0fb87ab0b362/uymargin_auditoria.md)).
 - **Entregables:**
   - Servidor MCP `@supabase/mcp-server-supabase` configurado en `~/.gemini/config/mcp_config.json`.
