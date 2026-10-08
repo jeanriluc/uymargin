@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Capturas de auditoría y documentación: quedan en disco, no en git
+docs/audit/capturas/
+docs/**/*.png
+docs/**/*.jpg
+docs/**/*.jpeg
+**/capturas/
+**/screenshots/
