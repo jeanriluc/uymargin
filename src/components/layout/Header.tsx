@@ -1,5 +1,4 @@
 import { ArrowLeftRight, Bot, RefreshCw, Settings, Wifi, WifiOff, Zap } from "lucide-react";
-import type { ExchangeRateResponse } from "@/lib/mlu/types";
 import { NumberField } from "@/components/ui/NumberField";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -20,16 +19,12 @@ const STATUS: Record<ConnectionStatus, { label: string; badgeClass: string; Icon
   offline: { label: "SIN CONEXIÓN", badgeClass: "border-dashed border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100", Icon: WifiOff },
 };
 
-const SOURCE_LABEL: Record<ExchangeRateResponse["source"], string> = {
-  dolarapi: "DolarApi UY (Venta Oficial)",
-  "open-er-api": "Interbancario USD/UYU",
-  fallback: "Cotización por defecto",
-};
 
 interface HeaderProps {
   exchangeRate: number;
   onExchangeRateChange: (rate: number) => void;
-  rateInfo: ExchangeRateResponse | null;
+  /** Fuente y fecha de la cotización en uso, en texto. */
+  rateLabel: string;
   rateLoading: boolean;
   onRefreshRate: () => void;
   status: ConnectionStatus;
@@ -42,7 +37,7 @@ interface HeaderProps {
 export function Header({
   exchangeRate,
   onExchangeRateChange,
-  rateInfo,
+  rateLabel,
   rateLoading,
   onRefreshRate,
   status,
@@ -101,7 +96,7 @@ export function Header({
                 <NumberField
                   id="header-rate"
                   value={exchangeRate}
-                  onChange={(v) => onExchangeRateChange(v > 0 ? v : 40)}
+                  onChange={onExchangeRateChange}
                   inputClassName="h-6 text-xs font-black border-0 bg-transparent px-0! focus:ring-0 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
@@ -111,8 +106,8 @@ export function Header({
               type="button"
               onClick={onRefreshRate}
               disabled={rateLoading}
-              title={rateInfo ? `Fuente: ${SOURCE_LABEL[rateInfo.source]}` : "Actualizar cotización"}
-              aria-label="Actualizar cotización"
+              title={`${rateLabel}. Actualizar desde el BCU`}
+              aria-label={`Actualizar cotización desde el BCU. En uso: ${rateLabel}`}
               className="size-7 rounded text-zinc-600 hover:text-black dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`size-3.5 ${rateLoading ? "animate-spin text-black dark:text-white" : ""}`} />

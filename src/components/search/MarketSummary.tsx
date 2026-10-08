@@ -15,8 +15,10 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { formatMoney, formatUyu } from "@/lib/format";
-import type { MarketStats, MluItem, MluSearchError } from "@/lib/mlu/types";
+import { formatRate, formatUyu } from "@/lib/format";
+import type { MarketStats, MluItem, MluSearchError, UnsupportedListing } from "@/lib/mlu/types";
+import { convertToUyu, describeRate, type ExchangeRate } from "@/lib/currency";
+import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 
 export type MarketState =
   | { status: "idle" }
@@ -27,6 +29,10 @@ export type MarketState =
 interface MarketSummaryProps {
   state: MarketState;
   stats: MarketStats | null;
+  /** Cotización en uso para pasar a pesos las publicaciones en dólares. */
+  rate: ExchangeRate | null;
+  /** Publicaciones en una moneda no soportada: se muestran, no se calculan. */
+  unsupported?: UnsupportedListing[];
   source: "mlu" | "manual" | null;
   manualPrices: string;
   onManualPricesChange: (text: string) => void;
@@ -79,6 +85,8 @@ function StatCard({
 export function MarketSummary({
   state,
   stats,
+  rate,
+  unsupported = [],
   source,
   manualPrices,
   onManualPricesChange,
@@ -86,6 +94,7 @@ export function MarketSummary({
 }: MarketSummaryProps) {
   const loading = state.status === "loading";
   const items = state.status === "success" ? state.items : [];
+  const usdCount = items.filter((i) => i.currency === "USD").length;
   const total = state.status === "success" ? state.total : stats?.sampleSize ?? 0;
 
   return (
@@ -121,6 +130,52 @@ export function MarketSummary({
             <strong className="font-bold">No hay precios de mercado para “{state.query}”.</strong>{" "}
             {state.error.message}
           </div>
+        </div>
+      )}
+
+      {usdCount > 0 && !rate && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <strong className="font-bold">Falta la cotización del dólar.</strong> {usdCount} de {items.length}{" "}
+            publicaciones están en dólares. No se calculó el rango de mercado: ingresá la cotización en el encabezado.
+          </div>
+        </div>
+      )}
+
+      {usdCount > 0 && rate && (
+        <p className="mb-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+          {usdCount} de {items.length} publicaciones están en dólares. Para comparar se pasaron a pesos con:{" "}
+          <span className={rate.stale ? "font-bold text-amber-700 dark:text-amber-400" : ""}>
+            {describeRate(rate)} (<span className="num">{formatRate(rate.rate)}</span>)
+          </span>
+          .
+        </p>
+      )}
+
+      {unsupported.length > 0 && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+        >
+          <p className="flex items-start gap-2 font-bold">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {unsupported.length} {unsupported.length === 1 ? "publicación quedó" : "publicaciones quedaron"} fuera del
+            cálculo por estar en una moneda que UyMargin no convierte.
+          </p>
+          <ul className="mt-1.5 space-y-0.5 pl-6">
+            {unsupported.slice(0, 5).map((u) => (
+              <li key={u.id}>
+                <a href={u.permalink} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                  {u.title}
+                </a>
+                : <span className="num font-bold">{u.currency || "moneda sin indicar"} {u.price}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -289,9 +344,7 @@ export function MarketSummary({
                 {/* Price, Shipping & Actions */}
                 <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
                   <div className="min-w-0">
-                    <span className="num text-xs font-black text-black dark:text-white block">
-                      {formatMoney(item.price, item.currency)}
-                    </span>
+                    <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
                     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5">
                       {item.salesVolume && (
                         <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
@@ -309,9 +362,18 @@ export function MarketSummary({
                   <div className="ml-auto flex shrink-0 items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => onSelectPrice(Math.round(item.price))}
-                      title="Simular con este precio de venta"
-                      className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
+                      disabled={convertToUyu(item.price, item.currency, rate).status !== "ok"}
+                      onClick={() => {
+                        // El simulador trabaja en pesos: una publicación en dólares entra convertida.
+                        const c = convertToUyu(item.price, item.currency, rate);
+                        if (c.status === "ok") onSelectPrice(Math.round(c.amountUyu));
+                      }}
+                      title={
+                        convertToUyu(item.price, item.currency, rate).status === "ok"
+                          ? "Simular con este precio de venta (en pesos)"
+                          : "No se puede simular: falta la cotización o la moneda no es reconocida"
+                      }
+                      className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:pointer-events-none hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
                     >
                       Simular
                     </button>

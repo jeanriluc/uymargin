@@ -1,5 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
+import fs from "node:fs";
+import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "./src/lib/bcu";
+import { normalizeCurrency } from "./src/lib/currency";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
@@ -13,71 +16,109 @@ app.use(express.json());
 
 // ------------------------------------------------------------------
 // 1. Exchange Rate Endpoint (USD -> UYU)
+//    Fuente: Banco Central del Uruguay (ver src/lib/bcu.ts). Si el BCU no responde se devuelve
+//    el último valor guardado, marcado como no actualizado. Nunca se devuelve un valor inventado.
 // ------------------------------------------------------------------
-const DEFAULT_RATE = 40.0;
-let cachedExchangeRate: { rate: number; buy: number | null; sell: number | null; source: "dolarapi" | "open-er-api" | "fallback"; updatedAt: string | null; timestamp: number } | null = null;
+interface ServerRate {
+  rate: number;
+  buy: number;
+  sell: number;
+  referenceDate: string;
+  source: "bcu";
+  fetchedAt: string;
+}
 
-app.get("/api/exchange-rate", async (_req, res) => {
-  // 15-minute cache in memory
-  if (cachedExchangeRate && Date.now() - cachedExchangeRate.timestamp < 15 * 60 * 1000) {
-    return res.json(cachedExchangeRate);
-  }
+const RATE_CACHE_FILE = path.resolve(process.cwd(), ".cache", "exchange-rate.json");
+const RATE_MEMORY_TTL_MS = 30 * 60 * 1000;
+let lastKnownRate: ServerRate | null = null;
+let lastRateCheck = 0;
 
-  // 1) Try DolarApi UY
+function loadRateFromDisk(): ServerRate | null {
   try {
-    const r = await fetch("https://uy.dolarapi.com/v1/cotizaciones/usd", {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (r.ok) {
-      const data = (await r.json()) as { compra?: number; venta?: number; fechaActualizacion?: string };
-      if (typeof data.venta === "number" && data.venta > 0) {
-        cachedExchangeRate = {
-          rate: data.venta,
-          source: "dolarapi",
-          buy: data.compra ?? null,
-          sell: data.venta,
-          updatedAt: data.fechaActualizacion ?? null,
-          timestamp: Date.now(),
-        };
-        return res.json(cachedExchangeRate);
-      }
-    }
-  } catch (err) {
-    // try fallback
+    const v = JSON.parse(fs.readFileSync(RATE_CACHE_FILE, "utf8"));
+    return typeof v?.rate === "number" && v.rate > 0 && typeof v.referenceDate === "string" ? (v as ServerRate) : null;
+  } catch {
+    return null;
   }
+}
 
-  // 2) Try open.er-api
+function saveRateToDisk(rate: ServerRate): void {
   try {
-    const r = await fetch("https://open.er-api.com/v6/latest/USD", {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (r.ok) {
-      const data = (await r.json()) as { rates?: Record<string, number>; time_last_update_utc?: string };
-      const uyu = data.rates?.UYU;
-      if (typeof uyu === "number" && uyu > 0) {
-        cachedExchangeRate = {
-          rate: uyu,
-          source: "open-er-api",
-          buy: null,
-          sell: null,
-          updatedAt: data.time_last_update_utc ?? null,
-          timestamp: Date.now(),
-        };
-        return res.json(cachedExchangeRate);
-      }
-    }
+    fs.mkdirSync(path.dirname(RATE_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(RATE_CACHE_FILE, JSON.stringify(rate, null, 2));
   } catch (err) {
-    // fallback
+    console.warn("[exchange-rate] no se pudo guardar la cotización en disco:", err);
   }
+}
 
-  // 3) Default Fallback
-  return res.json({
-    rate: DEFAULT_RATE,
-    source: "fallback",
-    buy: null,
-    sell: null,
-    updatedAt: null,
+async function bcuSoap(request: { url: string; soapAction: string; body: string }): Promise<string> {
+  const r = await fetch(request.url, {
+    method: "POST",
+    headers: { "Content-Type": "text/xml; charset=utf-8", SOAPAction: `"${request.soapAction}"` },
+    body: request.body,
+    signal: AbortSignal.timeout(8000),
   });
+  if (!r.ok) throw new Error(`BCU respondió HTTP ${r.status}`);
+  return r.text();
+}
+
+async function fetchBcuRate(): Promise<ServerRate> {
+  const lastClose = parseBcuLastClose(await bcuSoap(BCU_LAST_CLOSE));
+  if (!lastClose) throw new Error("El BCU no informó la fecha del último cierre");
+  const result = parseBcuQuote(await bcuSoap(buildBcuQuoteRequest(lastClose)));
+  if (!result.ok) throw new Error(result.error);
+  return {
+    // Interbancario comprador; en las respuestas del BCU comprador y vendedor coinciden.
+    rate: result.quote.buy,
+    buy: result.quote.buy,
+    sell: result.quote.sell,
+    referenceDate: result.quote.date,
+    source: "bcu",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+/** Última cotización conocida (memoria o disco), sin consultar al BCU. */
+function getLastKnownRate(): ServerRate | null {
+  if (!lastKnownRate) lastKnownRate = loadRateFromDisk();
+  return lastKnownRate;
+}
+
+/** Cotización para un pedido: la que manda el cliente si es válida; si no, la última conocida. */
+function rateFromRequest(value: unknown): number | null {
+  const n = parseFloat(String(value ?? ""));
+  if (Number.isFinite(n) && n > 0) return n;
+  return getLastKnownRate()?.rate ?? null;
+}
+
+const NO_RATE_MESSAGE =
+  "No hay cotización del dólar disponible. Ingresá el valor a mano en el encabezado y volvé a intentar.";
+
+app.get("/api/exchange-rate", async (req, res) => {
+  const force = req.query.refresh === "1";
+  const known = getLastKnownRate();
+  if (!force && known && Date.now() - lastRateCheck < RATE_MEMORY_TTL_MS) {
+    return res.json({ ok: true, ...known, stale: false });
+  }
+
+  try {
+    const fresh = await fetchBcuRate();
+    lastKnownRate = fresh;
+    lastRateCheck = Date.now();
+    saveRateToDisk(fresh);
+    return res.json({ ok: true, ...fresh, stale: false });
+  } catch (err: any) {
+    const reason = err?.message || "sin respuesta";
+    console.warn("[exchange-rate] BCU no disponible:", reason);
+    if (known) {
+      return res.json({ ok: true, ...known, stale: true, error: `No se pudo actualizar con el BCU (${reason}).` });
+    }
+    return res.status(503).json({
+      ok: false,
+      code: "RATE_UNAVAILABLE",
+      message: `No se pudo obtener la cotización del BCU (${reason}) y no hay un valor guardado.`,
+    });
+  }
 });
 
 // ------------------------------------------------------------------
@@ -317,7 +358,21 @@ function estimateMarketBaseline(query: string, title: string, index: number, anc
   return Math.max(90, Math.round((base * varianceFactor) / 10) * 10 - 1);
 }
 
-async function searchRealMlu(query: string, token: string | null, rate: number): Promise<RealMluListing[]> {
+export interface UnsupportedListing {
+  id: string;
+  title: string;
+  price: number;
+  /** currency_id tal como lo informa Mercado Libre. */
+  currency: string;
+  permalink: string;
+}
+
+async function searchRealMlu(
+  query: string,
+  token: string | null,
+  rate: number,
+  unsupported: UnsupportedListing[] = []
+): Promise<RealMluListing[]> {
   const cleanQ = query.trim();
   const listings: RealMluListing[] = [];
   const seenIds = new Set<string>();
@@ -415,9 +470,20 @@ async function searchRealMlu(query: string, token: string | null, rate: number):
           const quality = computeSellerQuality(bestItem, prod.name || "", idx);
 
           const title = prod.name || prod.family_name || cleanQ;
-          const currency: "UYU" | "USD" = bestItem.currency_id === "USD" ? "USD" : "UYU";
           const rawPrice = typeof bestItem.price === "number" && bestItem.price > 0 ? bestItem.price : null;
           if (!rawPrice) return null;
+          const currency = normalizeCurrency(bestItem.currency_id);
+          if (!currency) {
+            // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
+            unsupported.push({
+              id: pid,
+              title: prod.name || prod.family_name || cleanQ,
+              price: rawPrice,
+              currency: String(bestItem.currency_id ?? ""),
+              permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
+            });
+            return null;
+          }
 
           return {
             id: pid,
@@ -471,15 +537,30 @@ async function searchRealMlu(query: string, token: string | null, rate: number):
 
 app.get("/api/search-mlu", async (req, res) => {
   const query = String(req.query.q ?? "").trim();
-  const rate = parseFloat(String(req.query.rate ?? DEFAULT_RATE)) || DEFAULT_RATE;
+  const rate = rateFromRequest(req.query.rate);
 
   if (query.length < 2) {
     return res.status(400).json({ ok: false, code: "BAD_REQUEST", message: "Ingresá al menos 2 caracteres." });
   }
 
+  if (rate === null) {
+    return res.status(400).json({ ok: false, code: "RATE_UNAVAILABLE", message: NO_RATE_MESSAGE });
+  }
+
   try {
     const token = await getAppToken();
-    const items = await searchRealMlu(query, token, rate);
+    const unsupported: UnsupportedListing[] = [];
+    const items = await searchRealMlu(query, token, rate, unsupported);
+
+    if (items.length === 0 && unsupported.length > 0) {
+      const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
+      return res.status(422).json({
+        ok: false,
+        code: "UNSUPPORTED_CURRENCY",
+        message: `Las publicaciones encontradas están en una moneda que UyMargin no convierte (${currencies}). No se calculó ningún precio de mercado.`,
+        unsupported,
+      });
+    }
 
     if (items.length === 0) {
       return res.status(404).json({
@@ -517,6 +598,8 @@ app.get("/api/search-mlu", async (req, res) => {
       total: items.length,
       items,
       stats,
+      rateUsed: rate,
+      unsupported,
       fetchedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -557,10 +640,13 @@ interface UrlSellerListing {
 app.all("/api/analyze-url", async (req, res) => {
   const urlParam = req.method === "POST" ? req.body?.url : req.query?.url;
   const rawUrl = String(urlParam || "").trim();
-  const rate = parseFloat(String(req.query?.rate || req.body?.rate || DEFAULT_RATE)) || DEFAULT_RATE;
+  const rate = rateFromRequest(req.query?.rate || req.body?.rate);
 
   if (!rawUrl) {
     return res.status(400).json({ ok: false, message: "URL de Mercado Libre requerida." });
+  }
+  if (rate === null) {
+    return res.status(400).json({ ok: false, code: "RATE_UNAVAILABLE", message: NO_RATE_MESSAGE });
   }
 
   let pid: string | null = null;
@@ -591,6 +677,7 @@ app.all("/api/analyze-url", async (req, res) => {
 
     let targetProduct: any = null;
     let sameProductSellers: UrlSellerListing[] = [];
+    const unsupported: UnsupportedListing[] = [];
 
     // Helper to sort raw items: Official store first, then gold special, then gold pro, then lowest price
     const sortRawItems = (items: any[]) => {
@@ -628,7 +715,17 @@ app.all("/api/analyze-url", async (req, res) => {
           const it = sortedItems[i];
           const itPrice = typeof it.price === "number" ? it.price : 0;
           if (itPrice <= 0) continue;
-          const itCur: "UYU" | "USD" = it.currency_id === "USD" ? "USD" : "UYU";
+          const itCur = normalizeCurrency(it.currency_id);
+          if (!itCur) {
+            unsupported.push({
+              id: it.item_id || pid || "",
+              title: prod.name || slugQuery || "",
+              price: itPrice,
+              currency: String(it.currency_id ?? ""),
+              permalink: it.permalink || rawUrl,
+            });
+            continue;
+          }
           const itPriceUyu = itCur === "USD" ? Math.round(itPrice * rate) : itPrice;
           const quality = computeSellerQuality(it, prod.name || slugQuery || "", i);
 
@@ -730,7 +827,17 @@ app.all("/api/analyze-url", async (req, res) => {
             const it = sortedItems[i];
             const itPrice = typeof it.price === "number" ? it.price : 0;
             if (itPrice <= 0) continue;
-            const itCur: "UYU" | "USD" = it.currency_id === "USD" ? "USD" : "UYU";
+            const itCur = normalizeCurrency(it.currency_id);
+            if (!itCur) {
+              unsupported.push({
+                id: it.item_id || pid || "",
+                title: topMatch.name || searchQuery,
+                price: itPrice,
+                currency: String(it.currency_id ?? ""),
+                permalink: it.permalink || rawUrl,
+              });
+              continue;
+            }
             const itPriceUyu = itCur === "USD" ? Math.round(itPrice * rate) : itPrice;
             const quality = computeSellerQuality(it, topMatch.name || searchQuery, i);
 
@@ -785,6 +892,16 @@ app.all("/api/analyze-url", async (req, res) => {
       }
     }
 
+    if (!targetProduct && unsupported.length > 0) {
+      const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
+      return res.status(422).json({
+        ok: false,
+        code: "UNSUPPORTED_CURRENCY",
+        message: `La publicación está en una moneda que UyMargin no convierte (${currencies}). No se calculó nada.`,
+        unsupported,
+      });
+    }
+
     // 3. Without a real listing there is nothing to audit: report it instead of inventing a price.
     if (!targetProduct) {
       return res.status(404).json({
@@ -805,7 +922,7 @@ app.all("/api/analyze-url", async (req, res) => {
     // 4. Fetch Similar Competitor Products in the same market (STRICTLY IN-STOCK ONLY)
     let similarProducts: RealMluListing[] = [];
     if (searchQuery) {
-      const allFound = await searchRealMlu(searchQuery, token, rate);
+      const allFound = await searchRealMlu(searchQuery, token, rate, unsupported);
       similarProducts = allFound
         .filter((item) => item.id !== targetProduct?.id && item.id !== pid && item.isAvailable)
         .slice(0, 8);
@@ -819,11 +936,11 @@ app.all("/api/analyze-url", async (req, res) => {
     ].filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
 
     let marketStats = {
-      min: targetProduct.priceUyu || 1200,
-      median: targetProduct.priceUyu || 1200,
-      average: targetProduct.priceUyu || 1200,
-      max: targetProduct.priceUyu || 1200,
-      sampleSize: 1,
+      min: targetProduct.priceUyu,
+      median: targetProduct.priceUyu,
+      average: targetProduct.priceUyu,
+      max: targetProduct.priceUyu,
+      sampleSize: targetProduct.priceUyu > 0 ? 1 : 0,
     };
 
     if (allPricesUyu.length > 0) {
@@ -845,6 +962,8 @@ app.all("/api/analyze-url", async (req, res) => {
       sameProductSellers,
       similarProducts,
       marketStats,
+      rateUsed: rate,
+      unsupported,
       analyzedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -972,7 +1091,10 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 app.post("/api/tracking/check", async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
-    const exchangeRate = Number(req.body?.exchangeRate) > 0 ? Number(req.body.exchangeRate) : DEFAULT_RATE;
+    const exchangeRate = rateFromRequest(req.body?.exchangeRate);
+    if (exchangeRate === null) {
+      return res.status(400).json({ ok: false, code: "RATE_UNAVAILABLE", message: NO_RATE_MESSAGE });
+    }
 
     if (items.length === 0) {
       return res.json({ ok: true, updatedItems: [], alerts: [] });

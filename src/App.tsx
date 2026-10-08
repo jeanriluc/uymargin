@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bot,
   Check,
@@ -38,6 +38,14 @@ import { loadDraft, saveDraft } from "@/lib/storage/draft";
 import { isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
 import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
+import {
+  convertToUyu,
+  describeRate,
+  loadStoredRate,
+  resolveExchangeRate,
+  saveStoredRate,
+  type ExchangeRate,
+} from "@/lib/currency";
 
 import type {
   AnalysisInputs,
@@ -45,7 +53,7 @@ import type {
   MlChannelSettings,
   DirectChannelSettings,
 } from "@/lib/finance/types";
-import type { MarketStats, ExchangeRateResponse } from "@/lib/mlu/types";
+import type { MarketStats, ExchangeRateResponse, UnsupportedListing } from "@/lib/mlu/types";
 
 // Loaded on demand: none of these is needed to get the first verdict.
 const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
@@ -86,18 +94,40 @@ function useEverTrue(flag: boolean): boolean {
 }
 
 export default function App() {
-  const [inputs, setInputs] = useState<AnalysisInputs>(() => loadDraft(createDefaultInputs()));
+  const [inputs, setInputs] = useState<AnalysisInputs>(() => ({
+    ...loadDraft(createDefaultInputs()),
+    // La cotización nunca arranca de un valor por defecto: última guardada o ninguna.
+    exchangeRate: loadStoredRate()?.rate ?? 0,
+  }));
   const [marketState, setMarketState] = useState<MarketState>({ status: "idle" });
   const [stats, setStats] = useState<MarketStats | null>(null);
   const [marketSource, setMarketSource] = useState<"mlu" | "manual" | null>(null);
+  const [unsupportedListings, setUnsupportedListings] = useState<UnsupportedListing[]>([]);
   const [manualPrices, setManualPrices] = useState<string>("");
 
   const [searchLoading, setSearchLoading] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>("idle");
 
-  const [rateInfo, setRateInfo] = useState<ExchangeRateResponse | null>(null);
+  // Cotización con su fecha y fuente. Arranca con la última guardada, marcada como no actualizada.
+  const [rateMeta, setRateMeta] = useState<ExchangeRate | null>(() => {
+    const stored = loadStoredRate();
+    return stored ? { ...stored, stale: true } : null;
+  });
   const [rateLoading, setRateLoading] = useState(false);
-  const [rateFailed, setRateFailed] = useState(false);
+
+  // La cotización efectivamente en uso. Si el valor de la calculadora difiere del guardado
+  // (por ejemplo durante una prueba de "si sube el dólar"), se trata como valor manual.
+  const currentRate = useMemo<ExchangeRate | null>(() => {
+    if (!(inputs.exchangeRate > 0)) return null;
+    if (rateMeta && rateMeta.rate === inputs.exchangeRate) return rateMeta;
+    return {
+      rate: inputs.exchangeRate,
+      referenceDate: new Date().toISOString().slice(0, 10),
+      source: "manual",
+      fetchedAt: new Date().toISOString(),
+      stale: false,
+    };
+  }, [inputs.exchangeRate, rateMeta]);
   const [copyFailed, setCopyFailed] = useState(false);
 
   const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
@@ -114,13 +144,23 @@ export default function App() {
   const auditsEverOpened = useEverTrue(savedAuditsOpen);
 
   const handleLoadCloudAudit = (audit: CloudAuditRecord) => {
-    const targetPrice = audit.target_price_uyu || Math.round(audit.target_price || 1200);
+    // Precio en pesos guardado; si no está, se convierte el original con su moneda. Nunca se asume.
+    const converted =
+      typeof audit.target_price === "number"
+        ? convertToUyu(audit.target_price, audit.target_currency ?? "UYU", currentRate)
+        : null;
+    const targetPrice =
+      audit.target_price_uyu && audit.target_price_uyu > 0
+        ? audit.target_price_uyu
+        : converted?.status === "ok"
+          ? Math.round(converted.amountUyu)
+          : 0;
     updateInputs({
       productName: audit.title,
       query: audit.title,
-      salePrice: targetPrice,
+      ...(targetPrice > 0 ? { salePrice: targetPrice } : {}),
     });
-    if (audit.competitor_median) {
+    if (audit.competitor_median && targetPrice > 0) {
       setStats({
         min: audit.competitor_min || targetPrice,
         median: audit.competitor_median,
@@ -176,27 +216,60 @@ export default function App() {
     checkCloud();
   }, [checkCloud]);
 
-  // Fetch exchange rate on mount
-  const fetchRate = useCallback(async () => {
-    setRateLoading(true);
-    setRateFailed(false);
-    try {
-      const res = await fetch("/api/exchange-rate");
-      if (!res.ok) setRateFailed(true);
-      if (res.ok) {
+  // Cotización del BCU (vía servidor). Si no llega: última guardada, marcada como no actualizada.
+  // Si tampoco hay guardada: sin cotización, y se le pide el valor al usuario.
+  const fetchRate = useCallback(
+    async (force = false) => {
+      setRateLoading(true);
+      let fetched: ExchangeRate | null = null;
+      let serverLastKnown: ExchangeRate | null = null;
+      try {
+        const res = await fetch(`/api/exchange-rate${force ? "?refresh=1" : ""}`);
         const data: ExchangeRateResponse = await res.json();
-        setRateInfo(data);
-        if (data.rate && data.rate > 0) {
-          updateInputs({ exchangeRate: data.rate });
+        if (data.ok && data.rate > 0) {
+          const rate: ExchangeRate = {
+            rate: data.rate,
+            referenceDate: data.referenceDate,
+            source: "bcu",
+            fetchedAt: data.fetchedAt,
+            stale: data.stale,
+          };
+          if (data.stale) serverLastKnown = rate;
+          else fetched = rate;
         }
+      } catch (e) {
+        console.error("Failed to fetch exchange rate", e);
       }
-    } catch (e) {
-      console.error("Failed to fetch exchange rate", e);
-      setRateFailed(true);
-    } finally {
+
+      const resolution = resolveExchangeRate(fetched, serverLastKnown ?? loadStoredRate());
+      setRateMeta(resolution.rate);
+      if (resolution.status === "live") saveStoredRate(resolution.rate);
+      updateInputs({ exchangeRate: resolution.rate?.rate ?? 0 });
       setRateLoading(false);
-    }
-  }, [updateInputs]);
+    },
+    [updateInputs]
+  );
+
+  // Valor ingresado a mano en el encabezado.
+  const handleManualRate = useCallback(
+    (value: number) => {
+      updateInputs({ exchangeRate: value });
+      if (value > 0) {
+        const manual: ExchangeRate = {
+          rate: value,
+          referenceDate: new Date().toISOString().slice(0, 10),
+          source: "manual",
+          fetchedAt: new Date().toISOString(),
+          stale: false,
+        };
+        setRateMeta(manual);
+        saveStoredRate(manual);
+      } else {
+        setRateMeta(null);
+      }
+    },
+    [updateInputs]
+  );
 
   useEffect(() => {
     fetchRate();
@@ -225,6 +298,7 @@ export default function App() {
           items: data.items,
         });
 
+        setUnsupportedListings(Array.isArray(data.unsupported) ? data.unsupported : []);
         if (data.stats) {
           setStats(data.stats);
           if (inputs.salePrice <= 0) {
@@ -269,11 +343,20 @@ export default function App() {
     }
   };
 
+  // Estadísticas del radar recalculadas con la cotización vigente: si cambia el dólar, cambian.
+  // Si hay publicaciones en dólares y no hay cotización, no se calcula nada.
+  const liveStats = useMemo<MarketStats | null>(() => {
+    if (marketSource !== "mlu" || marketState.status !== "success") return stats;
+    const conversions = marketState.items.map((item) => convertToUyu(item.price, item.currency, currentRate));
+    if (conversions.some((c) => c.status === "no_rate")) return null;
+    return computeMarketStats(conversions.flatMap((c) => (c.status === "ok" ? [c.amountUyu] : [])));
+  }, [marketSource, marketState, stats, currentRate]);
+
   const analysis = analyzeAll(inputs);
   const bestChannel = analysis.ml.netProfit >= analysis.direct.netProfit ? "ml" : "direct";
   const winningChannelResult = bestChannel === "ml" ? analysis.ml : analysis.direct;
   const bestChannelLabel = bestChannel === "ml" ? "Mercado Libre UY" : "Tienda Propia / POS";
-  const isReady = inputs.salePrice > 0 && analysis.costs.landed > 0;
+  const isReady = inputs.salePrice > 0 && analysis.costs.landed > 0 && !(inputs.exchangeRate <= 0 && (inputs.cost.currency === "USD" || inputs.freight.currency === "USD"));
   const suggestedPrice = analysis.ml.targetMarginPrice ?? analysis.direct.targetMarginPrice;
   const minBreakEven = Math.min(
     analysis.ml.breakEvenPrice ?? Infinity,
@@ -285,10 +368,10 @@ export default function App() {
       id: createEntryId(),
       savedAt: new Date().toISOString(),
       inputs,
-      market: stats
+      market: liveStats
         ? {
-            ...stats,
-            total: marketState.status === "success" ? marketState.total : stats.sampleSize,
+            ...liveStats,
+            total: marketState.status === "success" ? marketState.total : liveStats.sampleSize,
             source: marketSource ?? "manual",
           }
         : null,
@@ -375,6 +458,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
       salePrice: 0,
     }));
     setStats(null);
+    setUnsupportedListings([]);
     setMarketSource(null);
     setManualPrices("");
     setMarketState({ status: "idle" });
@@ -390,17 +474,13 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     window.print();
   };
 
-  // The exchange rate drives every USD cost: say where it comes from and when it is not live.
-  const rateUpdatedAt = rateInfo?.updatedAt ? new Date(rateInfo.updatedAt) : null;
-  const rateAgeDays = rateUpdatedAt ? (Date.now() - rateUpdatedAt.getTime()) / 86_400_000 : 0;
-  const rateIsUnreliable = rateFailed || rateInfo?.source === "fallback" || rateAgeDays > 3;
-  const rateNote = rateLoading
-    ? "actualizando…"
-    : rateFailed || rateInfo?.source === "fallback"
-      ? "sin cotización en línea: revisá el valor"
-      : rateUpdatedAt
-        ? `cotización del ${rateUpdatedAt.toLocaleDateString("es-UY", { day: "numeric", month: "numeric" })}`
-        : null;
+  const rateIsUnreliable = !currentRate || currentRate.stale;
+  const rateNote = rateLoading ? "actualizando…" : currentRate ? describeRate(currentRate) : "falta la cotización";
+  // Sin cotización, cualquier monto en dólares queda sin poder calcularse.
+  const usesUsd = inputs.cost.currency === "USD" || inputs.freight.currency === "USD";
+  const rateMissing = !currentRate;
+  // Con costo o flete en dólares y sin cotización no hay nada confiable que mostrar.
+  const resultPending = rateMissing && usesUsd;
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -438,10 +518,10 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     <div className="min-h-screen bg-[#f5f5f6] dark:bg-[#0c0c0e] text-[#121212] dark:text-[#f2f2f3] flex flex-col font-sans transition-colors bg-editorial-dots">
       <Header
         exchangeRate={inputs.exchangeRate}
-        onExchangeRateChange={(r) => updateInputs({ exchangeRate: r })}
-        rateInfo={rateInfo}
+        onExchangeRateChange={handleManualRate}
+        rateLabel={currentRate ? describeRate(currentRate) : "Falta la cotización del dólar"}
         rateLoading={rateLoading}
-        onRefreshRate={fetchRate}
+        onRefreshRate={() => fetchRate(true)}
         status={status}
         cloudStatus={cloudStatus}
         onOpenAiAdvisor={() => setAiAdvisorOpen(true)}
@@ -479,7 +559,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider">
                   <span className="whitespace-nowrap">Costo puesto: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
                   <span className="whitespace-nowrap">Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
-                  <span>USD/UYU: <strong className="text-black dark:text-white num">{formatRate(inputs.exchangeRate)}</strong>
+                  <span>USD/UYU: <strong className="text-black dark:text-white num">{currentRate ? formatRate(currentRate.rate) : "—"}</strong>
                     {rateNote && (
                       <span
                         role="status"
@@ -567,6 +647,29 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         {/* Desktop: tools up front. Mobile: after the verdict, so cost and price stay on the first screen. */}
         {renderTools("hidden lg:flex")}
 
+        {rateMissing && !rateLoading && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200"
+          >
+            <p className="min-w-0 flex-1">
+              <strong className="font-bold">No hay cotización del dólar.</strong> No se pudo consultar al BCU y no hay
+              un valor guardado. Ingresá la cotización a mano: sin ella no se calcula ningún monto en dólares.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const field = document.getElementById("header-rate");
+                field?.scrollIntoView({ behavior: "smooth", block: "center" });
+                field?.focus({ preventScroll: true });
+              }}
+              className="shrink-0 rounded-md bg-black px-3.5 py-2 text-xs font-black uppercase tracking-wider text-white dark:bg-white dark:text-black cursor-pointer"
+            >
+              Ingresar cotización
+            </button>
+          </div>
+        )}
+
         {/* Steps 1 and 2: what you pay, what you charge */}
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <CostPanel
@@ -579,9 +682,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           <PricingBar
             salePrice={inputs.salePrice}
             exchangeRate={inputs.exchangeRate}
-            stats={stats}
-            suggestedPrice={suggestedPrice}
-            breakEvenPrice={Number.isFinite(minBreakEven) ? minBreakEven : null}
+            stats={liveStats}
+            suggestedPrice={resultPending ? null : suggestedPrice}
+            breakEvenPrice={!resultPending && Number.isFinite(minBreakEven) ? minBreakEven : null}
             onChange={(p) => updateInputs({ salePrice: p })}
             onFindMarketPrice={() => scrollToSection("mercado")}
           />
@@ -590,6 +693,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         {/* Step 3: the verdict */}
         <ProfitHeroCard
           id="resultado"
+          rateMissing={resultPending}
           inputs={inputs}
           analysis={analysis}
           bestChannel={bestChannel}
@@ -606,6 +710,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         {renderTools("flex lg:hidden")}
 
         {/* Channel battle */}
+        {!resultPending && (
         <section aria-labelledby="channels-heading" className="flex flex-col gap-4">
           <div>
             <h2 id="channels-heading" className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
@@ -639,7 +744,10 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           </div>
         </section>
 
+        )}
+
         {/* Strategic Bundle Optimizer (Anti-Cargo Fijo MLU & Multiplicador) */}
+        {!resultPending && (
         <BundleOptimizer
           inputs={inputs}
           baseResult={analysis.ml}
@@ -651,6 +759,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             scrollToSection("resultado");
           }}
         />
+        )}
 
         {/* Optional: market intelligence to pick a sale price */}
         <section id="mercado" aria-labelledby="market-heading" className="scroll-mt-24 flex flex-col gap-4">
@@ -714,7 +823,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
 
               <MarketSummary
                 state={marketState}
-                stats={stats}
+                stats={liveStats}
+                rate={currentRate}
+                unsupported={unsupportedListings}
                 source={marketSource}
                 manualPrices={manualPrices}
                 onManualPricesChange={handleManualPricesChange}
@@ -726,6 +837,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               {searchTab === "url" ? (
             <UrlAnalyzer
               exchangeRate={inputs.exchangeRate}
+              rate={currentRate}
               onSimulatePrice={(p, name) => {
                 updateInputs({ salePrice: p, productName: name, query: name });
                 scrollToSection("resultado");

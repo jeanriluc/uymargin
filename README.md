@@ -50,7 +50,7 @@ Otros comandos:
 | `npm run build` | Genera la interfaz de producción en `dist/` |
 | `npm start` | Corre el servidor sin recarga automática (con `NODE_ENV=production` sirve `dist/`) |
 | `npm run lint` | Chequeo de tipos (`tsc --noEmit`) |
-| `npm test` | Casos de prueba del motor financiero, sin red |
+| `npm test` | Casos de prueba del motor financiero y de moneda/cotización, sin red |
 
 ## Tests
 
@@ -58,7 +58,7 @@ Otros comandos:
 npm test
 ```
 
-Corre `scripts/verify_finance.ts`: casos dorados del motor financiero. No usa red ni base de datos.
+Corre `scripts/verify_finance.ts` (casos dorados del motor financiero) y `scripts/verify_currency.ts` (moneda, cotización del BCU y sus fallbacks). No usan red ni base de datos.
 
 > **Advertencia:** `scripts/verify_all.ts` **escribe en Supabase real** (inserta y borra un registro de prueba en la tabla `uymargin_audits`). No lo ejecutes contra un proyecto con datos que te importen. `npm test` no lo usa.
 
@@ -87,6 +87,8 @@ src/
   App.tsx                 Pantalla principal y estado de la simulación
   lib/finance/            Motor de cálculo: impuestos DGI, canales, packs, constantes
   lib/format.ts           Formato de moneda, porcentajes y tipo de cambio (es-UY)
+  lib/currency.ts         Moneda original de cada precio, conversión a pesos y reglas de la cotización
+  lib/bcu.ts              Pedidos y lectura de respuestas del servicio de cotizaciones del BCU
   lib/storage/            Historial y borrador de la simulación en el navegador
   lib/supabase.ts         Cliente de Supabase (se carga solo cuando se usa la nube)
   lib/mlu/                Tipos y estadísticas de precios de Mercado Libre
@@ -98,7 +100,8 @@ src/
   components/layout/      Encabezado
   components/ui/          Campos numéricos, selectores, ayudas
 scripts/
-  verify_finance.ts       Tests sin red (npm test)
+  verify_finance.ts       Tests del motor financiero, sin red (npm test)
+  verify_currency.ts      Tests de moneda y cotización, sin red (npm test)
   verify_all.ts           Tests que escriben en Supabase (no usar a la ligera)
   responsive-check.mjs    Medición de desbordes por ancho de pantalla
 docs/                     Documentación y reportes de auditoría
@@ -108,4 +111,12 @@ AUDIT_LOG.md              Registro de auditorías, cambios y decisiones pendient
 
 ## Cotización del dólar
 
-El servidor expone `/api/exchange-rate`. El costo en dólares se convierte con esa cotización, que se puede corregir a mano en el encabezado. La cinta superior muestra la fecha de la cotización en uso.
+- **Fuente:** servicio web de cotizaciones del Banco Central del Uruguay (`cotizaciones.bcu.gub.uy`, operaciones `awsultimocierre` y `awsbcucotizaciones`), moneda 2225 "DLS. USA BILLETE". Se usa el tipo de cambio del último cierre publicado.
+- El servicio es SOAP y no admite llamadas desde el navegador, así que la consulta la hace el servidor (`/api/exchange-rate`). El detalle está en `src/lib/bcu.ts`.
+- Cada cotización se guarda con su valor, la fecha del cierre y la fuente.
+- **Si el BCU no responde:** se usa el último valor guardado y la interfaz lo muestra como "cotización del [fecha], no actualizada".
+- **Si tampoco hay valor guardado:** la app pide la cotización a mano y deja pendiente todo cálculo con montos en dólares. No existe un valor por defecto.
+- La cotización se puede corregir a mano en el encabezado; queda rotulada como "valor manual".
+- Los precios de publicaciones se muestran siempre en su moneda original; si están en dólares, al lado va el equivalente en pesos con la cotización y la fecha usadas. Una moneda que no sea UYU o USD no se convierte.
+
+El servidor guarda la última cotización en `.cache/exchange-rate.json` (ignorado por git).

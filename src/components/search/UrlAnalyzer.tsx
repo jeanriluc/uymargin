@@ -25,6 +25,10 @@ import {
 } from "lucide-react";
 import { formatMoney, formatUyu } from "@/lib/format";
 import { StepHeader } from "@/components/ui/StepHeader";
+import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
+import { convertToUyu, type ExchangeRate } from "@/lib/currency";
+import type { UnsupportedListing } from "@/lib/mlu/types";
+import { formatRate } from "@/lib/format";
 import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
 
 export interface AnalyzedProductData {
@@ -95,6 +99,10 @@ export interface SimilarProductItem {
 export interface UrlAuditResponse {
   ok: boolean;
   url: string;
+  /** Cotización con la que el servidor calculó comparaciones y rango de mercado. */
+  rateUsed?: number;
+  /** Publicaciones en una moneda no soportada: se informan, no se calculan. */
+  unsupported?: UnsupportedListing[];
   targetProduct: AnalyzedProductData;
   sameProductSellers: SameProductSeller[];
   similarProducts: SimilarProductItem[];
@@ -109,6 +117,8 @@ export interface UrlAuditResponse {
 
 interface UrlAnalyzerProps {
   exchangeRate: number;
+  /** Cotización en uso, con fecha y fuente, para mostrar equivalentes en pesos. */
+  rate: ExchangeRate | null;
   onSimulatePrice: (price: number, productName: string) => void;
   onOpenCloudSettings: () => void;
 }
@@ -130,6 +140,7 @@ const SAMPLE_URLS = [
 
 export function UrlAnalyzer({
   exchangeRate,
+  rate,
   onSimulatePrice,
   onOpenCloudSettings,
 }: UrlAnalyzerProps) {
@@ -256,6 +267,18 @@ export function UrlAnalyzer({
 
   const targetIsAvailable = result?.targetProduct.isAvailable !== false && (result?.targetProduct.priceUyu ?? 0) > 0;
 
+  // Pesos con la cotización vigente (no la del momento del análisis). Null si no se puede convertir.
+  const uyuOf = (price: number, currency: string): number | null => {
+    const c = convertToUyu(price, currency, rate);
+    return c.status === "ok" ? Math.round(c.amountUyu) : null;
+  };
+  const simulate = (price: number, currency: string, title: string) => {
+    const uyu = uyuOf(price, currency);
+    if (uyu !== null) onSimulatePrice(uyu, title);
+  };
+  const rateChangedSinceAnalysis =
+    !!result?.rateUsed && !!rate && Math.abs(result.rateUsed - rate.rate) > 0.005;
+
   return (
     <div className="space-y-6">
       {/* Input Section */}
@@ -377,11 +400,9 @@ export function UrlAnalyzer({
                 {/* Simulate Button (if in stock) */}
                 {targetIsAvailable && (
                   <button
+                    disabled={uyuOf(result.targetProduct.price, result.targetProduct.currency) === null}
                     onClick={() =>
-                      onSimulatePrice(
-                        result.targetProduct.priceUyu,
-                        result.targetProduct.title
-                      )
+                      simulate(result.targetProduct.price, result.targetProduct.currency, result.targetProduct.title)
                     }
                     className="inline-flex items-center gap-1.5 rounded-md bg-black text-white dark:bg-white dark:text-black px-3 py-1.5 text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
                   >
@@ -498,18 +519,16 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                     <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
                       PRECIO DE REFERENCIA
                     </span>
-                    <span className="num text-2xl font-black text-black dark:text-white">
-                      {targetIsAvailable
-                        ? formatMoney(
-                            result.targetProduct.price,
-                            result.targetProduct.currency
-                          )
-                        : "Sin Precio Activo"}
-                    </span>
-                    {targetIsAvailable && result.targetProduct.currency === "USD" && (
-                      <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-1.5 num font-semibold">
-                        (≈ {formatUyu(result.targetProduct.priceUyu)})
-                      </span>
+                    {targetIsAvailable ? (
+                      <PriceWithEquivalent
+                        amount={result.targetProduct.price}
+                        currency={result.targetProduct.currency}
+                        rate={rate}
+                        className="num text-2xl font-black text-black dark:text-white"
+                        equivalentClassName="text-xs font-semibold text-zinc-600 dark:text-zinc-400"
+                      />
+                    ) : (
+                      <span className="text-2xl font-black text-black dark:text-white">Sin Precio Activo</span>
                     )}
                   </div>
 
@@ -532,6 +551,38 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                 </div>
               </div>
             </div>
+
+            {rateChangedSinceAnalysis && rate && result.rateUsed && (
+              <p
+                role="status"
+                className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+              >
+                El rango de mercado y las diferencias porcentuales de abajo se calcularon con el dólar a{" "}
+                <span className="num font-bold">{formatRate(result.rateUsed)}</span>; la cotización en uso ahora es{" "}
+                <span className="num font-bold">{formatRate(rate.rate)}</span>. Volvé a auditar el enlace para
+                actualizarlos. Los precios de cada publicación sí usan la cotización vigente.
+              </p>
+            )}
+
+            {result.unsupported && result.unsupported.length > 0 && (
+              <div
+                role="alert"
+                className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+              >
+                <p className="font-bold">
+                  {result.unsupported.length}{" "}
+                  {result.unsupported.length === 1 ? "publicación quedó" : "publicaciones quedaron"} fuera del cálculo
+                  por estar en una moneda que UyMargin no convierte.
+                </p>
+                <ul className="mt-1.5 space-y-0.5 pl-4">
+                  {result.unsupported.slice(0, 5).map((u) => (
+                    <li key={u.id}>
+                      {u.title}: <span className="num font-bold">{u.currency || "moneda sin indicar"} {u.price}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Benchmark Cards */}
             <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2.5">
@@ -741,16 +792,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
 
                         {/* Precios */}
                         <td className="py-3 font-bold num text-zinc-900 dark:text-zinc-100">
-                          <div>
-                            <p className="font-black text-black dark:text-white">
-                              {formatUyu(seller.priceUyu)}
-                            </p>
-                            {seller.currency === "USD" && (
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
-                                {formatMoney(seller.price, seller.currency)}
-                              </p>
-                            )}
-                          </div>
+                          <PriceWithEquivalent amount={seller.price} currency={seller.currency} rate={rate} />
                         </td>
 
                         {/* Diferencia % */}
@@ -796,11 +838,9 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                         <td className="py-3 text-right">
                           <div className="inline-flex items-center gap-2">
                             <button
+                              disabled={uyuOf(seller.price, seller.currency) === null}
                               onClick={() =>
-                                onSimulatePrice(
-                                  seller.priceUyu,
-                                  `${result.targetProduct.title} (${seller.seller})`
-                                )
+                                simulate(seller.price, seller.currency, `${result.targetProduct.title} (${seller.seller})`)
                               }
                               title="Simular margen con este precio de venta"
                               className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
@@ -903,9 +943,7 @@ loading="lazy" decoding="async"                               src={item.thumbnai
 
                     <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
                       <div className="min-w-0">
-                        <span className="num text-xs font-black text-black dark:text-white block">
-                          {formatMoney(item.price, item.currency)}
-                        </span>
+                        <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
                         {item.salesVolume && (
                           <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                             {item.salesVolume}
@@ -916,12 +954,8 @@ loading="lazy" decoding="async"                               src={item.thumbnai
                       <div className="ml-auto flex shrink-0 items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() =>
-                            onSimulatePrice(
-                              item.currency === "USD" ? Math.round(item.price * exchangeRate) : item.price,
-                              item.title
-                            )
-                          }
+                          disabled={uyuOf(item.price, item.currency) === null}
+                          onClick={() => simulate(item.price, item.currency, item.title)}
                           title="Simular rentabilidad con este competidor"
                           className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white"
                         >

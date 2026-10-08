@@ -94,7 +94,9 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
           }
           hint={
             inputs.cost.currency === "USD"
-              ? `≈ ${formatUyu(costs.merchandise)} al cambio ${formatRate(inputs.exchangeRate)}`
+              ? inputs.exchangeRate > 0
+                ? `≈ ${formatUyu(costs.merchandise)} al cambio ${formatRate(inputs.exchangeRate)}`
+                : "Falta la cotización del dólar para pasarlo a pesos"
               : inputs.exchangeRate > 0
                 ? `≈ ${formatUsd(costs.merchandise / inputs.exchangeRate)}`
                 : undefined
@@ -118,7 +120,11 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
               onChange={(currency) => onChange({ freight: { ...inputs.freight, currency } })}
             />
           }
-          hint={`Costo puesto: ${formatUyu(costs.landed)}`}
+          hint={
+            inputs.exchangeRate <= 0 && (inputs.cost.currency === "USD" || inputs.freight.currency === "USD")
+              ? "Costo puesto: pendiente (falta la cotización)"
+              : `Costo puesto: ${formatUyu(costs.landed)}`
+          }
         />
 
         <div className="sm:col-span-2">

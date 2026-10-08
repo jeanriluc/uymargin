@@ -39,6 +39,8 @@ interface ProfitHeroCardProps {
   inputs: AnalysisInputs;
   analysis: MultichannelAnalysis;
   bestChannel: "ml" | "direct";
+  /** Hay montos en dólares y no hay cotización: el resultado queda pendiente. */
+  rateMissing?: boolean;
   /** Sale price that reaches the target net margin, when it can be computed. */
   targetMarginPrice?: number | null;
   onSelectSalePrice?: (price: number) => void;
@@ -51,6 +53,7 @@ export function ProfitHeroCard({
   inputs,
   analysis,
   bestChannel,
+  rateMissing = false,
   targetMarginPrice,
   onSelectSalePrice,
   onUpdateCostAmount,
@@ -65,7 +68,7 @@ export function ProfitHeroCard({
   const price = inputs.salePrice || 0;
   const hasPrice = price > 0;
   const hasCost = analysis.costs.landed > 0;
-  const isReady = hasPrice && hasCost;
+  const isReady = hasPrice && hasCost && !rateMissing;
 
   const winningResult = bestChannel === "direct" ? analysis.direct : analysis.ml;
   const losingResult = bestChannel === "direct" ? analysis.ml : analysis.direct;
@@ -111,7 +114,9 @@ export function ProfitHeroCard({
     setStressPct(null);
   };
 
-  const missing = !hasCost && !hasPrice
+  const missing = rateMissing
+    ? { pill: "Falta la cotización del dólar", field: "header-rate", action: "Ingresar cotización" }
+    : !hasCost && !hasPrice
     ? { pill: "Faltan costo y precio", field: "wholesale-cost", action: "Cargar el costo" }
     : !hasCost
       ? { pill: "Falta el costo", field: "wholesale-cost", action: "Cargar el costo" }
@@ -177,6 +182,8 @@ export function ProfitHeroCard({
                     </span>
                   </>
                 )
+              ) : rateMissing ? (
+                "Falta la cotización del dólar: tu costo está en dólares y no se puede calcular"
               ) : !hasCost && !hasPrice ? (
                 "Cargá el costo y el precio para ver cuánto te queda limpio"
               ) : !hasCost ? (

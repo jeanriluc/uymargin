@@ -38,6 +38,8 @@ export type MluErrorCode =
   | "BAD_REQUEST"
   | "AUTH_REQUIRED"
   | "NO_RESULTS"
+  | "UNSUPPORTED_CURRENCY"
+  | "RATE_UNAVAILABLE"
   | "RATE_LIMITED"
   | "UPSTREAM_ERROR"
   | "NETWORK";
@@ -50,7 +52,20 @@ export interface MluSearchSuccess {
   items: MluItem[];
   /** Stats in UYU, computed with the exchange rate supplied in the request. */
   stats: MarketStats | null;
+  /** Cotización con la que el servidor calculó `stats`. */
+  rateUsed?: number;
+  /** Publicaciones en una moneda que no convertimos: se informan, no se calculan. */
+  unsupported?: UnsupportedListing[];
   fetchedAt: string;
+}
+
+export interface UnsupportedListing {
+  id: string;
+  title: string;
+  price: number;
+  /** currency_id tal como lo informa Mercado Libre. */
+  currency: string;
+  permalink: string;
 }
 
 export interface MluSearchError {
@@ -61,10 +76,18 @@ export interface MluSearchError {
 
 export type MluSearchResponse = MluSearchSuccess | MluSearchError;
 
-export interface ExchangeRateResponse {
-  rate: number;
-  source: "dolarapi" | "open-er-api" | "fallback";
-  buy: number | null;
-  sell: number | null;
-  updatedAt: string | null;
-}
+/** Respuesta de /api/exchange-rate. La fuente es el BCU; `stale` indica último valor guardado. */
+export type ExchangeRateResponse =
+  | {
+      ok: true;
+      rate: number;
+      buy: number;
+      sell: number;
+      /** Fecha del cierre del BCU al que corresponde (AAAA-MM-DD). */
+      referenceDate: string;
+      source: "bcu";
+      fetchedAt: string;
+      stale: boolean;
+      error?: string;
+    }
+  | { ok: false; code: "RATE_UNAVAILABLE"; message: string };

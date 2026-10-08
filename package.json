@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test": "tsx scripts/verify_finance.ts"
+    "test": "tsx scripts/verify_finance.ts && tsx scripts/verify_currency.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -21,6 +21,7 @@ import { analyzeAll } from "@/lib/finance/engine";
 import { saveAuditToCloud } from "@/lib/supabase";
 import type { AnalysisInputs } from "@/lib/finance/types";
 import type { MluSearchResponse } from "@/lib/mlu/types";
+import { normalizeCurrency } from "@/lib/currency";
 
 export interface BatchItemInput {
   sku: string;
@@ -71,6 +72,8 @@ export function BatchAuditor({
 }: BatchAuditorProps) {
   const [rawText, setRawText] = useState("");
   const [items, setItems] = useState<BatchItemInput[]>(SAMPLE_CATALOG);
+  // Filas que no se calculan porque no se sabe en qué moneda está el costo.
+  const [rejectedRows, setRejectedRows] = useState<{ line: string; reason: string }[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<{ current: number; total: number; currentName: string }>({
     current: 0,
@@ -90,6 +93,7 @@ export function BatchAuditor({
       .filter((l) => l.length > 0);
 
     const parsed: BatchItemInput[] = [];
+    const rejected: { line: string; reason: string }[] = [];
     for (const line of lines) {
       // Support comma, semicolon, or tab separation
       const parts = line.split(/[,;\t]/).map((p) => p.trim().replace(/^["']|["']$/g, ""));
@@ -97,23 +101,33 @@ export function BatchAuditor({
         let sku = parts[0];
         let name = parts[1];
         let costStr = parts[2] || "0";
-        let currStr = (parts[3] || "USD").toUpperCase();
+        let currStr = parts[3] || "";
 
         // If first column looks like a name without SKU
         if (isNaN(Number(parts[1])) && parts.length === 2) {
           sku = `SKU-${parsed.length + 1}`;
           name = parts[0];
           costStr = parts[1];
+          currStr = "";
         }
 
         const cost = parseFloat(costStr.replace("$", "").replace(",", ".")) || 0;
-        const currency: "USD" | "UYU" = currStr.includes("UY") || currStr.includes("PESO") ? "UYU" : "USD";
+        // La moneda tiene que venir indicada: no se asume dólares ni pesos.
+        const currency = normalizeCurrency(currStr);
 
         if (name && cost > 0) {
-          parsed.push({ sku, name, cost, currency });
+          if (currency) {
+            parsed.push({ sku, name, cost, currency });
+          } else {
+            rejected.push({
+              line,
+              reason: currStr ? `moneda no reconocida ("${currStr}")` : "falta la moneda (USD o UYU)",
+            });
+          }
         }
       }
     }
+    setRejectedRows(rejected);
     return parsed;
   };
 
@@ -142,6 +156,7 @@ export function BatchAuditor({
   };
 
   const handleLoadSample = () => {
+    setRejectedRows([]);
     setItems(SAMPLE_CATALOG);
     setRawText(
       SAMPLE_CATALOG.map((i) => `${i.sku}, ${i.name}, ${i.cost}, ${i.currency}`).join("\n")
@@ -363,6 +378,25 @@ export function BatchAuditor({
           placeholder="Ej:&#10;STAN-950, Botella termo Stanley Classic 950 ml, 26, USD&#10;F9-TWS, Auriculares Bluetooth F9-5 TWS, 3.8, USD&#10;XION-105, Olla a presion electrica 5 lts Xion, 1750, UYU"
           className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 font-mono text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-hidden focus:ring-1 focus:ring-black dark:focus:ring-white"
         />
+
+        {rejectedRows.length > 0 && (
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+          >
+            <p className="font-bold">
+              {rejectedRows.length} {rejectedRows.length === 1 ? "fila no se va a calcular" : "filas no se van a calcular"}:
+              indicá la moneda del costo (USD o UYU) en la cuarta columna.
+            </p>
+            <ul className="mt-1.5 space-y-0.5 pl-4">
+              {rejectedRows.slice(0, 6).map((r, i) => (
+                <li key={i}>
+                  <span className="num">{r.line}</span> — {r.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
