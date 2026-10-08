@@ -50,13 +50,17 @@ function read(): HistoryEntry[] {
   return cachedValue;
 }
 
-function write(entries: HistoryEntry[]): void {
+/** Returns false when the browser refused the write (storage full, private mode). */
+function write(entries: HistoryEntry[]): boolean {
+  let saved = true;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, MAX_ENTRIES)));
   } catch (err) {
     console.warn("[history] no se pudo guardar en localStorage", err);
+    saved = false;
   }
   listeners.forEach((l) => l());
+  return saved;
 }
 
 /** useSyncExternalStore-compatible store backed by localStorage */
@@ -74,8 +78,8 @@ export const historyStore = {
   },
   getSnapshot: read,
   getServerSnapshot: () => EMPTY,
-  add(entry: HistoryEntry) {
-    write([entry, ...read()]);
+  add(entry: HistoryEntry): boolean {
+    return write([entry, ...read()]);
   },
   remove(id: string) {
     write(read().filter((e) => e.id !== id));

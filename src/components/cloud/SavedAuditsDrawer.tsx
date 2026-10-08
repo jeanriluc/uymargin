@@ -35,11 +35,23 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
     setLoading(false);
   }
 
+  // Deleting is permanent in Supabase: the first tap arms the button, the second one deletes.
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   async function handleDelete(id?: string) {
     if (!id) return;
+    if (pendingDeleteId !== id) {
+      setDeleteError(null);
+      setPendingDeleteId(id);
+      return;
+    }
+    setPendingDeleteId(null);
     const res = await deleteCloudAudit(id);
     if (res.ok) {
       setAudits((prev) => prev.filter((a) => a.id !== id));
+    } else {
+      setDeleteError(res.error || "No se pudo eliminar la auditoría de la nube.");
     }
   }
 
@@ -104,6 +116,12 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
               <Loader2 className="size-6 animate-spin mb-2" />
               <p className="text-xs">Cargando auditorías de Supabase...</p>
             </div>
+          )}
+
+          {deleteError && (
+            <p role="alert" className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-300">
+              {deleteError}
+            </p>
           )}
 
           {!loading && error && (
@@ -196,11 +214,19 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
                       </a>
                     )}
                     <button
+                      type="button"
                       onClick={() => handleDelete(item.id)}
-                      className="rounded p-1 text-zinc-500 dark:text-zinc-400 hover:text-red-500 transition-colors"
+                      onBlur={() => setPendingDeleteId((cur) => (cur === item.id ? null : cur))}
+                      className={`inline-flex items-center justify-center gap-1 rounded p-1 transition-colors ${
+                        pendingDeleteId === item.id
+                          ? "bg-red-600 px-2 text-[11px] font-bold uppercase text-white"
+                          : "text-zinc-500 dark:text-zinc-400 hover:text-red-600"
+                      }`}
                       title="Eliminar de la nube"
+                      aria-label={pendingDeleteId === item.id ? `Confirmar: eliminar ${item.title} de la nube` : `Eliminar ${item.title} de la nube`}
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-3.5" aria-hidden />
+                      {pendingDeleteId === item.id && <span>¿Eliminar?</span>}
                     </button>
                     <button
                       onClick={() => {

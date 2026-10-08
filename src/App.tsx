@@ -5,6 +5,7 @@ import {
   Copy,
   FileSpreadsheet,
   Printer,
+  RotateCcw,
   Save,
   Share2,
   ShoppingBag,
@@ -12,7 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-import { Header, type ConnectionStatus } from "@/components/layout/Header";
+import { Header, type CloudStatus, type ConnectionStatus } from "@/components/layout/Header";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { MarketSummary, type MarketState } from "@/components/search/MarketSummary";
 import { UrlAnalyzer } from "@/components/search/UrlAnalyzer";
@@ -34,6 +35,8 @@ import { exportAuditToCsv } from "@/lib/export/csv";
 import { createDefaultInputs } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
+import { loadDraft, saveDraft } from "@/lib/storage/draft";
+import { getSupabaseConfig, testSupabaseConnection } from "@/lib/supabase";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
 import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
 
@@ -46,7 +49,7 @@ import type {
 import type { MarketStats, ExchangeRateResponse } from "@/lib/mlu/types";
 
 export default function App() {
-  const [inputs, setInputs] = useState<AnalysisInputs>(createDefaultInputs());
+  const [inputs, setInputs] = useState<AnalysisInputs>(() => loadDraft(createDefaultInputs()));
   const [marketState, setMarketState] = useState<MarketState>({ status: "idle" });
   const [stats, setStats] = useState<MarketStats | null>(null);
   const [marketSource, setMarketSource] = useState<"mlu" | "manual" | null>(null);
@@ -63,6 +66,8 @@ export default function App() {
   const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus>("off");
 
   const [searchTab, setSearchTab] = useState<"keyword" | "url" | "batch">("keyword");
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
@@ -109,6 +114,28 @@ export default function App() {
   const updateDirect = useCallback((patch: Partial<DirectChannelSettings>) => {
     setInputs((prev) => ({ ...prev, direct: { ...prev.direct, ...patch } }));
   }, []);
+
+  // Keep the simulation in progress across reloads.
+  useEffect(() => {
+    const id = window.setTimeout(() => saveDraft(inputs), 400);
+    return () => window.clearTimeout(id);
+  }, [inputs]);
+
+  // Read-only check so the cloud indicator reflects the real connection.
+  const checkCloud = useCallback(async () => {
+    const { url, key } = getSupabaseConfig();
+    if (!url || !key) {
+      setCloudStatus("off");
+      return;
+    }
+    setCloudStatus("checking");
+    const res = await testSupabaseConnection();
+    setCloudStatus(res.ok ? "ok" : "error");
+  }, []);
+
+  useEffect(() => {
+    checkCloud();
+  }, [checkCloud]);
 
   // Fetch exchange rate on mount
   const fetchRate = useCallback(async () => {
@@ -239,9 +266,14 @@ export default function App() {
         viability: analysis.direct.viability,
       },
     };
-    historyStore.add(entry);
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    if (historyStore.add(entry)) {
+      setSaveFailed(false);
+      setSavedSuccess(true);
+      setTimeout(() => setSavedSuccess(false), 2500);
+    } else {
+      setSaveFailed(true);
+      setTimeout(() => setSaveFailed(false), 5000);
+    }
   };
 
   const handleLoadEntry = (entry: HistoryEntry) => {
@@ -293,6 +325,24 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     window.open(url, "_blank");
   };
 
+  // Clears the product being analysed; tax regime, channel settings and exchange rate stay.
+  const handleNewSimulation = () => {
+    setInputs((prev) => ({
+      ...prev,
+      productName: "",
+      query: "",
+      cost: { ...prev.cost, amount: 0 },
+      freight: { ...prev.freight, amount: 0 },
+      salePrice: 0,
+    }));
+    setStats(null);
+    setMarketSource(null);
+    setManualPrices("");
+    setMarketState({ status: "idle" });
+    setStatus("idle");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleExportCsv = () => {
     exportAuditToCsv(inputs, analysis.ml, analysis.direct, analysis.costs.landed);
   };
@@ -326,6 +376,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         rateLoading={rateLoading}
         onRefreshRate={fetchRate}
         status={status}
+        cloudStatus={cloudStatus}
         onOpenAiAdvisor={() => setAiAdvisorOpen(true)}
         onOpenCloudModal={() => setSupabaseModalOpen(true)}
         onOpenSavedAudits={() => setSavedAuditsOpen(true)}
@@ -374,6 +425,18 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
 
             {/* Right: Quick Action Buttons */}
             <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+              {(inputs.cost.amount > 0 || inputs.salePrice > 0 || inputs.productName) && (
+                <button
+                  type="button"
+                  onClick={handleNewSimulation}
+                  className="flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+                  title="Empezar una simulación nueva (conserva régimen y canales)"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden />
+                  <span>Nueva</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleExportCsv}
@@ -430,7 +493,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 className="flex items-center gap-1.5 rounded-md bg-black hover:bg-zinc-800 text-white dark:bg-white dark:text-black dark:hover:bg-zinc-200 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:pointer-events-none active:scale-95"
               >
                 {savedSuccess ? <Check className="size-3.5" /> : <Save className="size-3.5" />}
-                <span>{savedSuccess ? "Guardado" : "Guardar"}</span>
+                <span>{savedSuccess ? "Guardado" : saveFailed ? "No se pudo guardar" : "Guardar"}</span>
               </button>
             </div>
           </div>
@@ -634,8 +697,14 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
       {/* Supabase Cloud Settings Modal */}
       <SupabaseModal
         isOpen={supabaseModalOpen}
-        onClose={() => setSupabaseModalOpen(false)}
-        onConnected={() => setSupabaseModalOpen(false)}
+        onClose={() => {
+          setSupabaseModalOpen(false);
+          checkCloud();
+        }}
+        onConnected={() => {
+          setSupabaseModalOpen(false);
+          checkCloud();
+        }}
       />
 
       {/* Supabase Saved Audits Drawer */}

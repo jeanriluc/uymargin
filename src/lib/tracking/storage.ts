@@ -3,7 +3,9 @@ import { getSupabaseClient } from "@/lib/supabase";
 
 const STORAGE_KEY = "uymargin_tracked_competitors";
 
-// Initial seed data with realistic historical price points from Mercado Libre Uruguay
+// Example records kept for reference only. They are NOT loaded into the app: tracked competitors
+// must come from real listings the user adds (PRODUCT.md, "Evidencia real, nunca fabricada").
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const INITIAL_TRACKED_ITEMS: TrackedCompetitor[] = [
   {
     id: "MLU36006952",
@@ -95,32 +97,31 @@ const INITIAL_TRACKED_ITEMS: TrackedCompetitor[] = [
   },
 ];
 
-/** Retrieve all tracked competitors from localStorage (with fallback seed). */
+/** Retrieve all tracked competitors from localStorage. Empty until the user adds one. */
 export function getTrackedCompetitors(): TrackedCompetitor[] {
-  if (typeof window === "undefined") return INITIAL_TRACKED_ITEMS;
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_TRACKED_ITEMS));
-      return INITIAL_TRACKED_ITEMS;
-    }
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_TRACKED_ITEMS;
+    return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     console.error("Failed to load tracked competitors from storage", e);
-    return INITIAL_TRACKED_ITEMS;
+    return [];
   }
 }
 
 /** Sync tracked items to Supabase cloud if connected */
-export async function syncTrackedToSupabase(items: TrackedCompetitor[]): Promise<void> {
-  if (typeof window === "undefined") return;
+export async function syncTrackedToSupabase(items: TrackedCompetitor[]): Promise<{ ok: boolean; failed: number }> {
+  if (typeof window === "undefined") return { ok: true, failed: 0 };
   const client = getSupabaseClient();
-  if (!client || items.length === 0) return;
+  if (!client || items.length === 0) return { ok: true, failed: 0 };
 
+  let failed = 0;
   try {
     for (const item of items) {
-      await client.from("competitor_tracking").upsert({
+      // supabase-js reports failures in `error` instead of throwing.
+      const { error } = await client.from("competitor_tracking").upsert({
         id: item.id,
         product_id: item.productId || item.id,
         title: item.title,
@@ -143,10 +144,19 @@ export async function syncTrackedToSupabase(items: TrackedCompetitor[]): Promise
         status: item.status,
         last_checked: item.lastChecked,
       });
+      if (error) {
+        failed++;
+        console.warn("[syncTrackedToSupabase] no se pudo sincronizar", item.id, error.message);
+      }
     }
   } catch (err) {
     console.warn("[syncTrackedToSupabase] error syncing items:", err);
+    return { ok: false, failed: items.length };
   }
+  if (failed > 0) {
+    window.dispatchEvent(new CustomEvent("uymargin_tracking_sync_failed", { detail: { failed } }));
+  }
+  return { ok: failed === 0, failed };
 }
 
 /** Save full list to storage */

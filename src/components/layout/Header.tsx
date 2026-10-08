@@ -4,6 +4,14 @@ import { NumberField } from "@/components/ui/NumberField";
 import { ThemeToggle } from "./ThemeToggle";
 
 export type ConnectionStatus = "online" | "manual" | "offline" | "idle";
+export type CloudStatus = "off" | "checking" | "ok" | "error";
+
+const CLOUD: Record<CloudStatus, { dot: string; label: string }> = {
+  off: { dot: "bg-zinc-400", label: "Nube sin configurar" },
+  checking: { dot: "bg-zinc-400 animate-pulse", label: "Comprobando conexión con la nube" },
+  ok: { dot: "bg-emerald-500", label: "Nube conectada" },
+  error: { dot: "bg-amber-500", label: "La nube no responde: revisá la configuración" },
+};
 
 const STATUS: Record<ConnectionStatus, { label: string; badgeClass: string; Icon: typeof Wifi }> = {
   idle: { label: "MLU LISTO", badgeClass: "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 border-zinc-300 dark:border-zinc-700", Icon: Zap },
@@ -25,6 +33,7 @@ interface HeaderProps {
   rateLoading: boolean;
   onRefreshRate: () => void;
   status: ConnectionStatus;
+  cloudStatus: CloudStatus;
   onOpenAiAdvisor: () => void;
   onOpenCloudModal: () => void;
   onOpenSavedAudits: () => void;
@@ -37,6 +46,7 @@ export function Header({
   rateLoading,
   onRefreshRate,
   status,
+  cloudStatus,
   onOpenAiAdvisor,
   onOpenCloudModal,
   onOpenSavedAudits,
@@ -115,10 +125,10 @@ export function Header({
               type="button"
               onClick={onOpenSavedAudits}
               className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-2 text-xs font-black uppercase tracking-wider rounded-l-md transition-all cursor-pointer text-zinc-800 dark:text-zinc-200"
-              title="Ver auditorías en Supabase"
-              aria-label="Ver auditorías guardadas en la nube"
+              title={`${CLOUD[cloudStatus].label}. Ver auditorías guardadas`}
+              aria-label={`${CLOUD[cloudStatus].label}. Ver auditorías guardadas en la nube`}
             >
-              <span className="size-2 rounded-full bg-emerald-500"></span>
+              <span aria-hidden className={`size-2 rounded-full ${CLOUD[cloudStatus].dot}`}></span>
               <span className="hidden sm:inline">Nube</span>
             </button>
             <button
