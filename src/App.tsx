@@ -3,10 +3,14 @@ import {
   Bot,
   Check,
   Copy,
+  Cloud,
   FileSpreadsheet,
+  History,
+  Link2,
   Printer,
   RotateCcw,
   Save,
+  Search,
   Share2,
   ShoppingBag,
   Store,
@@ -62,6 +66,17 @@ function PanelFallback() {
     </div>
   );
 }
+
+type ToolId = "keyword" | "url" | "batch" | "copilot" | "cloud" | "history";
+
+const TOOLS: { id: ToolId; label: string; Icon: typeof Bot }[] = [
+  { id: "keyword", label: "Buscar precio de mercado", Icon: Search },
+  { id: "url", label: "Analizar un enlace de Mercado Libre", Icon: Link2 },
+  { id: "batch", label: "Cargar un catálogo CSV", Icon: FileSpreadsheet },
+  { id: "copilot", label: "Preguntarle al copiloto", Icon: Bot },
+  { id: "cloud", label: "Auditorías en la nube", Icon: Cloud },
+  { id: "history", label: "Historial", Icon: History },
+];
 
 /** Stays true once `flag` has been true, so a lazy overlay keeps its state after closing. */
 function useEverTrue(flag: boolean): boolean {
@@ -391,6 +406,34 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
+  const openTool = (id: ToolId) => {
+    if (id === "copilot") return setAiAdvisorOpen(true);
+    if (id === "cloud") return setSavedAuditsOpen(true);
+    if (id === "history") return scrollToSection("historial");
+    setSearchTab(id);
+    // Wait for the tab to render before scrolling to it.
+    requestAnimationFrame(() => scrollToSection("mercado"));
+  };
+
+  const renderTools = (visibility: string) => (
+    <nav aria-label="Herramientas" className={`${visibility} flex-wrap items-center gap-2`}>
+      <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+        También podés:
+      </span>
+      {TOOLS.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => openTool(id)}
+          className="inline-flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-surface px-3 py-1.5 text-xs font-bold text-zinc-800 dark:text-zinc-200 transition-colors hover:border-black dark:hover:border-white cursor-pointer"
+        >
+          <Icon className="size-3.5" aria-hidden />
+          <span>{label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+
   return (
     <div className="min-h-screen bg-[#f5f5f6] dark:bg-[#0c0c0e] text-[#121212] dark:text-[#f2f2f3] flex flex-col font-sans transition-colors bg-editorial-dots">
       <Header
@@ -463,6 +506,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 </button>
               )}
 
+              {isReady && (
+                <>
               <button
                 type="button"
                 onClick={handleExportCsv}
@@ -470,7 +515,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 title="Descargar auditoría en formato Excel / CSV"
               >
                 <FileSpreadsheet className="size-3.5 text-emerald-600" />
-                <span className="hidden sm:inline">CSV</span>
+                <span>CSV</span>
               </button>
 
               <button
@@ -480,7 +525,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 title="Imprimir / Exportar Ficha Oficial en PDF"
               >
                 <Printer className="size-3.5" />
-                <span className="hidden sm:inline">PDF</span>
+                <span>PDF</span>
               </button>
 
               <button
@@ -490,7 +535,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 title="Copiar resumen al portapapeles"
               >
                 {copiedSummary ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                <span className="hidden sm:inline">{copiedSummary ? "Copiado" : copyFailed ? "No se pudo copiar" : "Copiar"}</span>
+                <span>{copiedSummary ? "Copiado" : copyFailed ? "No se pudo copiar" : "Copiar"}</span>
               </button>
 
               <button
@@ -500,16 +545,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 title="Compartir veredicto por WhatsApp"
               >
                 <Share2 className="size-3.5" />
-                <span className="hidden sm:inline">WhatsApp</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAiAdvisorOpen(true)}
-                className="flex items-center gap-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-all cursor-pointer"
-              >
-                <Bot className="size-3.5" />
-                <span>Copilot IA</span>
+                <span>WhatsApp</span>
               </button>
 
               <button
@@ -521,9 +557,14 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 {savedSuccess ? <Check className="size-3.5" /> : <Save className="size-3.5" />}
                 <span>{savedSuccess ? "Guardado" : saveFailed ? "No se pudo guardar" : "Guardar"}</span>
               </button>
+                </>
+              )}
             </div>
           </div>
         </section>
+
+        {/* Desktop: tools up front. Mobile: after the verdict, so cost and price stay on the first screen. */}
+        {renderTools("hidden lg:flex")}
 
         {/* Steps 1 and 2: what you pay, what you charge */}
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
@@ -560,6 +601,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             updateInputs({ exchangeRate: newRate });
           }}
         />
+
+        {renderTools("flex lg:hidden")}
 
         {/* Channel battle */}
         <section aria-labelledby="channels-heading" className="flex flex-col gap-4">
@@ -705,7 +748,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         </section>
 
         {/* History Vault Section */}
-        <section aria-label="Historial de Simulaciones" className="mt-2">
+        <section id="historial" aria-label="Historial de Simulaciones" className="scroll-mt-24 mt-2">
           <HistorySection onLoadEntry={handleLoadEntry} />
         </section>
       </main>
