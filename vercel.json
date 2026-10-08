@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "functions": {
+    "api/search-mlu.ts": { "maxDuration": 60 },
+    "api/analyze-url.ts": { "maxDuration": 60 },
+    "api/chat.ts": { "maxDuration": 60 },
+    "api/exchange-rate.ts": { "maxDuration": 30 },
+    "api/tracking/check.ts": { "maxDuration": 10 }
+  },
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

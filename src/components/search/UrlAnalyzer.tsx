@@ -1,79 +1,45 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Link as LinkIcon,
   Search,
   Loader2,
   ExternalLink,
-  Users,
   Store,
   Truck,
-  TrendingDown,
-  TrendingUp,
   Calculator,
   Cloud,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
-  Package,
   PackageSearch,
   Star,
-  Award,
-  ShieldCheck,
-  Check,
   Sparkles,
-  SlidersHorizontal,
 } from "lucide-react";
-import { formatMoney, formatUyu } from "@/lib/format";
+import { formatUyu } from "@/lib/format";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
-import type { UnsupportedListing } from "@/lib/mlu/types";
+import type { ExactProductBlock, UnsupportedListing } from "@/lib/mlu/types";
+import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { formatRate } from "@/lib/format";
 import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
 
 export interface AnalyzedProductData {
   id: string;
   title: string;
+  /** Precio de referencia: el de la oferta exacta más barata. 0 si no hay ofertas activas. */
   price: number;
   priceUyu: number;
   currency: "UYU" | "USD";
   thumbnail: string | null;
   permalink: string;
-  seller: string;
-  sellerCity: string;
-  condition: "new" | "used" | "other";
+  /** Apodo del vendedor de la oferta más barata. null = no disponible. */
+  seller: string | null;
+  sellerCity: string | null;
+  condition: "new" | "used" | "other" | null;
   freeShipping: boolean;
   isAvailable?: boolean;
-  stockStatus?: string;
-  salesVolume?: string;
-  sellerBadge?: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation?: string;
-  positivePercentage?: number;
-  ratingAverage?: number;
-  reviewsCount?: number;
   activeSellersCount?: number;
-}
-
-export interface SameProductSeller {
-  id: string;
-  price: number;
-  priceUyu: number;
-  currency: "UYU" | "USD";
-  seller: string;
-  sellerCity: string;
-  permalink: string;
-  freeShipping: boolean;
-  differencePercent?: number;
-  isAvailable?: boolean;
-  stockStatus?: string;
-  salesVolume?: string;
-  sellerBadge?: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation?: string;
-  positivePercentage?: number;
-  ratingAverage?: number;
-  reviewsCount?: number;
-  isOfficialStore?: boolean;
-  isTopSeller?: boolean;
 }
 
 export interface SimilarProductItem {
@@ -104,7 +70,8 @@ export interface UrlAuditResponse {
   /** Publicaciones en una moneda no soportada: se informan, no se calculan. */
   unsupported?: UnsupportedListing[];
   targetProduct: AnalyzedProductData;
-  sameProductSellers: SameProductSeller[];
+  /** Ofertas del mismo producto de catálogo ("Productos exactos"). */
+  exact: ExactProductBlock;
   similarProducts: SimilarProductItem[];
   marketStats: {
     min: number;
@@ -151,10 +118,6 @@ export function UrlAnalyzer({
   const [savingToCloud, setSavingToCloud] = useState(false);
   const [cloudSavedSuccess, setCloudSavedSuccess] = useState(false);
   const [cloudError, setCloudError] = useState<string | null>(null);
-
-  // Filters & Sorting for sellers
-  const [sellerFilter, setSellerFilter] = useState<"all" | "official_leader" | "free_shipping">("all");
-  const [sellerSort, setSellerSort] = useState<"top" | "price_asc" | "diff">("top");
 
   async function handleAnalyze(targetUrl?: string) {
     const inputUrl = (targetUrl ?? url).trim();
@@ -206,13 +169,13 @@ export function UrlAnalyzer({
       competitor_min: result.marketStats.min,
       competitor_median: result.marketStats.median,
       competitor_max: result.marketStats.max,
-      competitor_count: result.sameProductSellers.length + result.similarProducts.length,
-      same_product_sellers: result.sameProductSellers.map((s) => ({
-        seller: s.seller,
-        price: s.price,
-        currency: s.currency,
-        priceUyu: s.priceUyu,
-        permalink: s.permalink,
+      competitor_count: result.exact.offers.length + result.similarProducts.length,
+      same_product_sellers: result.exact.offers.map((o) => ({
+        seller: o.seller?.nickname ?? "no disponible",
+        price: o.price,
+        currency: o.currency,
+        priceUyu: o.priceUyu,
+        permalink: o.permalink,
       })),
       similar_products: result.similarProducts.map((p) => ({
         title: p.title,
@@ -233,38 +196,6 @@ export function UrlAnalyzer({
     }
   }
 
-  // Filter and sort same-product sellers
-  const filteredSellers = useMemo(() => {
-    if (!result) return [];
-    let list = [...result.sameProductSellers];
-
-    if (sellerFilter === "official_leader") {
-      list = list.filter(
-        (s) =>
-          s.sellerBadge === "Tienda Oficial" ||
-          s.sellerBadge === "MercadoLíder Platinum" ||
-          s.sellerBadge === "MercadoLíder Gold"
-      );
-    } else if (sellerFilter === "free_shipping") {
-      list = list.filter((s) => s.freeShipping);
-    }
-
-    if (sellerSort === "price_asc") {
-      list.sort((a, b) => a.priceUyu - b.priceUyu);
-    } else if (sellerSort === "diff") {
-      list.sort((a, b) => (a.differencePercent ?? 0) - (b.differencePercent ?? 0));
-    } else {
-      // "top": official first, then platinum, then rating
-      list.sort((a, b) => {
-        const aScore = (a.sellerBadge === "Tienda Oficial" ? 50 : a.sellerBadge === "MercadoLíder Platinum" ? 30 : 10) + (a.ratingAverage ?? 4.5) * 5;
-        const bScore = (b.sellerBadge === "Tienda Oficial" ? 50 : b.sellerBadge === "MercadoLíder Platinum" ? 30 : 10) + (b.ratingAverage ?? 4.5) * 5;
-        return bScore - aScore;
-      });
-    }
-
-    return list;
-  }, [result, sellerFilter, sellerSort]);
-
   const targetIsAvailable = result?.targetProduct.isAvailable !== false && (result?.targetProduct.priceUyu ?? 0) > 0;
 
   // Pesos con la cotización vigente (no la del momento del análisis). Null si no se puede convertir.
@@ -283,10 +214,10 @@ export function UrlAnalyzer({
     <div className="space-y-6">
       {/* Input Section */}
       <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
-        <StepHeader title="Auditor de publicación por enlace (MLU)" aside="Solo con stock activo" />
+        <StepHeader title="Auditor de publicación por enlace (MLU)" aside="Producto de catálogo" />
 
         <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
-          Pegá el link de cualquier publicación de Mercado Libre Uruguay. UyMargin audita al instante si tiene stock activo, quién más vende el mismo producto en Uruguay, la reputación de cada tienda (ventas, calificaciones y opiniones positivas) y las mejores alternativas disponibles.
+          Pegá el link de una publicación de Mercado Libre Uruguay. UyMargin muestra las ofertas activas del mismo producto de catálogo con el precio de cada una, los datos del vendedor que informa Mercado Libre y productos similares.
         </p>
 
         <form
@@ -330,7 +261,7 @@ export function UrlAnalyzer({
         {/* Quick sample chips */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
           <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1">
-            PROBAR EJEMPLOS CON STOCK ACTIVO:
+            PROBAR CON UN EJEMPLO:
           </span>
           {SAMPLE_URLS.map((item) => (
             <button
@@ -365,13 +296,13 @@ export function UrlAnalyzer({
                 {/* Real Availability Badge */}
                 {targetIsAvailable ? (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    En Stock Disponible ({result.sameProductSellers.length || 1} en UY)
+                    <span className="size-2 rounded-full bg-emerald-500"></span>
+                    {result.exact.offers.length} {result.exact.offers.length === 1 ? "oferta activa" : "ofertas activas"} en UY
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">
                     <AlertTriangle className="size-3" />
-                    Pausada / Sin Stock en Uruguay
+                    0 ofertas activas en Uruguay
                   </span>
                 )}
               </div>
@@ -419,10 +350,10 @@ export function UrlAnalyzer({
                 <AlertCircle className="size-4 shrink-0 mt-0.5 text-amber-600" />
                 <div>
                   <p className="font-black uppercase tracking-wider text-[11px]">
-                    Atención: Publicación sin stock disponible actualmente
+                    Atención: este producto no tiene ofertas activas
                   </p>
                   <p className="mt-0.5 text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                    Esta publicación específica se encuentra pausada o sin vendedores con entrega inmediata en Uruguay. Para realizar tu estudio de rentabilidad, revisá la tabla de competidores y productos similares con stock verificado a continuación.
+                    Mercado Libre no informa ninguna publicación activa de este producto en Uruguay en este momento, así que no hay precio de referencia. Los productos similares de abajo no son el mismo producto.
                   </p>
                 </div>
               </div>
@@ -466,58 +397,10 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                   <ExternalLink className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
                 </a>
 
-                {/* Pre-Click Seller Quality, Volume & Reviews Bar */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {/* Seller badge */}
-                  {result.targetProduct.sellerBadge === "Tienda Oficial" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                      <Store className="size-3" /> Tienda Oficial
-                    </span>
-                  ) : result.targetProduct.sellerBadge === "MercadoLíder Platinum" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                      <Award className="size-3" /> MercadoLíder Platinum
-                    </span>
-                  ) : result.targetProduct.sellerBadge === "MercadoLíder Gold" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                      <Award className="size-3" /> MercadoLíder Gold
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">
-                      <ShieldCheck className="size-3 text-emerald-500" /> Vendedor Destacado
-                    </span>
-                  )}
-
-                  {/* Rating with stars */}
-                  {result.targetProduct.ratingAverage != null && (
-                  <span className="inline-flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[11px] font-black text-amber-800 dark:text-amber-300">
-                    <Star className="size-3 fill-amber-500 text-amber-500" />
-                    <span>{result.targetProduct.ratingAverage}</span>
-                    {result.targetProduct.reviewsCount != null && (
-                      <span className="text-[11px] font-normal text-amber-700 dark:text-amber-400">({result.targetProduct.reviewsCount} opiniones)</span>
-                    )}
-                  </span>
-                  )}
-
-                  {/* Sales Volume badge */}
-                  {result.targetProduct.salesVolume && (
-                  <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                    <Package className="size-3" aria-hidden /> {result.targetProduct.salesVolume}
-                  </span>
-                  )}
-
-                  {/* Positive reputation % */}
-                  {result.targetProduct.positivePercentage != null && (
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                    <Check className="size-3 text-emerald-500" />
-                    {result.targetProduct.positivePercentage}% opiniones positivas
-                  </span>
-                  )}
-                </div>
-
                 <div className="mt-3.5 flex flex-wrap items-center gap-4 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
                   <div>
                     <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
-                      PRECIO DE REFERENCIA
+                      PRECIO DE REFERENCIA (OFERTA MÁS BARATA)
                     </span>
                     {targetIsAvailable ? (
                       <PriceWithEquivalent
@@ -528,22 +411,26 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                         equivalentClassName="text-xs font-semibold text-zinc-600 dark:text-zinc-400"
                       />
                     ) : (
-                      <span className="text-2xl font-black text-black dark:text-white">Sin Precio Activo</span>
+                      <span className="text-2xl font-black text-black dark:text-white">Sin precio activo</span>
                     )}
                   </div>
 
-                  <div className="border-l border-zinc-200 dark:border-zinc-800 pl-4">
-                    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
-                      TIENDA / VENDEDOR
-                    </span>
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
-                      <Store className="size-3.5 text-zinc-500 dark:text-zinc-400" />
-                      <span>{result.targetProduct.seller}</span>
-                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">({result.targetProduct.sellerCity})</span>
+                  {targetIsAvailable && (
+                    <div className="min-w-0 border-l border-zinc-200 dark:border-zinc-800 pl-4">
+                      <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
+                        VENDEDOR DE ESA OFERTA
+                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
+                        <Store className="size-3.5 text-zinc-500 dark:text-zinc-400" aria-hidden />
+                        <span className="break-words">{result.targetProduct.seller ?? "no disponible"}</span>
+                        {result.targetProduct.sellerCity && (
+                          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">({result.targetProduct.sellerCity})</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {result.targetProduct.freeShipping && (
+                  {targetIsAvailable && result.targetProduct.freeShipping && (
                     <span className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
                       <Truck className="size-3" /> Envío Gratis
                     </span>
@@ -557,10 +444,10 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                 role="status"
                 className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
               >
-                El rango de mercado y las diferencias porcentuales de abajo se calcularon con el dólar a{" "}
+                El rango de mercado de abajo se calculó con el dólar a{" "}
                 <span className="num font-bold">{formatRate(result.rateUsed)}</span>; la cotización en uso ahora es{" "}
                 <span className="num font-bold">{formatRate(rate.rate)}</span>. Volvé a auditar el enlace para
-                actualizarlos. Los precios de cada publicación sí usan la cotización vigente.
+                actualizarlo. Los precios de cada publicación y los productos exactos sí usan la cotización vigente.
               </p>
             )}
 
@@ -584,8 +471,14 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
               </div>
             )}
 
-            {/* Benchmark Cards */}
-            <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2.5">
+            {/* Benchmark Cards: sin precios no hay rango que mostrar */}
+            {result.marketStats.sampleSize > 0 && (
+            <>
+            <p className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+              Rango de mercado: ofertas del producto exacto más los similares de abajo, sin precios atípicos (
+              <span className="num">{result.marketStats.sampleSize}</span> precios).
+            </p>
+            <div className="mt-2.5 grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2.5">
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 p-3">
                 <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                   MÍNIMO ENCONTRADO
@@ -622,249 +515,17 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                 </p>
               </div>
             </div>
-          </div>
-
-          {/* Section 1: Same Product Sold by Other Sellers */}
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <Users className="size-4 text-zinc-600 dark:text-zinc-400" />
-                <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
-                  Mismo Producto: Tiendas que lo venden con Stock en Uruguay
-                </h3>
-              </div>
-              <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                {result.sameProductSellers.length} VENDEDORES ACTIVOS EN UY
-              </span>
-            </div>
-
-            {/* Filters & Sorting bar */}
-            {result.sameProductSellers.length > 0 && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-800">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1 flex items-center gap-1">
-                    <SlidersHorizontal className="size-3" /> FILTRAR:
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setSellerFilter("all")}
-                    className={`rounded px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                      sellerFilter === "all"
-                        ? "bg-black text-white dark:bg-white dark:text-black"
-                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
-                    }`}
-                  >
-                    Todos ({result.sameProductSellers.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSellerFilter("official_leader")}
-                    className={`rounded px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                      sellerFilter === "official_leader"
-                        ? "bg-black text-white dark:bg-white dark:text-black"
-                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
-                    }`}
-                  >
-                    <Star className="size-3" aria-hidden /> Tiendas Oficiales & MercadoLíder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSellerFilter("free_shipping")}
-                    className={`rounded px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer ${
-                      sellerFilter === "free_shipping"
-                        ? "bg-black text-white dark:bg-white dark:text-black"
-                        : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
-                    }`}
-                  >
-                    <Truck className="size-3" aria-hidden /> Envío Gratis
-                  </button>
-                </div>
-
-                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    ORDENAR:
-                  </span>
-                  <select
-                    value={sellerSort}
-                    onChange={(e: any) => setSellerSort(e.target.value)}
-                    className="h-7 min-w-0 max-w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 text-[11px] font-bold text-zinc-800 dark:text-zinc-200 outline-none"
-                  >
-                    <option value="top">Top Reputación & Ventas</option>
-                    <option value="price_asc">Menor Precio en $U</option>
-                    <option value="diff">Mayor Descuento vs. Ref</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {filteredSellers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center text-xs text-zinc-600 dark:text-zinc-400">
-                {result.sameProductSellers.length === 0
-                  ? "No se detectaron vendedores adicionales para este código de publicación específico."
-                  : "No hay vendedores que coincidan con los filtros seleccionados."}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
-                      <th className="pb-2.5">Tienda / Vendedor</th>
-                      <th className="pb-2.5">Calidad & Ventas</th>
-                      <th className="pb-2.5">Disponibilidad</th>
-                      <th className="pb-2.5">Precio de Venta</th>
-                      <th className="pb-2.5">vs. Referencia</th>
-                      <th className="pb-2.5">Envío</th>
-                      <th className="pb-2.5 text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-medium">
-                    {filteredSellers.map((seller, idx) => (
-                      <tr
-                        key={seller.id + idx}
-                        className="hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 transition-colors"
-                      >
-                        {/* Tienda & Badge */}
-                        <td className="py-3">
-                          <div className="flex items-start gap-2">
-                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-800 text-[11px] font-bold mt-0.5">
-                              {idx + 1}
-                            </span>
-                            <div>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="font-black text-zinc-900 dark:text-zinc-100">
-                                  {seller.seller}
-                                </p>
-                                {seller.sellerBadge === "Tienda Oficial" ? (
-                                  <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
-                                    Oficial
-                                  </span>
-                                ) : seller.sellerBadge === "MercadoLíder Platinum" ? (
-                                  <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
-                                    Platinum
-                                  </span>
-                                ) : seller.sellerBadge === "MercadoLíder Gold" ? (
-                                  <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
-                                    Gold
-                                  </span>
-                                ) : null}
-                              </div>
-                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                                {seller.sellerCity}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Calidad & Reviews (Pre-click insight) */}
-                        <td className="py-3">
-                          <div>
-                            {seller.ratingAverage != null ? (
-                              <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 dark:text-amber-400">
-                                <Star className="size-3 fill-amber-500 text-amber-500" />
-                                <span>{seller.ratingAverage}</span>
-                                {seller.reviewsCount != null && (
-                                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold">
-                                    ({seller.reviewsCount})
-                                  </span>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Sin datos</span>
-                            )}
-                            {(seller.salesVolume || seller.positivePercentage != null) && (
-                              <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
-                                {seller.salesVolume && (
-                                  <span className="font-bold text-emerald-700 dark:text-emerald-400">{seller.salesVolume}</span>
-                                )}
-                                {seller.positivePercentage != null && <span>{seller.positivePercentage}% pos.</span>}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Disponibilidad */}
-                        <td className="py-3">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                            <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                            En Stock UY
-                          </span>
-                        </td>
-
-                        {/* Precios */}
-                        <td className="py-3 font-bold num text-zinc-900 dark:text-zinc-100">
-                          <PriceWithEquivalent amount={seller.price} currency={seller.currency} rate={rate} />
-                        </td>
-
-                        {/* Diferencia % */}
-                        <td className="py-3">
-                          {seller.differencePercent !== undefined &&
-                          seller.differencePercent !== 0 ? (
-                            <span
-                              className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-bold num ${
-                                seller.differencePercent < 0
-                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
-                                  : "bg-red-500/10 text-red-600 dark:text-red-400"
-                              }`}
-                            >
-                              {seller.differencePercent < 0 ? (
-                                <TrendingDown className="size-3" />
-                              ) : (
-                                <TrendingUp className="size-3" />
-                              )}
-                              {seller.differencePercent > 0 ? "+" : ""}
-                              {seller.differencePercent}%
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-bold uppercase">
-                              Igual
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Envío */}
-                        <td className="py-3">
-                          {seller.freeShipping ? (
-                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                              <Truck className="size-3" /> Gratis
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                              A cargo comprador
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Acción */}
-                        <td className="py-3 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              disabled={uyuOf(seller.price, seller.currency) === null}
-                              onClick={() =>
-                                simulate(seller.price, seller.currency, `${result.targetProduct.title} (${seller.seller})`)
-                              }
-                              title="Simular margen con este precio de venta"
-                              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
-                            >
-                              Simular
-                            </button>
-                            <a
-                              href={seller.permalink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="rounded p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                              title="Ver publicación directa en Mercado Libre Uruguay"
-                            >
-                              <ExternalLink className="size-3.5" />
-                            </a>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            </>
             )}
           </div>
+
+          {/* Section 1: Productos exactos (mismo product_id de catálogo) */}
+          <ExactOffersSection
+            exact={result.exact}
+            rate={rate}
+            onSimulate={(priceUyu, title) => onSimulatePrice(priceUyu, title)}
+            onChooseAlternative={(candidate) => handleAnalyze(candidate.permalink)}
+          />
 
           {/* Section 2: Similar Competing Products in the Market (Verified In-Stock) */}
           {result.similarProducts.length > 0 && (

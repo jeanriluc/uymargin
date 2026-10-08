@@ -72,6 +72,7 @@ Todas son opcionales para la calculadora básica. Sin ellas, la función asociad
 | Variable | Para qué |
 |---|---|
 | `PORT` | Puerto del servidor (por defecto 3000; el proyecto usa 3001) |
+| `HOST` | Dirección en la que escucha el servidor (por defecto `127.0.0.1`, solo esta máquina; `0.0.0.0` para exponerlo a la red) |
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Credenciales de una aplicación de Mercado Libre. Necesarias para el radar y "Por enlace" |
 | `ML_ACCESS_TOKEN` | Alternativa a las dos anteriores: un token de acceso ya emitido |
 | `GEMINI_API_KEY` | Copiloto |
@@ -83,7 +84,10 @@ La tabla que necesita Supabase se crea con el script SQL que muestra la propia a
 ## Estructura
 
 ```
-server.ts                 Servidor Express: API (cotización, radar, enlace, copiloto) y entrega de la interfaz
+server/app.ts             App Express con las rutas /api/* (cotización, radar, enlace, copiloto); no abre puertos
+server/local.ts           Arranque local: Vite (desarrollo) o dist/ (producción) + app.listen
+api/                      Funciones de Vercel: cada archivo exporta el app de server/app.ts
+vercel.json               Configuración de Vercel (framework, rewrite de la SPA, maxDuration)
 src/
   App.tsx                 Pantalla principal y estado de la simulación
   lib/finance/            Motor de cálculo: impuestos DGI, canales, packs, constantes
@@ -121,3 +125,39 @@ PRODUCT.md                Qué es el producto, para quién y con qué principios
 - Los precios de publicaciones se muestran siempre en su moneda original; si están en dólares, al lado va el equivalente en pesos con la cotización y la fecha usadas. Una moneda que no sea UYU o USD no se convierte.
 
 El servidor guarda la última cotización en `.cache/exchange-rate.json` (ignorado por git).
+
+## Despliegue en Vercel
+
+El mismo código corre de dos maneras. **Local:** `server/local.ts` (`npm run dev` / `npm start`), como siempre. **Vercel:** el frontend (Vite) sale como estático desde `dist/` y cada ruta `/api/*` es una función de `api/` que exporta el mismo app Express de `server/app.ts` (sin `app.listen`).
+
+Detalles de la adaptación:
+- `vercel.json` fija `framework: vite`, `outputDirectory: dist`, el rewrite de la SPA (todo lo que no sea `/api/` va a `index.html`) y `maxDuration` por función (60 s para radar, enlace y copiloto; 30 s cotización).
+- La cotización del BCU se guarda solo en memoria y en `/tmp` de la instancia (mejor esfuerzo, sin error si no se puede escribir). La fuente de verdad de "última cotización" es el `localStorage` del navegador.
+- `POST /api/tracking/check` responde **501** en Vercel (se llamaba a sí mismo por HTTP). El seguimiento de competidores no está conectado a la interfaz.
+- Las funciones no tienen estado: dos instancias pueden tener cotizaciones en memoria distintas.
+
+### Variables de entorno
+
+Se cargan en el panel de Vercel (Project → Settings → Environment Variables), por entorno (Production / Preview / Development). **Nunca** se escriben en el repositorio.
+
+| Variable | Dónde vive | Notas |
+|---|---|---|
+| `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Secreta de servidor | Radar y "Por enlace". Alternativa: `ML_ACCESS_TOKEN` (también secreta) |
+| `GEMINI_API_KEY` | Secreta de servidor | Copiloto |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | **Embebidas en el bundle del navegador** (prefijo `VITE_`, se resuelven en el build) | Cualquiera que abra la página puede leerlas. Solo la clave pública (anon/publishable); jamás una secreta. Cambiarlas exige un nuevo deploy |
+| `PORT`, `HOST` | Solo ejecución local | Vercel no las usa |
+
+Los previews por rama usan las variables del entorno *Preview*: cargalas también ahí si querés que funcionen el radar, el copiloto o la nube.
+
+### Pasos
+
+1. Importar el repositorio de GitHub en Vercel. Debe detectar **Vite**; el build es `npm run build` y la salida `dist` (ya están en `vercel.json`).
+2. Elegir Node.js 22 o 24 en Project Settings → Build and Deployment (el proyecto se probó localmente con Node 26, que Vercel no ofrece).
+3. Cargar las variables de la tabla de arriba.
+4. Deploy. Cada rama obtiene un preview.
+5. Probar `/api/exchange-rate` en el preview antes de compartirlo.
+
+Importante: estos endpoints **no tienen autenticación ni límite de uso**. En Vercel quedan públicos y gastan tu cuota de Mercado Libre y de Gemini; revisá la protección del deployment (Deployment Protection) antes de compartir la URL.
+
+Si una función falla con el cuerpo de una petición POST vacío, probar la variable de proyecto `NODEJS_HELPERS=0` (desactiva los helpers de Vercel que reemplazan `req/res`). No verificado.
+

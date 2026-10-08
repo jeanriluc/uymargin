@@ -114,7 +114,7 @@ export function MarketSummary({
           )}
         </div>
 
-        {stats && stats.outliersRemoved > 0 && (
+        {stats && stats.outliersRemoved != null && stats.outliersRemoved > 0 && (
           <span className="inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
             {stats.outliersRemoved} OUTLIERS EXCLUIDOS (IQR)
           </span>
@@ -203,8 +203,9 @@ export function MarketSummary({
             />
             <StatCard
               label="PROMEDIO"
-              value={stats ? formatUyu(stats.average) : "—"}
-              onClick={stats ? () => onSelectPrice(Math.round(stats.average)) : undefined}
+              value={stats ? (stats.average != null ? formatUyu(stats.average) : "No disponible") : "—"}
+              sublabel={stats && stats.average == null ? "No se guardó en la nube" : undefined}
+              onClick={stats && stats.average != null ? () => onSelectPrice(Math.round(stats.average!)) : undefined}
             />
             <StatCard
               label="MÁXIMO"
@@ -213,8 +214,14 @@ export function MarketSummary({
             />
             <StatCard
               label="OFERTAS"
-              value={stats || state.status === "success" ? total.toLocaleString("es-UY") : "—"}
-              sublabel="Muestra real con stock"
+              value={
+                stats?.fromCloud && state.status !== "success" && total === 0
+                  ? "No disponible"
+                  : stats || state.status === "success"
+                    ? total.toLocaleString("es-UY")
+                    : "—"
+              }
+              sublabel={stats?.fromCloud && state.status !== "success" ? "Guardado en la nube" : "Muestra real con stock"}
             />
           </>
         )}

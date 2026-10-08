@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowLeftRight, Bot, RefreshCw, Settings, Wifi, WifiOff, Zap } from "lucide-react";
 import { NumberField } from "@/components/ui/NumberField";
 import { ThemeToggle } from "./ThemeToggle";
@@ -47,6 +48,13 @@ export function Header({
   onOpenSavedAudits,
 }: HeaderProps) {
   const s = STATUS[status];
+  // Valor tipeado a mano, pendiente de confirmación explícita; no se usa hasta que se confirma.
+  const [pendingRate, setPendingRate] = useState<number | null>(null);
+  const [prevRate, setPrevRate] = useState(exchangeRate);
+  if (exchangeRate !== prevRate) {
+    setPrevRate(exchangeRate);
+    setPendingRate(null);
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 dark:border-zinc-800 bg-[#fbfbfb]/90 dark:bg-[#0c0c0e]/90 backdrop-blur-md transition-colors">
@@ -83,7 +91,7 @@ export function Header({
           </span>
 
           {/* Dólar BCU / UYU rate ticker */}
-          <div className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-md">
+          <div className="flex flex-wrap items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-md">
             <div className="flex flex-col">
               <div className="flex items-center gap-1 text-[11px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
                 <ArrowLeftRight className="size-2.5 text-zinc-800 dark:text-zinc-200" />
@@ -95,12 +103,37 @@ export function Header({
                 </label>
                 <NumberField
                   id="header-rate"
-                  value={exchangeRate}
-                  onChange={onExchangeRateChange}
+                  value={pendingRate ?? exchangeRate}
+                  onChange={(v) => setPendingRate(v === exchangeRate ? null : v)}
                   inputClassName="h-6 text-xs font-black border-0 bg-transparent px-0! focus:ring-0 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
             </div>
+
+            {pendingRate !== null && (
+              <div role="group" aria-label="Confirmar cotización manual" className="flex items-center gap-1">
+                {pendingRate > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onExchangeRateChange(pendingRate);
+                      setPendingRate(null);
+                    }}
+                    title="Usar este valor como cotización manual"
+                    className="rounded bg-black px-2 py-1 text-[11px] font-black uppercase text-white dark:bg-white dark:text-black cursor-pointer"
+                  >
+                    Usar este valor
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPendingRate(null)}
+                  className="rounded border border-zinc-300 dark:border-zinc-700 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            )}
 
             <button
               type="button"

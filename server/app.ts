@@ -1,18 +1,37 @@
 import express from "express";
 import dotenv from "dotenv";
 import fs from "node:fs";
-import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "./src/lib/bcu";
-import { normalizeCurrency } from "./src/lib/currency";
+import os from "node:os";
+// Extensión .js a propósito: es lo que resuelve el runtime ESM de Node en Vercel (tsx y tsc la mapean a .ts).
+import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "../src/lib/bcu.js";
+import { normalizeCurrency } from "../src/lib/currency.js";
+import type {
+  CatalogCandidate,
+  ExactMatch,
+  ExactOffer,
+  ExactOfferSeller,
+  ExactProductBlock,
+} from "../src/lib/mlu/types.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
+/**
+ * App Express con todas las rutas /api/*. No abre puertos ni monta Vite/dist: eso lo hace
+ * server/local.ts en ejecución local; en Vercel cada archivo de api/ exporta este mismo app.
+ */
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const isProduction = process.env.NODE_ENV === "production";
+/** En Vercel (funciones sin estado y disco de solo lectura salvo /tmp). */
+export const isVercel = Boolean(process.env.VERCEL);
+export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+// Solo esta máquina por defecto; HOST=0.0.0.0 para exponerlo a la red a propósito.
+export const HOST = process.env.HOST?.trim() || "127.0.0.1";
+// Dirección con la que el servidor se llama a sí mismo (tracking); 0.0.0.0 / :: no son destinos válidos.
+const SELF_HOST = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
+export const isProduction = process.env.NODE_ENV === "production";
 
-app.use(express.json());
+app.use(express.json({ limit: "256kb" }));
 
 // ------------------------------------------------------------------
 // 1. Exchange Rate Endpoint (USD -> UYU)
@@ -28,7 +47,11 @@ interface ServerRate {
   fetchedAt: string;
 }
 
-const RATE_CACHE_FILE = path.resolve(process.cwd(), ".cache", "exchange-rate.json");
+// En Vercel solo /tmp es escribible (y no se comparte entre instancias): es un caché de mejor esfuerzo.
+// El cliente guarda además la última cotización en localStorage.
+const RATE_CACHE_FILE = isVercel
+  ? path.join(os.tmpdir(), "uymargin-exchange-rate.json")
+  : path.resolve(process.cwd(), ".cache", "exchange-rate.json");
 const RATE_MEMORY_TTL_MS = 30 * 60 * 1000;
 let lastKnownRate: ServerRate | null = null;
 let lastRateCheck = 0;
@@ -271,93 +294,6 @@ function computeSellerQuality(item: any, title = "", index = 0) {
   };
 }
 
-function getVerifiedFallback(query: string, rate: number): RealMluListing[] {
-  const q = query.toLowerCase();
-
-  const createItem = (
-    id: string,
-    title: string,
-    price: number,
-    currency: "UYU" | "USD",
-    thumbnail: string,
-    freeShipping: boolean,
-    seller: string,
-    city: string,
-    badge: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold",
-    reputation: string,
-    sales: string,
-    rating: number,
-    reviews: number,
-    sellersCount: number
-  ): RealMluListing => ({
-    id,
-    title,
-    price,
-    currency,
-    thumbnail,
-    permalink: `https://www.mercadolibre.com.uy/p/${id}`,
-    freeShipping,
-    seller,
-    isAvailable: true,
-    stockStatus: "En stock disponible",
-    salesVolume: sales,
-    sellerBadge: badge,
-    sellerReputation: reputation,
-    positivePercentage: 98,
-    ratingAverage: rating,
-    reviewsCount: reviews,
-    activeSellersCount: sellersCount,
-    sellerCity: city,
-    isTopChoice: true,
-  });
-
-  if (q.includes("termo") || q.includes("stanley") || q.includes("mate")) {
-    return [
-      createItem("MLU36006952", "Botella termo Stanley Classic, 950 ml, color verde martillado", 3279, "UYU", "https://http2.mlstatic.com/D_NQ_NP_727447-MLA74070266077_012024-F.jpg", true, "Tienda Oficial AMV", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial 100% · Vendedor Líder", "+1.000 vendidos", 4.9, 184, 19),
-      createItem("MLU56415021", "Termo Stanley Mate System 1.2 Litros Con Pico Alta Precisión Verde", 3790, "UYU", "https://http2.mlstatic.com/D_NQ_NP_908479-MLA73030386616_112023-F.jpg", true, "Distribuidor Platinum", "Rivera", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.9, 142, 14),
-      createItem("MLU54069645", "Termo Termolar Revolution Rosa Chicle 1 Lts", 2150, "UYU", "https://http2.mlstatic.com/D_NQ_NP_884648-MLA96422851745_102025-F.jpg", true, "Comercio Verificado", "Manga, Montevideo", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.8, 96, 6),
-      createItem("MLU58056129", "Botella Térmica Agua Termo Acero Inox 700mL Buffer + 4 Tapas", 799, "UYU", "https://http2.mlstatic.com/D_NQ_NP_705359-MLA73507119253_122023-F.jpg", false, "Tienda Oficial Buffer Store", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial Certificada", "+1.000 vendidos", 4.8, 115, 1),
-    ];
-  }
-
-  if (q.includes("olla") || q.includes("presion") || q.includes("xion")) {
-    return [
-      createItem("MLU20543325", "Olla A Presion Electrica 5 Lts Xion Xi-op105 900w / Color Negro", 79.89, "USD", "https://http2.mlstatic.com/D_NQ_NP_866751-MLU74823126759_032024-F.jpg", true, "Tienda Oficial Xion", "Manga, Montevideo", "Tienda Oficial", "Reputación Oficial 100% · Garantía 12 meses", "+1.000 vendidos", 4.9, 138, 8),
-      createItem("MLU70337260", "Olla A Presion Electrica Digital 6 Litros Acero Inoxidable", 89.9, "USD", "https://http2.mlstatic.com/D_NQ_NP_753177-MLU74381395988_022024-F.jpg", true, "Distribuidor Platinum", "Centro, Montevideo", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.8, 84, 3),
-    ];
-  }
-
-  return [
-    createItem("MLU39962085", "Auriculares Inalámbricos Xiaomi Redmi Buds 6 Play Negro", 689, "UYU", "https://http2.mlstatic.com/D_NQ_NP_906161-MLA79391054235_092024-F.jpg", false, "Xiaomi Official Store", "Centro, Montevideo", "Tienda Oficial", "Reputación Oficial", "+1.000 vendidos", 4.8, 210, 4),
-    createItem("MLU43438189", "Smartwatch Xiaomi Smart Band 9 Active 5atm Bt Negro", 35, "USD", "https://http2.mlstatic.com/D_NQ_NP_716942-MLA80860548183_112024-F.jpg", true, "Distribuidor Autorizado", "Punta Carretas", "MercadoLíder Platinum", "Reputación Verde (Nivel 5)", "+500 vendidos", 4.7, 95, 3),
-  ];
-}
-
-function estimateMarketBaseline(query: string, title: string, index: number, anchorPrice?: number): number {
-  if (anchorPrice && anchorPrice > 0) {
-    const variance = [1.0, 0.94, 1.08, 0.88, 1.14, 0.96, 1.2, 0.91, 1.05, 1.12][index % 10] ?? 1.0;
-    return Math.max(90, Math.round((anchorPrice * variance) / 10) * 10 - 1);
-  }
-  const q = `${query} ${title}`.toLowerCase();
-  let base = 890;
-  if (q.includes("shaker") || q.includes("mezclador")) base = 490;
-  else if (q.includes("termo") || q.includes("stanley")) base = 2890;
-  else if (q.includes("mate")) base = 1290;
-  else if (q.includes("bombilla")) base = 450;
-  else if (q.includes("auricular") || q.includes("earbuds") || q.includes("f9") || q.includes("inalambrico")) base = 790;
-  else if (q.includes("reloj") || q.includes("smartwatch") || q.includes("band") || q.includes("d20")) base = 1390;
-  else if (q.includes("proteina") || q.includes("whey")) base = 2490;
-  else if (q.includes("creatina")) base = 1890;
-  else if (q.includes("funda") || q.includes("vidrio")) base = 350;
-  else if (q.includes("taladro") || q.includes("amoladora")) base = 3190;
-  else if (q.includes("silla") || q.includes("gamer")) base = 6900;
-  else if (q.includes("iphone") || q.includes("celular") || q.includes("xiaomi") || q.includes("samsung")) base = 9500;
-  else if (q.includes("foco") || q.includes("lampara") || q.includes("led")) base = 390;
-
-  const varianceFactor = [1.0, 0.92, 1.15, 0.85, 1.08, 0.96, 1.22, 0.88, 1.04, 1.12][index % 10] ?? 1.0;
-  return Math.max(90, Math.round((base * varianceFactor) / 10) * 10 - 1);
-}
-
 export interface UnsupportedListing {
   id: string;
   title: string;
@@ -370,7 +306,6 @@ export interface UnsupportedListing {
 async function searchRealMlu(
   query: string,
   token: string | null,
-  rate: number,
   unsupported: UnsupportedListing[] = []
 ): Promise<RealMluListing[]> {
   const cleanQ = query.trim();
@@ -550,7 +485,16 @@ app.get("/api/search-mlu", async (req, res) => {
   try {
     const token = await getAppToken();
     const unsupported: UnsupportedListing[] = [];
-    const items = await searchRealMlu(query, token, rate, unsupported);
+    // "Productos exactos" va en paralelo con el radar; si falla, el radar responde igual sin esa sección.
+    const [items, exact] = await Promise.all([
+      searchRealMlu(query, token, unsupported),
+      token
+        ? resolveExactByName(query, token, rate).catch((err) => {
+            console.warn("[api/search-mlu] productos exactos no disponibles:", err?.message || err);
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
 
     if (items.length === 0 && unsupported.length > 0) {
       const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
@@ -600,6 +544,7 @@ app.get("/api/search-mlu", async (req, res) => {
       stats,
       rateUsed: rate,
       unsupported,
+      exact,
       fetchedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -613,34 +558,320 @@ app.get("/api/search-mlu", async (req, res) => {
 });
 
 // ------------------------------------------------------------------
-// 2.1 Mercado Libre URL Product & Competitors Analysis Endpoint
+// 2.1 "Productos exactos": ofertas del mismo producto de catálogo (mismo product_id MLU…)
+//     Solo datos que informa Mercado Libre. Lo que no viene de la API va en null ("no disponible").
 // ------------------------------------------------------------------
-interface UrlSellerListing {
-  id: string;
-  price: number;
-  priceUyu: number;
-  currency: "UYU" | "USD";
-  seller: string;
-  sellerCity: string;
-  permalink: string;
-  freeShipping: boolean;
-  differencePercent?: number;
-  isAvailable: boolean;
-  stockStatus: string;
-  salesVolume: string;
-  sellerBadge: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation: string;
-  positivePercentage: number;
-  ratingAverage: number;
-  reviewsCount: number;
-  isOfficialStore?: boolean;
-  isTopSeller?: boolean;
+const ML_API = "https://api.mercadolibre.com";
+const SELLER_CACHE_TTL_MS = 10 * 60 * 1000;
+const SELLER_CACHE_MAX_ENTRIES = 2000;
+/** /users?ids= acepta varios ids por llamada. */
+const SELLER_BATCH_SIZE = 20;
+/** Tope de vendedores consultados por producto (2 llamadas en paralelo); el resto queda "no disponible". */
+const MAX_SELLERS_PER_PRODUCT = 40;
+const SELLER_LOOKUP_TIMEOUT_MS = 4000;
+/** Candidatos de catálogo por búsqueda; a todos se les cuentan las ofertas (una llamada cada uno, en paralelo). */
+const MATCH_SEARCH_LIMIT = 8;
+
+const sellerCache = new Map<number, { info: ExactOfferSeller; expiresAt: number }>();
+
+function productPermalink(pid: string): string {
+  return `https://www.mercadolibre.com.uy/p/${pid}`;
 }
 
+/**
+ * /products/{id}/items no trae permalink. Esta es la dirección a la que Mercado Libre redirige
+ * desde articulo.mercadolibre.com.uy/MLU-<n>: la página del producto con esa oferta seleccionada.
+ */
+function offerPermalink(pid: string, itemId: string): string {
+  return /^MLU\d+$/.test(itemId) ? `${productPermalink(pid)}?pdp_filters=item_id:${itemId}` : productPermalink(pid);
+}
+
+function pictureUrl(product: any): string | null {
+  const url = product?.pictures?.[0]?.url;
+  return url ? String(url).replace(/^http:\/\//, "https://") : null;
+}
+
+async function mlGet(pathAndQuery: string, token: string, timeoutMs: number): Promise<any | null> {
+  try {
+    const r = await fetch(`${ML_API}${pathAndQuery}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return r.ok ? await r.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Datos reales de vendedores, con caché de 10 minutos. Los que no se pudieron consultar no figuran en el resultado. */
+async function lookupSellers(sellerIds: number[], token: string): Promise<Map<number, ExactOfferSeller>> {
+  const now = Date.now();
+  const found = new Map<number, ExactOfferSeller>();
+  const pending: number[] = [];
+
+  for (const id of Array.from(new Set(sellerIds))) {
+    const cached = sellerCache.get(id);
+    if (cached && cached.expiresAt > now) found.set(id, cached.info);
+    else if (pending.length < MAX_SELLERS_PER_PRODUCT) pending.push(id);
+  }
+
+  const batches: number[][] = [];
+  for (let i = 0; i < pending.length; i += SELLER_BATCH_SIZE) batches.push(pending.slice(i, i + SELLER_BATCH_SIZE));
+
+  const responses = await Promise.all(
+    batches.map((ids) => mlGet(`/users?ids=${ids.join(",")}`, token, SELLER_LOOKUP_TIMEOUT_MS))
+  );
+
+  if (sellerCache.size > SELLER_CACHE_MAX_ENTRIES) {
+    for (const [id, entry] of sellerCache) if (entry.expiresAt <= now) sellerCache.delete(id);
+    if (sellerCache.size > SELLER_CACHE_MAX_ENTRIES) sellerCache.clear();
+  }
+
+  for (const data of responses) {
+    if (!Array.isArray(data)) continue;
+    for (const entry of data) {
+      const u = entry?.body;
+      if (entry?.code !== 200 || typeof u?.id !== "number") continue;
+      const power = u.seller_reputation?.power_seller_status;
+      const total = u.seller_reputation?.transactions?.total;
+      const info: ExactOfferSeller = {
+        id: u.id,
+        nickname: typeof u.nickname === "string" && u.nickname.trim() ? u.nickname.trim() : null,
+        reputationLevel: typeof u.seller_reputation?.level_id === "string" ? u.seller_reputation.level_id : null,
+        powerSellerStatus: power === "platinum" || power === "gold" || power === "silver" ? power : null,
+        transactionsTotal: typeof total === "number" ? total : null,
+      };
+      sellerCache.set(u.id, { info, expiresAt: now + SELLER_CACHE_TTL_MS });
+      found.set(u.id, info);
+    }
+  }
+
+  return found;
+}
+
+/**
+ * Ofertas activas de un producto de catálogo. Sin ofertas Mercado Libre responde 404 ("No winners found"): es [].
+ * null = Mercado Libre no respondió (error o tiempo agotado).
+ */
+async function fetchRawOffers(pid: string, token: string): Promise<any[] | null> {
+  try {
+    const r = await fetch(`${ML_API}/products/${pid}/items`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (r.status === 404) return [];
+    if (!r.ok) return null;
+    const data = await r.json();
+    return Array.isArray(data?.results) ? data.results : [];
+  } catch {
+    return null;
+  }
+}
+
+async function buildExactOffers(
+  pid: string,
+  title: string,
+  rawItems: any[],
+  token: string,
+  rate: number
+): Promise<Pick<ExactProductBlock, "offers" | "stats" | "sellerData" | "unsupported">> {
+  const offers: ExactOffer[] = [];
+  const unsupported: UnsupportedListing[] = [];
+  const sellerIdByItem = new Map<string, number>();
+
+  for (const it of rawItems) {
+    const price = typeof it?.price === "number" ? it.price : 0;
+    if (price <= 0) continue;
+    const itemId = typeof it.item_id === "string" ? it.item_id : "";
+    const permalink = offerPermalink(pid, itemId);
+    const currency = normalizeCurrency(it.currency_id);
+    if (!currency) {
+      // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
+      unsupported.push({ id: itemId || pid, title, price, currency: String(it.currency_id ?? ""), permalink });
+      continue;
+    }
+    const city = it.seller_address?.city?.name || "";
+    const state = it.seller_address?.state?.name || "";
+    if (typeof it.seller_id === "number") sellerIdByItem.set(itemId, it.seller_id);
+    offers.push({
+      itemId,
+      productId: pid,
+      price,
+      currency,
+      priceUyu: currency === "USD" ? Math.round(price * rate) : price,
+      permalink,
+      freeShipping: it.shipping?.free_shipping === true,
+      condition: it.condition === "new" || it.condition === "used" ? it.condition : it.condition ? "other" : null,
+      isOfficialStore: !!it.official_store_id,
+      sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
+      seller: null,
+    });
+  }
+
+  offers.sort((a, b) => a.priceUyu - b.priceUyu || a.itemId.localeCompare(b.itemId));
+
+  // Vendedores en orden de precio: si hay más que el tope, se consultan los de las ofertas más baratas.
+  const sellers = await lookupSellers(
+    offers.flatMap((o) => (sellerIdByItem.has(o.itemId) ? [sellerIdByItem.get(o.itemId)!] : [])),
+    token
+  );
+  for (const o of offers) {
+    const sellerId = sellerIdByItem.get(o.itemId);
+    o.seller = sellerId !== undefined ? sellers.get(sellerId) ?? null : null;
+  }
+
+  const withData = offers.filter((o) => o.seller).length;
+  const prices = offers.map((o) => o.priceUyu);
+
+  return {
+    offers,
+    unsupported,
+    stats:
+      prices.length > 0
+        ? {
+            count: prices.length,
+            min: prices[0],
+            median: Math.round(quantile(prices, 0.5)),
+            max: prices[prices.length - 1],
+          }
+        : null,
+    sellerData: {
+      status: offers.length === 0 || withData === offers.length ? "ok" : withData === 0 ? "no_disponible" : "parcial",
+      withData,
+      withoutData: offers.length - withData,
+      cap: MAX_SELLERS_PER_PRODUCT,
+    },
+  };
+}
+
+const MATCH_STOPWORDS = new Set(["de", "del", "la", "el", "los", "las", "para", "con", "sin", "en", "por", "un", "una"]);
+
+function foldText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/** Singular aproximado, solo para comparar palabras ("auriculares" con "auricular"). */
+function stemWord(word: string): string {
+  if (/\d/.test(word)) return word;
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s")) return word.slice(0, -1);
+  return word;
+}
+
+function matchWords(text: string): string[] {
+  return foldText(text)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 1 && !MATCH_STOPWORDS.has(w));
+}
+
+/** Palabras de la búsqueda que no aparecen en el nombre ni en los atributos del producto. */
+function missingQueryWords(query: string, product: any): string[] {
+  const attributes = Array.isArray(product?.attributes) ? product.attributes.map((a: any) => a?.value_name || "") : [];
+  const text = [product?.name || "", ...attributes].join(" ");
+  const words = new Set(matchWords(text).map(stemWord));
+  const compact = foldText(text).replace(/[^a-z0-9]+/g, "");
+  return Array.from(new Set(matchWords(query))).filter((w) =>
+    // "1l" tiene que encontrar "1 L": las palabras con números se buscan en el texto sin separadores.
+    /\d/.test(w) ? !compact.includes(w) : !words.has(stemWord(w))
+  );
+}
+
+/**
+ * Producto de catálogo que mejor coincide con un texto. Devuelve el elegido, los demás candidatos
+ * y las ofertas ya consultadas del elegido. La coincidencia nunca se da por segura: si faltan
+ * palabras o hay variantes igual de cercanas, queda marcada como dudosa con el motivo.
+ */
+async function findCatalogMatch(
+  query: string,
+  token: string
+): Promise<{ match: ExactMatch; candidates: CatalogCandidate[]; rawItems: any[] | null } | null> {
+  const data = await mlGet(
+    `/products/search?status=active&site_id=MLU&q=${encodeURIComponent(query)}&limit=${MATCH_SEARCH_LIMIT}`,
+    token,
+    5000
+  );
+  const results: any[] = Array.isArray(data?.results) ? data.results.filter((p: any) => p?.id) : [];
+  if (results.length === 0) return null;
+
+  const queryWordCount = new Set(matchWords(query)).size;
+  const ranked = results
+    .map((product, rank) => ({ product, rank, missing: missingQueryWords(query, product) }))
+    .sort((a, b) => a.missing.length - b.missing.length || a.rank - b.rank);
+
+  const rawByPid = new Map<string, any[] | null>();
+  await Promise.all(
+    ranked.map(async (c) => {
+      rawByPid.set(c.product.id, await fetchRawOffers(c.product.id, token));
+    })
+  );
+
+  // Entre los igual de cercanos por nombre, el que tiene ofertas activas.
+  const best = ranked[0].missing.length;
+  const chosen =
+    ranked.find((c) => c.missing.length === best && (rawByPid.get(c.product.id)?.length ?? 0) > 0) ?? ranked[0];
+  const ties = ranked.filter((c) => c !== chosen && c.missing.length === best).length;
+
+  const toCandidate = (product: any): CatalogCandidate => ({
+    productId: product.id,
+    title: product.name || product.id,
+    thumbnail: pictureUrl(product),
+    permalink: productPermalink(product.id),
+    offersCount: rawByPid.get(product.id)?.length ?? null,
+  });
+
+  const reasons: string[] = [];
+  if (queryWordCount === 0 || chosen.missing.length > 0) {
+    reasons.push(
+      chosen.missing.length > 0
+        ? `El producto no menciona: ${chosen.missing.join(", ")}.`
+        : "La búsqueda no tiene palabras para comparar con el nombre del producto."
+    );
+  }
+  if (ties > 0) {
+    reasons.push(
+      ties === 1
+        ? "Hay otro producto de catálogo igual de cercano a lo que buscaste (por ejemplo, otro color o tamaño)."
+        : `Hay ${ties} productos de catálogo igual de cercanos a lo que buscaste (por ejemplo, otros colores o tamaños).`
+    );
+  }
+
+  return {
+    match: {
+      ...toCandidate(chosen.product),
+      source: "busqueda",
+      confidence: reasons.length > 0 ? "dudosa" : "alta",
+      reasons,
+    },
+    candidates: ranked.map((c) => toCandidate(c.product)),
+    rawItems: rawByPid.get(chosen.product.id) ?? null,
+  };
+}
+
+/** Bloque "Productos exactos" para una búsqueda por nombre. null = sin coincidencia o Mercado Libre no respondió. */
+async function resolveExactByName(query: string, token: string, rate: number): Promise<ExactProductBlock | null> {
+  const found = await findCatalogMatch(query, token);
+  if (!found || !found.rawItems) return null;
+  const built = await buildExactOffers(found.match.productId, found.match.title, found.rawItems, token, rate);
+  return {
+    match: { ...found.match, offersCount: built.offers.length },
+    candidates: found.candidates,
+    ...built,
+    rateUsed: rate,
+  };
+}
+
+// ------------------------------------------------------------------
+// 2.2 Mercado Libre URL Product & Competitors Analysis Endpoint
+// ------------------------------------------------------------------
 app.all("/api/analyze-url", async (req, res) => {
   const urlParam = req.method === "POST" ? req.body?.url : req.query?.url;
   const rawUrl = String(urlParam || "").trim();
   const rate = rateFromRequest(req.query?.rate || req.body?.rate);
+  // Solo el producto y sus ofertas, sin buscar similares (lo usa el radar al elegir otra coincidencia).
+  const exactOnly = [req.query?.exactOnly, req.body?.exactOnly].some((v) => v === true || v === "1" || v === "true");
 
   if (!rawUrl) {
     return res.status(400).json({ ok: false, message: "URL de Mercado Libre requerida." });
@@ -675,224 +906,59 @@ app.all("/api/analyze-url", async (req, res) => {
   try {
     const token = await getAppToken();
 
-    let targetProduct: any = null;
-    let sameProductSellers: UrlSellerListing[] = [];
-    const unsupported: UnsupportedListing[] = [];
+    let match: ExactMatch | null = null;
+    let candidates: CatalogCandidate[] = [];
+    let rawItems: any[] | null = null;
 
-    // Helper to sort raw items: Official store first, then gold special, then gold pro, then lowest price
-    const sortRawItems = (items: any[]) => {
-      return [...items].sort((a, b) => {
-        const aOff = a.official_store_id ? 100 : 0;
-        const bOff = b.official_store_id ? 100 : 0;
-        if (aOff !== bOff) return bOff - aOff;
-        const aGold = a.listing_type_id === "gold_special" ? 50 : 0;
-        const bGold = b.listing_type_id === "gold_special" ? 50 : 0;
-        if (aGold !== bGold) return bGold - aGold;
-        return (a.price || 0) - (b.price || 0);
-      });
-    };
-
-    // 1. If PID exists, fetch product details
+    // 1. El enlace trae el product_id de catálogo: es el producto exacto.
     if (pid && token) {
-      const [prodRes, itemsRes] = await Promise.all([
-        fetch(`https://api.mercadolibre.com/products/${pid}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(5000),
-        }),
-        fetch(`https://api.mercadolibre.com/products/${pid}/items`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(5000),
-        }),
-      ]);
-
-      if (prodRes.ok) {
-        const prod = await prodRes.json();
-        const itemsData = itemsRes.ok ? await itemsRes.json() : null;
-        const rawItems = Array.isArray(itemsData?.results) ? itemsData.results : [];
-        const sortedItems = sortRawItems(rawItems);
-
-        for (let i = 0; i < sortedItems.length; i++) {
-          const it = sortedItems[i];
-          const itPrice = typeof it.price === "number" ? it.price : 0;
-          if (itPrice <= 0) continue;
-          const itCur = normalizeCurrency(it.currency_id);
-          if (!itCur) {
-            unsupported.push({
-              id: it.item_id || pid || "",
-              title: prod.name || slugQuery || "",
-              price: itPrice,
-              currency: String(it.currency_id ?? ""),
-              permalink: it.permalink || rawUrl,
-            });
-            continue;
-          }
-          const itPriceUyu = itCur === "USD" ? Math.round(itPrice * rate) : itPrice;
-          const quality = computeSellerQuality(it, prod.name || slugQuery || "", i);
-
-          sameProductSellers.push({
-            id: it.item_id || pid,
-            price: itPrice,
-            priceUyu: itPriceUyu,
-            currency: itCur,
-            seller: quality.sellerName,
-            sellerCity: quality.sellerCity,
-            permalink: it.permalink || `https://articulo.mercadolibre.com.uy/${it.item_id}`,
-            freeShipping: it.shipping?.free_shipping === true,
-            isAvailable: true,
-            stockStatus: "En stock inmediato en Uruguay",
-            salesVolume: quality.salesVolume,
-            sellerBadge: quality.sellerBadge,
-            sellerReputation: quality.sellerReputation,
-            positivePercentage: quality.positiveRatingPct,
-            ratingAverage: quality.ratingAverage,
-            reviewsCount: quality.reviewsCount,
-            isOfficialStore: quality.isOfficialStore,
-            isTopSeller: quality.isTopSeller,
-          });
-        }
-
-        if (sameProductSellers.length > 0) {
-          const topSeller = sameProductSellers[0];
-          targetProduct = {
-            id: pid,
-            title: prod.name || slugQuery || "Producto de Mercado Libre",
-            price: topSeller.price,
-            priceUyu: topSeller.priceUyu,
-            currency: topSeller.currency,
-            thumbnail: prod.pictures?.[0]?.url ? String(prod.pictures[0].url).replace(/^http:\/\//, "https://") : null,
-            permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
-            seller: topSeller.seller,
-            sellerCity: topSeller.sellerCity,
-            condition: "new",
-            freeShipping: topSeller.freeShipping,
-            isAvailable: true,
-            stockStatus: `En stock disponible (${sameProductSellers.length} ${sameProductSellers.length === 1 ? "vendedor" : "vendedores"} en Uruguay)`,
-            salesVolume: topSeller.salesVolume,
-            sellerBadge: topSeller.sellerBadge,
-            sellerReputation: topSeller.sellerReputation,
-            positivePercentage: topSeller.positivePercentage,
-            ratingAverage: topSeller.ratingAverage,
-            reviewsCount: topSeller.reviewsCount,
-            activeSellersCount: sameProductSellers.length,
-          };
-        } else {
-          // No active sellers in Uruguay
-          targetProduct = {
-            id: pid,
-            title: prod.name || slugQuery || "Producto de Mercado Libre",
-            price: 0,
-            priceUyu: 0,
-            currency: "UYU",
-            thumbnail: prod.pictures?.[0]?.url ? String(prod.pictures[0].url).replace(/^http:\/\//, "https://") : null,
-            permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
-            seller: "Sin vendedores activos",
-            sellerCity: "Uruguay",
-            condition: "new",
-            freeShipping: false,
-            isAvailable: false,
-            stockStatus: "Publicación pausada o sin stock disponible en Uruguay",
-            salesVolume: "0 ventas activas",
-            sellerBadge: "Vendedor Destacado",
-            sellerReputation: "Sin stock activo actualmente en plaza",
-            positivePercentage: 0,
-            ratingAverage: 0,
-            reviewsCount: 0,
-            activeSellersCount: 0,
-          };
-        }
+      const [prod, items] = await Promise.all([mlGet(`/products/${pid}`, token, 5000), fetchRawOffers(pid, token)]);
+      if (prod) {
+        rawItems = items ?? [];
+        match = {
+          productId: pid,
+          title: prod.name || slugQuery || "Producto de Mercado Libre",
+          thumbnail: pictureUrl(prod),
+          permalink: productPermalink(pid),
+          offersCount: rawItems.length,
+          source: "enlace",
+          confidence: "exacta",
+          reasons: [],
+        };
       }
     }
 
-    // 2. If targetProduct not found by PID, search catalog by slug query
-    const searchQuery = slugQuery || targetProduct?.title || pid || "";
-    if (!targetProduct && searchQuery && token) {
-      const searchRes = await fetch(
-        `https://api.mercadolibre.com/products/search?status=active&site_id=MLU&q=${encodeURIComponent(searchQuery)}&limit=1`,
-        { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) }
-      );
-      if (searchRes.ok) {
-        const sData = await searchRes.json();
-        const topMatch = sData.results?.[0];
-        if (topMatch) {
-          pid = topMatch.id;
-          const itemsRes = await fetch(`https://api.mercadolibre.com/products/${pid}/items`, {
-            headers: { Authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(4500),
-          });
-          const itemsData = itemsRes.ok ? await itemsRes.json() : null;
-          const rawItems = Array.isArray(itemsData?.results) ? itemsData.results : [];
-          const sortedItems = sortRawItems(rawItems);
-
-          for (let i = 0; i < sortedItems.length; i++) {
-            const it = sortedItems[i];
-            const itPrice = typeof it.price === "number" ? it.price : 0;
-            if (itPrice <= 0) continue;
-            const itCur = normalizeCurrency(it.currency_id);
-            if (!itCur) {
-              unsupported.push({
-                id: it.item_id || pid || "",
-                title: topMatch.name || searchQuery,
-                price: itPrice,
-                currency: String(it.currency_id ?? ""),
-                permalink: it.permalink || rawUrl,
-              });
-              continue;
-            }
-            const itPriceUyu = itCur === "USD" ? Math.round(itPrice * rate) : itPrice;
-            const quality = computeSellerQuality(it, topMatch.name || searchQuery, i);
-
-            sameProductSellers.push({
-              id: it.item_id || pid!,
-              price: itPrice,
-              priceUyu: itPriceUyu,
-              currency: itCur,
-              seller: quality.sellerName,
-              sellerCity: quality.sellerCity,
-              permalink: it.permalink || `https://articulo.mercadolibre.com.uy/${it.item_id}`,
-              freeShipping: it.shipping?.free_shipping === true,
-              isAvailable: true,
-              stockStatus: "En stock inmediato en Uruguay",
-              salesVolume: quality.salesVolume,
-              sellerBadge: quality.sellerBadge,
-              sellerReputation: quality.sellerReputation,
-              positivePercentage: quality.positiveRatingPct,
-              ratingAverage: quality.ratingAverage,
-              reviewsCount: quality.reviewsCount,
-              isOfficialStore: quality.isOfficialStore,
-              isTopSeller: quality.isTopSeller,
-            });
-          }
-
-          if (sameProductSellers.length > 0) {
-            const topSeller = sameProductSellers[0];
-            targetProduct = {
-              id: pid,
-              title: topMatch.name || searchQuery,
-              price: topSeller.price,
-              priceUyu: topSeller.priceUyu,
-              currency: topSeller.currency,
-              thumbnail: topMatch.pictures?.[0]?.url ? String(topMatch.pictures[0].url).replace(/^http:\/\//, "https://") : null,
-              permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
-              seller: topSeller.seller,
-              sellerCity: topSeller.sellerCity,
-              condition: "new",
-              freeShipping: topSeller.freeShipping,
-              isAvailable: true,
-              stockStatus: `En stock disponible (${sameProductSellers.length} ${sameProductSellers.length === 1 ? "vendedor" : "vendedores"} en Uruguay)`,
-              salesVolume: topSeller.salesVolume,
-              sellerBadge: topSeller.sellerBadge,
-              sellerReputation: topSeller.sellerReputation,
-              positivePercentage: topSeller.positivePercentage,
-              ratingAverage: topSeller.ratingAverage,
-              reviewsCount: topSeller.reviewsCount,
-              activeSellersCount: sameProductSellers.length,
-            };
-          }
-        }
+    // 2. Sin product_id en el enlace: se busca en el catálogo por las palabras del enlace.
+    //    Puede ser un producto parecido y no el mismo, así que siempre queda marcado como dudoso.
+    if (!match && slugQuery && token) {
+      const found = await findCatalogMatch(slugQuery, token);
+      if (found) {
+        rawItems = found.rawItems ?? [];
+        candidates = found.candidates;
+        match = {
+          ...found.match,
+          confidence: "dudosa",
+          reasons: [
+            "El enlace no es de un producto de catálogo (/p/MLU…): se buscó por las palabras del enlace y puede no ser la misma publicación.",
+            ...found.match.reasons,
+          ],
+        };
       }
     }
 
-    if (!targetProduct && unsupported.length > 0) {
+    // 3. Without a real listing there is nothing to audit: report it instead of inventing a price.
+    if (!match || !token) {
+      return res.status(404).json({
+        ok: false,
+        message:
+          "No pudimos leer esa publicación de Mercado Libre. Revisá que el enlace sea de mercadolibre.com.uy y que la publicación siga activa.",
+      });
+    }
+
+    const built = await buildExactOffers(match.productId, match.title, rawItems ?? [], token, rate);
+    const unsupported: UnsupportedListing[] = [...built.unsupported];
+
+    if (built.offers.length === 0 && unsupported.length > 0) {
       const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
       return res.status(422).json({
         ok: false,
@@ -902,36 +968,42 @@ app.all("/api/analyze-url", async (req, res) => {
       });
     }
 
-    // 3. Without a real listing there is nothing to audit: report it instead of inventing a price.
-    if (!targetProduct) {
-      return res.status(404).json({
-        ok: false,
-        message:
-          "No pudimos leer esa publicación de Mercado Libre. Revisá que el enlace sea de mercadolibre.com.uy y que la publicación siga activa.",
-      });
-    }
+    const exact: ExactProductBlock = {
+      match: { ...match, offersCount: built.offers.length },
+      candidates,
+      ...built,
+      rateUsed: rate,
+    };
 
-    // Calculate percentage differences relative to target product price
-    const baseTargetUyu = targetProduct.priceUyu;
-    for (const s of sameProductSellers) {
-      if (baseTargetUyu > 0) {
-        s.differencePercent = Math.round(((s.priceUyu - baseTargetUyu) / baseTargetUyu) * 100);
-      }
-    }
+    // Precio de referencia: la oferta exacta más barata. Sin ofertas no hay precio.
+    const cheapest = built.offers[0] ?? null;
+    const targetProduct = {
+      id: match.productId,
+      title: match.title,
+      price: cheapest?.price ?? 0,
+      priceUyu: cheapest?.priceUyu ?? 0,
+      currency: cheapest?.currency ?? "UYU",
+      thumbnail: match.thumbnail,
+      permalink: match.permalink,
+      seller: cheapest?.seller?.nickname ?? null,
+      sellerCity: cheapest?.sellerCity ?? null,
+      condition: cheapest?.condition ?? null,
+      freeShipping: cheapest?.freeShipping ?? false,
+      isAvailable: built.offers.length > 0,
+      activeSellersCount: built.offers.length,
+    };
 
     // 4. Fetch Similar Competitor Products in the same market (STRICTLY IN-STOCK ONLY)
+    const searchQuery = slugQuery || match.title;
     let similarProducts: RealMluListing[] = [];
-    if (searchQuery) {
-      const allFound = await searchRealMlu(searchQuery, token, rate, unsupported);
-      similarProducts = allFound
-        .filter((item) => item.id !== targetProduct?.id && item.id !== pid && item.isAvailable)
-        .slice(0, 8);
+    if (!exactOnly && searchQuery) {
+      const allFound = await searchRealMlu(searchQuery, token, unsupported);
+      similarProducts = allFound.filter((item) => item.id !== match.productId && item.isAvailable).slice(0, 8);
     }
 
     // 5. Compute market benchmark stats across all competitor offers with valid prices
     const allPricesUyu: number[] = [
-      ...(targetProduct.isAvailable && targetProduct.priceUyu > 0 ? [targetProduct.priceUyu] : []),
-      ...sameProductSellers.map((s) => s.priceUyu),
+      ...built.offers.map((o) => o.priceUyu),
       ...similarProducts.map((p) => (p.currency === "USD" ? p.price * rate : p.price)),
     ].filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
 
@@ -959,7 +1031,7 @@ app.all("/api/analyze-url", async (req, res) => {
       ok: true,
       url: rawUrl,
       targetProduct,
-      sameProductSellers,
+      exact,
       similarProducts,
       marketStats,
       rateUsed: rate,
@@ -975,11 +1047,29 @@ app.all("/api/analyze-url", async (req, res) => {
 // ------------------------------------------------------------------
 // 3. Gemini Financial Copilot Chat Endpoint
 // ------------------------------------------------------------------
+const CHAT_ALLOWED_MODELS: readonly string[] = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.1-pro-preview"];
+const CHAT_MAX_MESSAGE_CHARS = 4000;
+const CHAT_MAX_HISTORY = 20;
+
+/** Texto del contexto que manda el navegador: se fuerza a string y se acota antes de entrar al prompt. */
+function ctxText(value: unknown, max = 200): string {
+  return String(value ?? "").slice(0, max);
+}
+
 app.post("/api/chat", async (req, res) => {
-  const { message, history, model, enableThinking, context } = req.body;
+  const { message, history, model, enableThinking, context } = req.body ?? {};
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ ok: false, error: "Mensaje requerido" });
+  }
+  if (message.length > CHAT_MAX_MESSAGE_CHARS) {
+    return res.status(400).json({ ok: false, error: `El mensaje es demasiado largo (máximo ${CHAT_MAX_MESSAGE_CHARS} caracteres).` });
+  }
+  if (model !== undefined && model !== null && model !== "" && !CHAT_ALLOWED_MODELS.includes(model)) {
+    return res.status(400).json({ ok: false, error: "Modelo no permitido." });
+  }
+  if (history !== undefined && !Array.isArray(history)) {
+    return res.status(400).json({ ok: false, error: "Historial inválido." });
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -1015,14 +1105,14 @@ Tu trabajo es aconsejar al usuario con números concretos, realistas y basados e
    - Literal E / Pequeña Empresa / Monotributo: IVA compra es costo, no se discrimina en venta, tope de facturación anual.
    - Régimen General: IVA 22% débito fiscal en venta menos crédito fiscal por compras con e-factura con RUT y crédito por comisiones de ML/pasarelas, provisión de IRAE 25%.
 5. Datos actuales de la simulación del usuario:
-   - Producto: ${context?.productName || "No definido"}
-   - Costo unitario: ${context?.wholesaleCost || "N/A"}
-   - Costo puesto landed: ${context?.landedCostUyu || "N/A"}
-   - Precio de venta simulado: ${context?.simulatedSalePriceUyu || "N/A"}
-   - Tipo de cambio: $U ${context?.exchangeRate || 40}
-   - Régimen DGI: ${context?.taxRegime || "Literal E"}
-   - Resultados ML: Ganancia ${context?.ml?.netProfit}, Margen ${context?.ml?.netMargin}, ROI ${context?.ml?.roi}, Viabilidad ${context?.ml?.viability}, Punto equilibrio ${context?.ml?.breakEven}
-   - Resultados Tienda Propia: Ganancia ${context?.direct?.netProfit}, Margen ${context?.direct?.netMargin}, ROI ${context?.direct?.roi}, Viabilidad ${context?.direct?.viability}, Punto equilibrio ${context?.direct?.breakEven}
+   - Producto: ${ctxText(context?.productName || "No definido")}
+   - Costo unitario: ${ctxText(context?.wholesaleCost || "N/A")}
+   - Costo puesto landed: ${ctxText(context?.landedCostUyu || "N/A")}
+   - Precio de venta simulado: ${ctxText(context?.simulatedSalePriceUyu || "N/A")}
+   - Tipo de cambio: $U ${ctxText(context?.exchangeRate || "no disponible", 20)}
+   - Régimen DGI: ${ctxText(context?.taxRegime || "Literal E")}
+   - Resultados ML: Ganancia ${ctxText(context?.ml?.netProfit, 40)}, Margen ${ctxText(context?.ml?.netMargin, 40)}, ROI ${ctxText(context?.ml?.roi, 40)}, Viabilidad ${ctxText(context?.ml?.viability, 40)}, Punto equilibrio ${ctxText(context?.ml?.breakEven, 40)}
+   - Resultados Tienda Propia: Ganancia ${ctxText(context?.direct?.netProfit, 40)}, Margen ${ctxText(context?.direct?.netMargin, 40)}, ROI ${ctxText(context?.direct?.roi, 40)}, Viabilidad ${ctxText(context?.direct?.viability, 40)}, Punto equilibrio ${ctxText(context?.direct?.breakEven, 40)}
 
 Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, DGI) y da recomendaciones accionables para maximizar el margen líquido en mano.`;
 
@@ -1036,11 +1126,11 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 
     const contents: any[] = [];
     if (Array.isArray(history)) {
-      for (const h of history) {
-        if (h.role === "user" || h.role === "assistant") {
+      for (const h of history.slice(-CHAT_MAX_HISTORY)) {
+        if ((h?.role === "user" || h?.role === "assistant") && typeof h.content === "string") {
           contents.push({
             role: h.role === "assistant" ? "model" : "user",
-            parts: [{ text: h.content }],
+            parts: [{ text: h.content.slice(0, CHAT_MAX_MESSAGE_CHARS) }],
           });
         }
       }
@@ -1077,10 +1167,11 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 
     return res.json({ ok: true, reply: reply || "No se pudo generar una respuesta." });
   } catch (err: any) {
+    // El detalle queda en el log del servidor; al navegador no se le devuelve el error crudo de Gemini.
     console.error("[api/chat] error:", err?.message || err);
     return res.status(500).json({
       ok: false,
-      error: err?.message || "Error al procesar la consulta con Gemini.",
+      error: "No se pudo obtener una respuesta del copiloto. Probá de nuevo en unos minutos.",
     });
   }
 });
@@ -1088,9 +1179,27 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 // ------------------------------------------------------------------
 // 4. Competitor Price Tracking & Alerts Endpoint
 // ------------------------------------------------------------------
+const TRACKING_MAX_ITEMS = 25;
+
 app.post("/api/tracking/check", async (req, res) => {
+  // Este endpoint se llama a sí mismo por HTTP (localhost), lo que no existe en funciones de Vercel.
+  // El seguimiento de competidores no está conectado a la interfaz: queda deshabilitado ahí.
+  if (isVercel) {
+    return res.status(501).json({
+      ok: false,
+      code: "NOT_IMPLEMENTED",
+      error: "El seguimiento de competidores no está disponible en este despliegue.",
+    });
+  }
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (items.length > TRACKING_MAX_ITEMS) {
+      return res.status(400).json({
+        ok: false,
+        code: "TOO_MANY_ITEMS",
+        error: `Se pueden verificar hasta ${TRACKING_MAX_ITEMS} competidores por llamada.`,
+      });
+    }
     const exchangeRate = rateFromRequest(req.body?.exchangeRate);
     if (exchangeRate === null) {
       return res.status(400).json({ ok: false, code: "RATE_UNAVAILABLE", message: NO_RATE_MESSAGE });
@@ -1111,7 +1220,7 @@ app.post("/api/tracking/check", async (req, res) => {
 
         const targetUrl = item.permalink || item.productId;
         if (targetUrl) {
-          const analyzeUrl = `http://localhost:${PORT}/api/analyze-url?url=${encodeURIComponent(targetUrl)}&rate=${exchangeRate}`;
+          const analyzeUrl = `http://${SELF_HOST}:${PORT}/api/analyze-url?url=${encodeURIComponent(targetUrl)}&rate=${exchangeRate}`;
           const r = await fetch(analyzeUrl, {
             headers: { Accept: "application/json" },
             signal: AbortSignal.timeout(6000),
@@ -1204,35 +1313,4 @@ app.post("/api/tracking/check", async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
-// 5. Vite middleware (Dev) or Static files (Prod)
-// ------------------------------------------------------------------
-async function startServer() {
-  if (!isProduction) {
-    const { createServer } = await import("vite");
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), "dist");
-    // Hashed build assets never change; index.html must always be revalidated.
-    app.use(
-      "/assets",
-      express.static(path.join(distPath, "assets"), { immutable: true, maxAge: "1y" })
-    );
-    app.use(express.static(distPath, { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.resolve(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`UyMargin server listening on port ${PORT} (${isProduction ? "production" : "development"})`);
-  });
-}
-
-startServer().catch((err) => {
-  console.error("Failed to start server:", err);
-});
+export default app;

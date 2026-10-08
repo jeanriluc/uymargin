@@ -24,14 +24,17 @@ export interface MluItem {
 }
 
 export interface MarketStats {
-  /** Number of prices used for stats after outlier removal. */
+  /** Number of prices used for stats after outlier removal. 0 when a cloud audit did not store it. */
   sampleSize: number;
-  /** Outliers removed by the IQR filter. */
-  outliersRemoved: number;
+  /** Outliers removed by the IQR filter. null = not available (cloud audits do not store it). */
+  outliersRemoved: number | null;
   min: number;
   max: number;
-  average: number;
+  /** null = not available (cloud audits do not store it; it is never reconstructed). */
+  average: number | null;
   median: number;
+  /** True when loaded from a saved cloud audit: only min, median, max and offer count were stored. */
+  fromCloud?: boolean;
 }
 
 export type MluErrorCode =
@@ -56,6 +59,8 @@ export interface MluSearchSuccess {
   rateUsed?: number;
   /** Publicaciones en una moneda que no convertimos: se informan, no se calculan. */
   unsupported?: UnsupportedListing[];
+  /** Ofertas del producto de catálogo que mejor coincide con la búsqueda. null = no disponible. */
+  exact?: ExactProductBlock | null;
   fetchedAt: string;
 }
 
@@ -91,3 +96,85 @@ export type ExchangeRateResponse =
       error?: string;
     }
   | { ok: false; code: "RATE_UNAVAILABLE"; message: string };
+
+// ------------------------------------------------------------------
+// "Productos exactos": ofertas del mismo producto de catálogo (mismo product_id MLU…).
+// Todo lo de acá viene de la API de Mercado Libre; lo que la API no informa va en null
+// y la interfaz lo rotula "no disponible".
+// ------------------------------------------------------------------
+
+/** Datos del vendedor según /users de Mercado Libre. */
+export interface ExactOfferSeller {
+  id: number;
+  /** Apodo de la cuenta. Puede no coincidir con el nombre que muestra la página de la publicación. */
+  nickname: string | null;
+  /** level_id de la reputación ("5_green", "3_yellow"…). null = el vendedor no tiene nivel asignado. */
+  reputationLevel: string | null;
+  /** Estado MercadoLíder real. null = no es MercadoLíder. */
+  powerSellerStatus: "platinum" | "gold" | "silver" | null;
+  /** Transacciones históricas de la cuenta. */
+  transactionsTotal: number | null;
+}
+
+export interface ExactOffer {
+  itemId: string;
+  productId: string;
+  price: number;
+  currency: "UYU" | "USD";
+  /** Precio en pesos con la cotización de la respuesta (`rateUsed`). */
+  priceUyu: number;
+  /** Página del producto de catálogo con esta oferta seleccionada. */
+  permalink: string;
+  freeShipping: boolean;
+  condition: "new" | "used" | "other" | null;
+  isOfficialStore: boolean;
+  sellerCity: string | null;
+  /** null = no se consultó o Mercado Libre no respondió: no disponible. */
+  seller: ExactOfferSeller | null;
+}
+
+export interface CatalogCandidate {
+  productId: string;
+  title: string;
+  thumbnail: string | null;
+  permalink: string;
+  /** Ofertas activas del producto. null = no se consultó. */
+  offersCount: number | null;
+}
+
+export interface ExactMatch extends CatalogCandidate {
+  /**
+   * "enlace": el product_id venía en el enlace pegado. "busqueda": se eligió por nombre.
+   * "elegido": el usuario lo eligió entre los candidatos (solo lo pone la interfaz).
+   */
+  source: "enlace" | "busqueda" | "elegido";
+  confidence: "exacta" | "alta" | "dudosa";
+  /** Motivos de la duda, en texto para mostrar. */
+  reasons: string[];
+}
+
+/** Mínimo, mediana y máximo de las ofertas exactas, en pesos, sin excluir ninguna. */
+export interface ExactStats {
+  count: number;
+  min: number;
+  median: number;
+  max: number;
+}
+
+export interface ExactProductBlock {
+  match: ExactMatch;
+  /** Productos de catálogo que devolvió la búsqueda (incluye el elegido). Vacío cuando vino por enlace. */
+  candidates: CatalogCandidate[];
+  /** Ordenadas por precio en pesos, de menor a mayor. */
+  offers: ExactOffer[];
+  stats: ExactStats | null;
+  sellerData: {
+    status: "ok" | "parcial" | "no_disponible";
+    withData: number;
+    withoutData: number;
+    /** Tope de vendedores consultados por producto. */
+    cap: number;
+  };
+  unsupported: UnsupportedListing[];
+  rateUsed: number;
+}
