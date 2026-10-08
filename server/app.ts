@@ -1,20 +1,28 @@
 import express from "express";
 import dotenv from "dotenv";
 import fs from "node:fs";
-import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "./src/lib/bcu";
-import { normalizeCurrency } from "./src/lib/currency";
+import os from "node:os";
+// Extensión .js a propósito: es lo que resuelve el runtime ESM de Node en Vercel (tsx y tsc la mapean a .ts).
+import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "../src/lib/bcu.js";
+import { normalizeCurrency } from "../src/lib/currency.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
 dotenv.config();
 
+/**
+ * App Express con todas las rutas /api/*. No abre puertos ni monta Vite/dist: eso lo hace
+ * server/local.ts en ejecución local; en Vercel cada archivo de api/ exporta este mismo app.
+ */
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+/** En Vercel (funciones sin estado y disco de solo lectura salvo /tmp). */
+export const isVercel = Boolean(process.env.VERCEL);
+export const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // Solo esta máquina por defecto; HOST=0.0.0.0 para exponerlo a la red a propósito.
-const HOST = process.env.HOST?.trim() || "127.0.0.1";
+export const HOST = process.env.HOST?.trim() || "127.0.0.1";
 // Dirección con la que el servidor se llama a sí mismo (tracking); 0.0.0.0 / :: no son destinos válidos.
 const SELF_HOST = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
-const isProduction = process.env.NODE_ENV === "production";
+export const isProduction = process.env.NODE_ENV === "production";
 
 app.use(express.json({ limit: "256kb" }));
 
@@ -32,7 +40,11 @@ interface ServerRate {
   fetchedAt: string;
 }
 
-const RATE_CACHE_FILE = path.resolve(process.cwd(), ".cache", "exchange-rate.json");
+// En Vercel solo /tmp es escribible (y no se comparte entre instancias): es un caché de mejor esfuerzo.
+// El cliente guarda además la última cotización en localStorage.
+const RATE_CACHE_FILE = isVercel
+  ? path.join(os.tmpdir(), "uymargin-exchange-rate.json")
+  : path.resolve(process.cwd(), ".cache", "exchange-rate.json");
 const RATE_MEMORY_TTL_MS = 30 * 60 * 1000;
 let lastKnownRate: ServerRate | null = null;
 let lastRateCheck = 0;
@@ -1026,6 +1038,15 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
 const TRACKING_MAX_ITEMS = 25;
 
 app.post("/api/tracking/check", async (req, res) => {
+  // Este endpoint se llama a sí mismo por HTTP (localhost), lo que no existe en funciones de Vercel.
+  // El seguimiento de competidores no está conectado a la interfaz: queda deshabilitado ahí.
+  if (isVercel) {
+    return res.status(501).json({
+      ok: false,
+      code: "NOT_IMPLEMENTED",
+      error: "El seguimiento de competidores no está disponible en este despliegue.",
+    });
+  }
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     if (items.length > TRACKING_MAX_ITEMS) {
@@ -1148,35 +1169,4 @@ app.post("/api/tracking/check", async (req, res) => {
   }
 });
 
-// ------------------------------------------------------------------
-// 5. Vite middleware (Dev) or Static files (Prod)
-// ------------------------------------------------------------------
-async function startServer() {
-  if (!isProduction) {
-    const { createServer } = await import("vite");
-    const vite = await createServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), "dist");
-    // Hashed build assets never change; index.html must always be revalidated.
-    app.use(
-      "/assets",
-      express.static(path.join(distPath, "assets"), { immutable: true, maxAge: "1y" })
-    );
-    app.use(express.static(distPath, { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
-    app.get("*", (_req, res) => {
-      res.sendFile(path.resolve(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, HOST, () => {
-    console.log(`UyMargin server listening on ${HOST}:${PORT} (${isProduction ? "production" : "development"})`);
-  });
-}
-
-startServer().catch((err) => {
-  console.error("Failed to start server:", err);
-});
+export default app;
