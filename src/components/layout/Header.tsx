@@ -57,7 +57,7 @@ export function Header({
     <header className="sticky top-0 z-30 border-b border-zinc-200 dark:border-zinc-800 bg-[#fbfbfb]/90 dark:bg-[#0c0c0e]/90 backdrop-blur-md transition-colors">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-3 sm:gap-x-4 sm:px-6">
         {/* Brand with editorial black block logo inspired by reference image */}
-        <div className="flex items-center gap-2 sm:gap-3.5">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3.5">
           <div role="img" aria-label="UyMargin" className="flex size-10 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-base tracking-tighter shadow-sm">
             UY
           </div>
@@ -66,21 +66,21 @@ export function Header({
               <span className="hidden min-[420px]:inline heading-grotesk text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
                 UyMargin
               </span>
-              <span className="hidden bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[11px] font-black uppercase tracking-widest sm:inline-block">
+              <span className="hidden bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[11px] font-black uppercase tracking-widest lg:inline-block">
                 MONTEVIDEO
               </span>
             </div>
-            <p className="hidden text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider sm:block">
+            <p className="hidden text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider xl:block">
               Analizador Financiero & Rentabilidad Mayorista
             </p>
           </div>
         </div>
 
         {/* Center / Right controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {/* Status pill */}
           <span
-            className={`hidden items-center gap-1.5 px-2.5 py-1 text-[11px] font-black tracking-wider uppercase border rounded-md sm:inline-flex ${s.badgeClass}`}
+            className={`hidden items-center gap-1.5 px-2.5 py-1 text-[11px] font-black tracking-wider uppercase border rounded-md whitespace-nowrap lg:inline-flex ${s.badgeClass}`}
             role="status"
           >
             <s.Icon className="size-3" aria-hidden />

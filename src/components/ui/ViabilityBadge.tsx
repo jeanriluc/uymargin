@@ -33,7 +33,7 @@ interface ViabilityBadgeProps {
 export function ViabilityBadge({ viability, compact = false }: ViabilityBadgeProps) {
   const { label, short, badgeClass, Icon } = CONFIG[viability];
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs border rounded-md transition-colors ${badgeClass}`}>
+    <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-xs border rounded-md transition-colors ${badgeClass}`}>
       <Icon className="size-3.5 shrink-0" aria-hidden />
       <span className="uppercase text-[11px] tracking-wider">{compact ? short : label}</span>
     </span>

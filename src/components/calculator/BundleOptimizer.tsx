@@ -37,7 +37,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
     >
       {/* Header bar */}
       <div className="p-4 sm:p-5 flex items-start sm:items-center justify-between gap-4 border-b border-border/50">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <div
             className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${
               isEligibleForBundleBoost
@@ -47,8 +47,8 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
           >
             <Boxes className="size-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h3 className="text-sm font-black uppercase tracking-tight text-foreground flex items-center gap-1.5">
                 <span>Estrategia de Packs & Bundles (MLU)</span>
               </h3>
@@ -74,7 +74,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
           type="button"
           onClick={() => setUserExpanded(!expanded)}
           aria-expanded={expanded}
-          className="rounded-md border border-border bg-surface-2 p-1.5 text-muted hover:text-foreground transition-colors cursor-pointer"
+          className="shrink-0 rounded-md border border-border bg-surface-2 p-1.5 text-muted hover:text-foreground transition-colors cursor-pointer"
           aria-label={expanded ? "Minimizar opciones de packs" : "Expandir opciones de packs"}
         >
           {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -93,7 +93,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))]">
             {options.map((opt) => {
               const crosses = opt.crossesThreshold === 1;
               return (

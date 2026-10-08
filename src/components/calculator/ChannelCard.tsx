@@ -82,20 +82,20 @@ export function ChannelCard({
       {/* Top Banner Accent in solid black */}
       <div className="h-1 w-full bg-black dark:bg-white" />
 
-      <div className="p-6 flex flex-col gap-5 flex-1">
+      <div className="p-5 sm:p-6 flex flex-col gap-5 flex-1">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
-          <div className="flex items-center gap-3.5">
-            <div className="flex size-11 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black font-black">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-zinc-100 dark:border-zinc-800 pb-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-black text-white dark:bg-white dark:text-black font-black">
               {icon}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <h3 className="heading-grotesk text-base font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">
                   {r.label}
                 </h3>
                 {isWinner && hasPrice && (
-                  <span className="inline-flex items-center gap-1 bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[11px] font-black uppercase tracking-widest rounded">
+                  <span className="inline-flex items-center gap-1 whitespace-nowrap bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[11px] font-black uppercase tracking-widest rounded">
                     <Trophy className="size-2.5" /> RECOMENDADO
                   </span>
                 )}
@@ -112,7 +112,7 @@ export function ChannelCard({
 
         {/* Hero KPI: Ganancia Neta Líquida */}
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-4">
-          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
             <span>Ganancia Neta Líquida por Unidad</span>
             {hasPrice && (
               <span className="font-semibold text-zinc-500 dark:text-zinc-400">
@@ -121,7 +121,7 @@ export function ChannelCard({
             )}
           </div>
 
-          <div className="flex items-baseline gap-3">
+          <div className="flex flex-wrap items-baseline gap-x-3">
             <p className="num text-3xl sm:text-4xl font-black tracking-tight text-black dark:text-white">
               <AnimatedNumber value={r.netProfit} format={formatUyu} />
             </p>
@@ -132,7 +132,7 @@ export function ChannelCard({
         </div>
 
         {/* 4 Financial Metrics Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-2">
           <StatBox
             label="MARGEN NETO"
             value={<AnimatedNumber value={r.netMargin} format={formatPct} />}
@@ -169,7 +169,7 @@ export function ChannelCard({
 
         {/* Waterfall Chart */}
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
             <span>Cascada de Rentabilidad</span>
             <span className="text-[11px] font-normal text-zinc-500 dark:text-zinc-400">Desglose secuencial</span>
           </div>

@@ -125,7 +125,7 @@ export function MarketSummary({
       )}
 
       {/* 5 Architectural Stat Cards */}
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7.5rem),1fr))] gap-2.5">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-24 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
@@ -192,11 +192,11 @@ export function MarketSummary({
       {items.length > 0 && (
         <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
                 Publicaciones Reales Verificadas con Stock en Uruguay
               </h4>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase whitespace-nowrap">
                 <span className="size-1.5 rounded-full bg-emerald-500"></span> 100% Stock Activo
               </span>
             </div>
@@ -213,16 +213,16 @@ export function MarketSummary({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
             {items.slice(0, 9).map((item) => (
               <div
                 key={item.id}
-                className="group flex flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/40 p-3 transition-all hover:border-black dark:hover:border-white hover:shadow-sm"
+                className="group flex min-w-0 flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/40 p-3 transition-all hover:border-black dark:hover:border-white hover:shadow-sm"
               >
                 <div>
                   {/* Top badges: Stock & Store Quality */}
-                  <div className="flex items-center justify-between gap-1 mb-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
                       <span className="size-1.5 rounded-full bg-emerald-500"></span> En Stock
                     </span>
 
@@ -272,12 +272,12 @@ export function MarketSummary({
                   </div>
 
                   {/* Pre-click seller reputation, sales & reviews */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
-                    <span className="text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[130px]">
+                  <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between gap-2 text-[11px]">
+                    <span className="min-w-0 flex-1 truncate text-zinc-600 dark:text-zinc-400 font-medium" title={item.seller || undefined}>
                       {item.seller || "Vendedor sin identificar"}
                     </span>
                     {item.ratingAverage != null && (
-                      <div className="flex items-center gap-1 font-black text-amber-700 dark:text-amber-400">
+                      <div className="flex shrink-0 items-center gap-1 font-black text-amber-700 dark:text-amber-400">
                       <Star className="size-2.5 fill-amber-500 text-amber-500" />
                       <span>{item.ratingAverage}</span>
                       {item.reviewsCount != null && <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-normal">({item.reviewsCount})</span>}
@@ -287,27 +287,28 @@ export function MarketSummary({
                 </div>
 
                 {/* Price, Shipping & Actions */}
-                <div className="mt-3 flex items-center justify-between border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
-                  <div>
+                <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
+                  <div className="min-w-0">
                     <span className="num text-xs font-black text-black dark:text-white block">
                       {formatMoney(item.price, item.currency)}
                     </span>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5">
                       {item.salesVolume && (
                         <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                           {item.salesVolume}
                         </span>
                       )}
                       {item.freeShipping && (
-                        <span className="inline-flex items-center gap-0.5 text-[11px] font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">
-                          <Truck className="size-2" /> Gratis
+                        <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-[11px] font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">
+                          <Truck className="size-2" aria-hidden /> Envío gratis
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
                     <button
+                      type="button"
                       onClick={() => onSelectPrice(Math.round(item.price))}
                       title="Simular con este precio de venta"
                       className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
@@ -319,7 +320,8 @@ export function MarketSummary({
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Ver en Mercado Libre"
-                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                      aria-label={`Ver ${item.title} en Mercado Libre`}
+                      className="tap-target inline-flex size-8 items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                     >
                       <ExternalLink className="size-3" />
                     </a>

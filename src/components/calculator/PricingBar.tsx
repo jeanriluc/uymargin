@@ -57,7 +57,7 @@ export function PricingBar({
     <section aria-label="Precio de venta" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
       <StepHeader step="02" title="Precio de venta al público" aside="Lo que cobrás" />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] items-end">
+      <div className="grid gap-5">
         <div>
           <NumberField
             id="sale-price"
@@ -65,7 +65,7 @@ export function PricingBar({
             value={salePrice}
             onChange={onChange}
             prefix="$U"
-            inputClassName="h-14 text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100"
+            inputClassName="h-14! text-3xl! font-black tracking-tight text-zinc-900 dark:text-zinc-100"
             hint={
               exchangeRate > 0 && salePrice > 0
                 ? `Equivale a ${formatUsd(salePrice / exchangeRate)} al cambio de ${formatRate(exchangeRate)}`
@@ -80,21 +80,21 @@ export function PricingBar({
             Atajos de Fijación de Precios:
           </span>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2">
             {quickActions.map(({ id, label, value, badge }) => (
               <button
                 key={id}
                 type="button"
                 disabled={value === null || value <= 0}
                 onClick={() => value !== null && onChange(Math.round(value))}
-                className="group flex flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-3 text-left transition-all hover:border-black dark:hover:border-white cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
+                className="group flex min-w-0 flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-3 text-left transition-all hover:border-black dark:hover:border-white cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
               >
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white">
                     {badge}
                   </span>
                 </div>
-                <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300 truncate">
+                <span className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-300">
                   {label}
                 </span>
                 <span className="num text-sm font-black text-black dark:text-white mt-1">
@@ -142,7 +142,7 @@ export function PricingBar({
             )}
           </div>
 
-          <div className="num mt-1.5 flex justify-between text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
+          <div className="num mt-1.5 flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
             <span>MIN: {formatUyu(stats.min)}</span>
             <span className="text-black dark:text-white font-black">MEDIANA: {formatUyu(stats.median)}</span>
             <span>MAX: {formatUyu(stats.max)}</span>

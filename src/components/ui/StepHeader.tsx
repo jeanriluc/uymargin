@@ -10,8 +10,8 @@ interface StepHeaderProps {
 
 export function StepHeader({ step, title, aside, id }: StepHeaderProps) {
   return (
-    <div className="flex items-center justify-between gap-3 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-      <div className="flex items-center gap-2.5">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+      <div className="flex min-w-0 items-center gap-2.5">
         {step && (
           <span
             aria-hidden
@@ -22,14 +22,14 @@ export function StepHeader({ step, title, aside, id }: StepHeaderProps) {
         )}
         <h2
           id={id}
-          className="heading-grotesk text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100"
+          className="heading-grotesk min-w-0 text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100"
         >
           {step && <span className="visually-hidden">Paso {Number(step)}: </span>}
           {title}
         </h2>
       </div>
       {aside && (
-        <span className="shrink-0 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
+        <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
           {aside}
         </span>
       )}

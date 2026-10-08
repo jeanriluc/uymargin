@@ -23,6 +23,7 @@
   font-variant-numeric: tabular-nums;
   /* A full monospace space between "$U" and the figure reads as a gap; tighten it. */
   word-spacing: -0.25em;
+  white-space: nowrap;
 }
 
 /* Subtle architectural dot grid inspired by editorial layout */
@@ -189,7 +190,9 @@
 @media (pointer: coarse) {
   button,
   summary,
-  [role="button"] {
+  select,
+  [role="button"],
+  a.tap-target {
     min-height: 2.75rem;
     min-width: 2.75rem;
   }

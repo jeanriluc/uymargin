@@ -1,0 +1,660 @@
+{
+  "fecha": "2026-10-08T11:03:32.538Z",
+  "url": "http://localhost:3001",
+  "radarItems": 9,
+  "enlaceOk": true,
+  "resumen": [
+    {
+      "ancho": 320,
+      "calculadora + radar": "6 elementos",
+      "por enlace": "página desborda · 8 elementos"
+    },
+    {
+      "ancho": 360,
+      "calculadora + radar": "3 elementos",
+      "por enlace": "4 elementos"
+    },
+    {
+      "ancho": 390,
+      "calculadora + radar": "3 elementos",
+      "por enlace": "3 elementos"
+    },
+    {
+      "ancho": 430,
+      "calculadora + radar": "3 elementos",
+      "por enlace": "3 elementos"
+    },
+    {
+      "ancho": 600,
+      "calculadora + radar": "0 elementos",
+      "por enlace": "0 elementos"
+    },
+    {
+      "ancho": 768,
+      "calculadora + radar": "0 elementos",
+      "por enlace": "0 elementos"
+    },
+    {
+      "ancho": 900,
+      "calculadora + radar": "0 elementos",
+      "por enlace": "0 elementos"
+    },
+    {
+      "ancho": 1024,
+      "calculadora + radar": "página desborda · 11 elementos",
+      "por enlace": "4 elementos"
+    },
+    {
+      "ancho": 1180,
+      "calculadora + radar": "página desborda · 5 elementos",
+      "por enlace": "2 elementos"
+    },
+    {
+      "ancho": 1280,
+      "calculadora + radar": "4 elementos",
+      "por enlace": "2 elementos"
+    },
+    {
+      "ancho": 1440,
+      "calculadora + radar": "4 elementos",
+      "por enlace": "2 elementos"
+    }
+  ],
+  "estados": {
+    "calculadora + radar": {
+      "320": {
+        "paginaDesborda": false,
+        "scrollWidth": 320,
+        "clientWidth": 320,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 32,
+            "elemento": "span \"RECOMENDADO\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 32,
+            "elemento": "p \"Mercado Libre Uruguay (Comisión + Mercad\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 146,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 34,
+            "elemento": "button \"Expandir opciones de packs\"",
+            "contenedor": "div \"Estrategia de Packs & Bundles (MLU)Multi\"",
+            "zona": "página"
+          }
+        ]
+      },
+      "360": {
+        "paginaDesborda": false,
+        "scrollWidth": 360,
+        "clientWidth": 360,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 106,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          }
+        ]
+      },
+      "390": {
+        "paginaDesborda": false,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 76,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          }
+        ]
+      },
+      "430": {
+        "paginaDesborda": false,
+        "scrollWidth": 430,
+        "clientWidth": 430,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 36,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          }
+        ]
+      },
+      "600": {
+        "paginaDesborda": false,
+        "scrollWidth": 600,
+        "clientWidth": 600,
+        "hallazgos": []
+      },
+      "768": {
+        "paginaDesborda": false,
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "hallazgos": []
+      },
+      "900": {
+        "paginaDesborda": false,
+        "scrollWidth": 900,
+        "clientWidth": 900,
+        "hallazgos": []
+      },
+      "1024": {
+        "paginaDesborda": true,
+        "scrollWidth": 1063,
+        "clientWidth": 1024,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 28,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 26,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"OBJETIVOMargen 30% Neto$U 1.882\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"OBJETIVO\"",
+            "contenedor": "button \"OBJETIVOMargen 30% Neto$U 1.882\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 4,
+            "elemento": "span \"PROMEDIO\"",
+            "contenedor": "div \"PROMEDIO$U 1.618\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 39,
+            "elemento": "span \"Top\"",
+            "contenedor": "div \"En StockOficial TopBotella termo Stanley\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 8,
+            "elemento": "span \"$U 3.279\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 8,
+            "elemento": "span \"Gratis\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 75,
+            "elemento": "button \"Simular\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 101,
+            "elemento": "a \"\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 8,
+            "elemento": "span \"$U 4.035\"",
+            "contenedor": "div \"$U 4.035+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      },
+      "1180": {
+        "paginaDesborda": true,
+        "scrollWidth": 1193,
+        "clientWidth": 1180,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 11,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 13,
+            "elemento": "span \"Top\"",
+            "contenedor": "div \"En StockOficial TopBotella termo Stanley\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 49,
+            "elemento": "button \"Simular\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 75,
+            "elemento": "a \"\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      },
+      "1280": {
+        "paginaDesborda": false,
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 33,
+            "elemento": "button \"Simular\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 59,
+            "elemento": "a \"\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      },
+      "1440": {
+        "paginaDesborda": false,
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 33,
+            "elemento": "button \"Simular\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 59,
+            "elemento": "a \"\"",
+            "contenedor": "div \"$U 3.279+1.000 vendidos GratisSimular\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      }
+    },
+    "por enlace": {
+      "320": {
+        "paginaDesborda": true,
+        "scrollWidth": 348,
+        "clientWidth": 320,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 32,
+            "elemento": "span \"RECOMENDADO\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 32,
+            "elemento": "p \"Mercado Libre Uruguay (Comisión + Mercad\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 146,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 34,
+            "elemento": "button \"Expandir opciones de packs\"",
+            "contenedor": "div \"Estrategia de Packs & Bundles (MLU)Multi\"",
+            "zona": "página"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 18,
+            "elemento": "span \"Solo con stock activo\"",
+            "contenedor": "div \"Auditor de publicación por enlace (MLU)S\"",
+            "zona": "Precio de mercado · opcional"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 65,
+            "elemento": "select \"Top Reputación & VentasMenor Precio en $\"",
+            "contenedor": "div \"FILTRAR:Todos (19) Tiendas Oficiales & M\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      },
+      "360": {
+        "paginaDesborda": false,
+        "scrollWidth": 360,
+        "clientWidth": 360,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 106,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 25,
+            "elemento": "select \"Top Reputación & VentasMenor Precio en $\"",
+            "contenedor": "div \"FILTRAR:Todos (19) Tiendas Oficiales & M\"",
+            "zona": "Precio de mercado · opcional"
+          }
+        ]
+      },
+      "390": {
+        "paginaDesborda": false,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 76,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          }
+        ]
+      },
+      "430": {
+        "paginaDesborda": false,
+        "scrollWidth": 430,
+        "clientWidth": 430,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre los regímenes\"",
+            "zona": "Paso 1: Costo mayorista y régimen DGI"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 36,
+            "elemento": "span \"Rentable\"",
+            "contenedor": "div \"Mercado Libre UY RECOMENDADOMercado Libr\"",
+            "zona": "Mercado Libre UY"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"Sobre la comisión de Mercado Libre\"",
+            "zona": "Mercado Libre UY"
+          }
+        ]
+      },
+      "600": {
+        "paginaDesborda": false,
+        "scrollWidth": 600,
+        "clientWidth": 600,
+        "hallazgos": []
+      },
+      "768": {
+        "paginaDesborda": false,
+        "scrollWidth": 768,
+        "clientWidth": 768,
+        "hallazgos": []
+      },
+      "900": {
+        "paginaDesborda": false,
+        "scrollWidth": 900,
+        "clientWidth": 900,
+        "hallazgos": []
+      },
+      "1024": {
+        "paginaDesborda": false,
+        "scrollWidth": 1024,
+        "clientWidth": 1024,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 28,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 26,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"OBJETIVOMargen 30% Neto$U 1.882\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"OBJETIVO\"",
+            "contenedor": "button \"OBJETIVOMargen 30% Neto$U 1.882\"",
+            "zona": "Precio de venta"
+          }
+        ]
+      },
+      "1180": {
+        "paginaDesborda": false,
+        "scrollWidth": 1180,
+        "clientWidth": 1180,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 13,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 11,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          }
+        ]
+      },
+      "1280": {
+        "paginaDesborda": false,
+        "scrollWidth": 1280,
+        "clientWidth": 1280,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          }
+        ]
+      },
+      "1440": {
+        "paginaDesborda": false,
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "hallazgos": [
+          {
+            "tipo": "texto de botón cortado",
+            "px": 3,
+            "elemento": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          },
+          {
+            "tipo": "sale del contenedor",
+            "px": 2,
+            "elemento": "span \"COMPETITIVO\"",
+            "contenedor": "button \"COMPETITIVOMediana Mercado$U 899\"",
+            "zona": "Precio de venta"
+          }
+        ]
+      }
+    }
+  }
+}

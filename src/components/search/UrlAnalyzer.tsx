@@ -534,7 +534,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
             </div>
 
             {/* Benchmark Cards */}
-            <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-[repeat(auto-fit,minmax(min(100%,8.5rem),1fr))] gap-2.5">
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 p-3">
                 <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                   MÍNIMO ENCONTRADO
@@ -629,14 +629,14 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
                   <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     ORDENAR:
                   </span>
                   <select
                     value={sellerSort}
                     onChange={(e: any) => setSellerSort(e.target.value)}
-                    className="h-7 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 text-[11px] font-bold text-zinc-800 dark:text-zinc-200 outline-none"
+                    className="h-7 min-w-0 max-w-full rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 text-[11px] font-bold text-zinc-800 dark:text-zinc-200 outline-none"
                   >
                     <option value="top">Top Reputación & Ventas</option>
                     <option value="price_asc">Menor Precio en $U</option>
@@ -842,7 +842,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
                 {result.similarProducts.map((item) => (
                   <div
                     key={item.id}
@@ -888,7 +888,7 @@ loading="lazy" decoding="async"                               src={item.thumbnai
 
                       {/* Seller & Reviews Pre-click summary */}
                       <div className="mt-2.5 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[120px]">
+                        <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium min-w-0 flex-1 truncate">
                           {item.seller || "Vendedor sin identificar"}
                         </span>
                         {item.ratingAverage != null && (
@@ -901,8 +901,8 @@ loading="lazy" decoding="async"                               src={item.thumbnai
                       </div>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
-                      <div>
+                    <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
+                      <div className="min-w-0">
                         <span className="num text-xs font-black text-black dark:text-white block">
                           {formatMoney(item.price, item.currency)}
                         </span>
@@ -913,8 +913,9 @@ loading="lazy" decoding="async"                               src={item.thumbnai
                         )}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
                         <button
+                          type="button"
                           onClick={() =>
                             onSimulatePrice(
                               item.currency === "USD" ? Math.round(item.price * exchangeRate) : item.price,
@@ -931,7 +932,8 @@ loading="lazy" decoding="async"                               src={item.thumbnai
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Ver en Mercado Libre"
-                          className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                          aria-label={`Ver ${item.title} en Mercado Libre`}
+                          className="tap-target inline-flex size-8 items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                         >
                           <ExternalLink className="size-3" />
                         </a>

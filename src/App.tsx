@@ -452,32 +452,33 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
       <main className={`mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pt-8 sm:px-6 lg:pb-8 ${isReady ? "pb-28" : "pb-8"}`}>
         {/* Architectural Executive Ribbon (inspired by reference layout) */}
         <section aria-label="Resumen Ejecutivo" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-x-6 gap-y-4">
             {/* Left: Product & Sourcing */}
-            <div className="flex items-start gap-4">
-              <div className="flex size-14 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-sm">
-                <TrendingUp className="size-7" />
+            <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+              <div className="flex size-11 sm:size-14 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-sm">
+                <TrendingUp className="size-6 sm:size-7" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
                     {isReady ? "SIMULACIÓN ACTIVA" : "NUEVA SIMULACIÓN"}
                   </span>
-                  <span className="text-zinc-300 dark:text-zinc-700">·</span>
+                  <span aria-hidden className="text-zinc-300 dark:text-zinc-700">·</span>
                   <span className="text-[11px] font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">
                     {inputs.tax.regime === "literal_e"
                       ? "LITERAL E"
                       : `RÉGIMEN GENERAL (IVA ${Math.round((inputs.tax.vatRate ?? 0.22) * 100)}%)`}
                   </span>
                 </div>
-                <h1 className="heading-grotesk text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase mt-0.5">
+                <h1
+                  className="heading-grotesk text-xl sm:text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase mt-0.5 line-clamp-2 break-words"
+                  title={inputs.productName || inputs.query || undefined}
+                >
                   {inputs.productName || inputs.query || "Producto en Análisis"}
                 </h1>
-                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider">
-                  <span>Costo puesto: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
-                  <span>·</span>
-                  <span>Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
-                  <span>·</span>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider">
+                  <span className="whitespace-nowrap">Costo puesto: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
+                  <span className="whitespace-nowrap">Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
                   <span>USD/UYU: <strong className="text-black dark:text-white num">{formatRate(inputs.exchangeRate)}</strong>
                     {rateNote && (
                       <span
@@ -493,7 +494,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             </div>
 
             {/* Right: Quick Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+            <div className="grid grid-cols-2 min-[400px]:grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:items-center xl:max-w-[34rem] xl:shrink-0 xl:justify-end [&>button]:justify-center">
               {(inputs.cost.amount > 0 || inputs.salePrice > 0 || inputs.productName) && (
                 <button
                   type="button"

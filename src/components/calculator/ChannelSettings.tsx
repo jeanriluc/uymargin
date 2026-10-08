@@ -35,7 +35,7 @@ export function MlSettings({ value, onChange }: MlSettingsProps) {
         ]}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
         <NumberField
           id="ml-commission-rate"
           label={
@@ -138,7 +138,7 @@ export function DirectSettings({ value, onChange }: DirectSettingsProps) {
     <div className="grid gap-4">
       <fieldset>
         <legend className="field-label">Pasarela de pago</legend>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))]">
           {(Object.keys(GATEWAYS) as (keyof typeof GATEWAYS)[]).map((key) => {
             const g = GATEWAYS[key];
             return (
@@ -162,7 +162,7 @@ export function DirectSettings({ value, onChange }: DirectSettingsProps) {
         </div>
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,17rem),1fr))]">
         <Segmented
           name="direct-shipping-mode"
           legend="Envío local (DAC, Mirtrans, cadetería)"
