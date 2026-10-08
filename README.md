@@ -16,7 +16,7 @@ Simula el margen neto por unidad después de impuestos (DGI), comisiones y logí
   - *Lote CSV:* carga un catálogo (SKU, nombre, costo, moneda) y lo ordena por rentabilidad.
 - **Guardar y exportar:** historial en el navegador, exportación a CSV, impresión, resumen para copiar o enviar por WhatsApp.
 - **Nube (opcional):** guarda auditorías de "Por enlace" y "Lote CSV" en un proyecto propio de Supabase.
-- **Tema:** claro, oscuro o automático (sigue al sistema), desde el botón del encabezado. La elección se recuerda.
+- **Tema:** claro por defecto, con opción de oscuro desde el botón del encabezado. La elección se recuerda.
 - **Copiloto (opcional):** un asistente con Gemini que comenta un resultado ya calculado. No calcula ni reemplaza las cifras.
 
 Limitaciones conocidas, documentadas en el registro de auditoría interno (no publicado): no hay cuentas de usuario; el seguimiento de competidores está programado pero no tiene acceso desde la interfaz; "Por enlace" solo lee publicaciones de catálogo; las estrellas, opiniones y ventas que acompañan a cada publicación son estimaciones del servidor, no datos reales de Mercado Libre.
@@ -87,7 +87,7 @@ server.ts                 Servidor Express: API (cotización, radar, enlace, cop
 src/
   App.tsx                 Pantalla principal y estado de la simulación
   lib/finance/            Motor de cálculo: impuestos DGI, canales, packs, constantes
-  lib/theme.ts            Tema claro / oscuro / automático
+  lib/theme.ts            Tema claro (por defecto) u oscuro
   lib/format.ts           Formato de moneda, porcentajes y tipo de cambio (es-UY)
   lib/currency.ts         Moneda original de cada precio, conversión a pesos y reglas de la cotización
   lib/bcu.ts              Pedidos y lectura de respuestas del servicio de cotizaciones del BCU

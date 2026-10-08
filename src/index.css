@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* La variante `dark:` de Tailwind sigue al atributo data-theme de <html>, no al sistema.
-   Quién decide el tema (claro, oscuro o automático) es src/lib/theme.ts. */
+   El tema (claro por defecto, u oscuro) lo elige el usuario; ver src/lib/theme.ts. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @layer base {

@@ -9,17 +9,15 @@
     <meta property="og:description" content="Dashboard financiero SaaS y simulador de márgenes para e-commerce y mayoristas en Uruguay (Mercado Libre, Tienda Propia, DGI e impuestos)." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="color-scheme" content="light dark" />
     <script>
-      // Aplica el tema antes de pintar, para que no haya parpadeo. Mismo criterio que src/lib/theme.ts.
+      // Aplica el tema antes de pintar, para que no haya parpadeo. Mismo criterio que src/lib/theme.ts:
+      // oscuro solo si el usuario lo eligió; en cualquier otro caso, claro.
       (function () {
-        var choice = "auto";
+        var theme = "light";
         try {
-          var saved = localStorage.getItem("uymargin:theme:v2");
-          if (saved === "light" || saved === "dark" || saved === "auto") choice = saved;
+          if (localStorage.getItem("uymargin:theme:v2") === "dark") theme = "dark";
         } catch (e) {}
-        var dark = choice === "dark" || (choice === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
