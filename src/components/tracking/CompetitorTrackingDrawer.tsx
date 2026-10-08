@@ -152,7 +152,6 @@ export function CompetitorTrackingDrawer({
         permalink: p.permalink,
         thumbnail: p.thumbnail,
         seller: p.seller,
-        sellerBadge: p.sellerBadge,
         sellerCity: p.sellerCity,
         currency: p.currency,
         initialPrice: p.priceUyu || p.price,

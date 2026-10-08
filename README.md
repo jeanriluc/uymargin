@@ -19,7 +19,7 @@ Simula el margen neto por unidad después de impuestos (DGI), comisiones y logí
 - **Tema:** claro por defecto, con opción de oscuro desde el botón del encabezado. La elección se recuerda.
 - **Copiloto (opcional):** un asistente con Gemini que comenta un resultado ya calculado. No calcula ni reemplaza las cifras.
 
-Limitaciones conocidas, documentadas en el registro de auditoría interno (no publicado): no hay cuentas de usuario; el seguimiento de competidores está programado pero no tiene acceso desde la interfaz; "Por enlace" solo lee publicaciones de catálogo; las estrellas, opiniones y ventas que acompañan a cada publicación son estimaciones del servidor, no datos reales de Mercado Libre.
+Limitaciones conocidas, documentadas en el registro de auditoría interno (no publicado): no hay cuentas de usuario; el seguimiento de competidores está programado pero no tiene acceso desde la interfaz; "Por enlace" solo lee publicaciones de catálogo; de cada vendedor se muestra solo lo que informa Mercado Libre (apodo, reputación, MercadoLíder y transacciones); no hay estrellas, opiniones ni unidades en stock.
 
 > Es una herramienta de estimación. No reemplaza el asesoramiento de un contador.
 

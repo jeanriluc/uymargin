@@ -1,26 +1,25 @@
 import type { Currency } from "@/lib/finance/types";
 
+/**
+ * Producto de catálogo del radar (y de "Similares"). Lleva el precio de una de sus ofertas activas
+ * y los datos de ese vendedor. Solo datos que informa Mercado Libre; lo que falta va en null.
+ */
 export interface MluItem {
   id: string;
   title: string;
   price: number;
   currency: Currency;
-  condition: "new" | "used" | "other";
+  condition?: "new" | "used" | "other" | null;
   thumbnail: string | null;
   permalink: string;
   freeShipping: boolean;
-  seller: string | null;
-  isAvailable?: boolean;
-  stockStatus?: string;
-  salesVolume?: string;
-  sellerBadge?: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation?: string;
-  positivePercentage?: number;
-  ratingAverage?: number;
-  reviewsCount?: number;
+  /** La oferta mostrada es de una tienda oficial (official_store_id). */
+  isOfficialStore?: boolean;
+  /** Cantidad de ofertas activas del producto de catálogo. */
   activeSellersCount?: number;
-  sellerCity?: string;
-  isTopChoice?: boolean;
+  sellerCity?: string | null;
+  /** Vendedor de la oferta mostrada, según /users. null = no disponible. */
+  seller?: ExactOfferSeller | null;
 }
 
 export interface MarketStats {

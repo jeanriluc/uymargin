@@ -12,14 +12,13 @@ import {
   AlertCircle,
   AlertTriangle,
   PackageSearch,
-  Star,
-  Sparkles,
 } from "lucide-react";
 import { formatUyu } from "@/lib/format";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
-import type { ExactProductBlock, UnsupportedListing } from "@/lib/mlu/types";
+import type { ExactProductBlock, MluItem, UnsupportedListing } from "@/lib/mlu/types";
+import { CatalogProductCard } from "@/components/search/CatalogProductCard";
 import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { formatRate } from "@/lib/format";
 import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
@@ -42,26 +41,6 @@ export interface AnalyzedProductData {
   activeSellersCount?: number;
 }
 
-export interface SimilarProductItem {
-  id: string;
-  title: string;
-  price: number;
-  currency: "UYU" | "USD";
-  thumbnail: string | null;
-  permalink: string;
-  freeShipping: boolean;
-  seller: string | null;
-  isAvailable?: boolean;
-  stockStatus?: string;
-  salesVolume?: string;
-  sellerBadge?: string;
-  sellerReputation?: string;
-  positivePercentage?: number;
-  ratingAverage?: number;
-  reviewsCount?: number;
-  isTopChoice?: boolean;
-}
-
 export interface UrlAuditResponse {
   ok: boolean;
   url: string;
@@ -72,7 +51,7 @@ export interface UrlAuditResponse {
   targetProduct: AnalyzedProductData;
   /** Ofertas del mismo producto de catálogo ("Productos exactos"). */
   exact: ExactProductBlock;
-  similarProducts: SimilarProductItem[];
+  similarProducts: MluItem[];
   marketStats: {
     min: number;
     median: number;
@@ -527,114 +506,37 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
             onChooseAlternative={(candidate) => handleAnalyze(candidate.permalink)}
           />
 
-          {/* Section 2: Similar Competing Products in the Market (Verified In-Stock) */}
+          {/* Section 2: Productos similares (otros productos de catálogo con ofertas activas) */}
           {result.similarProducts.length > 0 && (
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
-                <div className="flex items-center gap-2">
-                  <PackageSearch className="size-4 text-zinc-600 dark:text-zinc-400" />
-                  <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
-                    Productos Similares y Tops Verificados en Uruguay
-                  </h3>
+              <div className="mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <PackageSearch className="size-4 text-zinc-600 dark:text-zinc-400" />
+                    <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
+                      Productos similares en Mercado Libre Uruguay
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
+                    <span className="num">{result.similarProducts.length}</span>{" "}
+                    {result.similarProducts.length === 1 ? "producto con ofertas activas" : "productos con ofertas activas"}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                  <span className="size-2 rounded-full bg-emerald-500"></span>
-                  {result.similarProducts.length} alternativas con stock activo
-                </span>
+                <p className="mt-1 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                  No son el mismo producto. Ordenados por cantidad de ofertas activas; a igual cantidad, primero el más
+                  barato. El precio de cada tarjeta es el de una de sus ofertas (tienda oficial si la hay; si no, la más
+                  barata) y el vendedor es el de esa oferta.
+                </p>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
                 {result.similarProducts.map((item) => (
-                  <div
+                  <CatalogProductCard
                     key={item.id}
-                    className="group flex flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/40 p-3 transition-all hover:border-black dark:hover:border-white shadow-sm"
-                  >
-                    <div>
-                      {/* Top Choice Badge & Stock */}
-                      <div className="flex items-center justify-between gap-1 mb-2">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                          <span className="size-1.5 rounded-full bg-emerald-500"></span>
-                          En Stock
-                        </span>
-                        {item.isTopChoice && (
-                          <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[11px] font-black uppercase tracking-wider">
-                            <Sparkles className="size-2.5" /> TOP
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-start gap-2.5">
-                        <div className="relative size-12 shrink-0 rounded bg-white border border-zinc-200 dark:border-zinc-700 p-0.5 overflow-hidden">
-                          {item.thumbnail ? (
-                            <img
-loading="lazy" decoding="async"                               src={item.thumbnail}
-                              alt=""
-                              className="size-full object-contain"
-                            />
-                          ) : (
-                            <PackageSearch className="m-auto size-5 text-zinc-500 dark:text-zinc-400" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <a
-                            href={item.permalink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="line-clamp-2 text-xs font-bold leading-snug text-zinc-800 dark:text-zinc-200 hover:underline"
-                          >
-                            {item.title}
-                          </a>
-                        </div>
-                      </div>
-
-                      {/* Seller & Reviews Pre-click summary */}
-                      <div className="mt-2.5 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium min-w-0 flex-1 truncate">
-                          {item.seller || "Vendedor sin identificar"}
-                        </span>
-                        {item.ratingAverage != null && (
-                          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
-                          <Star className="size-2.5 fill-amber-500 text-amber-500" />
-                          <span>{item.ratingAverage}</span>
-                          {item.reviewsCount != null && <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">({item.reviewsCount})</span>}
-                        </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
-                      <div className="min-w-0">
-                        <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
-                        {item.salesVolume && (
-                          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                            {item.salesVolume}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                        <button
-                          type="button"
-                          disabled={uyuOf(item.price, item.currency) === null}
-                          onClick={() => simulate(item.price, item.currency, item.title)}
-                          title="Simular rentabilidad con este competidor"
-                          className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white"
-                        >
-                          Simular
-                        </button>
-                        <a
-                          href={item.permalink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Ver en Mercado Libre"
-                          aria-label={`Ver ${item.title} en Mercado Libre`}
-                          className="tap-target inline-flex size-8 items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                        >
-                          <ExternalLink className="size-3" />
-                        </a>
-                      </div>
-                    </div>
-                  </div>
+                    item={item}
+                    rate={rate}
+                    onSimulate={(priceUyu) => onSimulatePrice(priceUyu, item.title)}
+                  />
                 ))}
               </div>
             </div>

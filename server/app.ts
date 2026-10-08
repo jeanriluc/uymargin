@@ -11,6 +11,7 @@ import type {
   ExactOffer,
   ExactOfferSeller,
   ExactProductBlock,
+  MluItem,
 } from "../src/lib/mlu/types.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
@@ -204,96 +205,6 @@ async function getAppToken(): Promise<string | null> {
   }
 }
 
-interface RealMluListing {
-  id: string;
-  title: string;
-  price: number;
-  currency: "UYU" | "USD";
-  thumbnail: string | null;
-  permalink: string;
-  freeShipping: boolean;
-  seller: string | null;
-  isAvailable: boolean;
-  stockStatus: string;
-  salesVolume: string;
-  sellerBadge: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation: string;
-  positivePercentage: number;
-  ratingAverage: number;
-  reviewsCount: number;
-  activeSellersCount: number;
-  sellerCity: string;
-  isTopChoice?: boolean;
-}
-
-function computeSellerQuality(item: any, title = "", index = 0) {
-  const isOfficial = !!item?.official_store_id;
-  const listingType = item?.listing_type_id || "";
-  const isGoldSpecial = listingType === "gold_special";
-  const isGoldPro = listingType === "gold_pro";
-  const city = item?.seller_address?.city?.name || "Montevideo";
-  const state = item?.seller_address?.state?.name || "Montevideo";
-  const price = typeof item?.price === "number" ? item.price : 1000;
-
-  let sellerBadge: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado" = "Vendedor Destacado";
-  let sellerReputation = "Reputación Positiva Verificada";
-  let salesVolume = "+100 vendidos";
-  let positiveRatingPct = 95;
-  let ratingAverage = 4.6;
-  let reviewsCount = 24 + Math.round((price * 2 + index * 7) % 35);
-
-  if (isOfficial) {
-    sellerBadge = "Tienda Oficial";
-    sellerReputation = "Reputación Oficial Certificada (100% positivo)";
-    salesVolume = "+1.000 vendidos";
-    positiveRatingPct = 99;
-    ratingAverage = 4.9;
-    reviewsCount = 145 + Math.round((price * 3 + index * 17) % 180);
-  } else if (isGoldSpecial) {
-    sellerBadge = "MercadoLíder Platinum";
-    sellerReputation = "Reputación Verde Oscuro (Nivel 5) · Entrega puntual";
-    salesVolume = "+500 vendidos";
-    positiveRatingPct = 98;
-    ratingAverage = 4.8;
-    reviewsCount = 88 + Math.round((price * 2 + index * 13) % 90);
-  } else if (isGoldPro) {
-    sellerBadge = "MercadoLíder Gold";
-    sellerReputation = "Reputación Verde (Nivel 4) · Vendedor confiable";
-    salesVolume = "+250 vendidos";
-    positiveRatingPct = 97;
-    ratingAverage = 4.7;
-    reviewsCount = 45 + Math.round((price + index * 9) % 45);
-  }
-
-  let sellerName = `Vendedor en ${city}`;
-  const tLower = title.toLowerCase();
-  if (isOfficial) {
-    if (tLower.includes("xion")) sellerName = "Tienda Oficial Xion";
-    else if (tLower.includes("stanley")) sellerName = "Tienda Oficial AMV / Stanley";
-    else if (tLower.includes("buffer")) sellerName = "Tienda Oficial Buffer Store";
-    else if (tLower.includes("xiaomi")) sellerName = "Xiaomi Official Store";
-    else if (tLower.includes("jbl")) sellerName = "JBL Official Partner UY";
-    else sellerName = `Tienda Oficial Certificada (${city})`;
-  } else if (isGoldSpecial) {
-    sellerName = `Distribuidor Platinum (${city})`;
-  }
-
-  return {
-    sellerName,
-    sellerBadge,
-    sellerReputation,
-    salesVolume,
-    positiveRatingPct,
-    ratingAverage,
-    reviewsCount,
-    isAvailable: true,
-    stockStatus: "En stock para entrega inmediata",
-    sellerCity: state && state !== city ? `${city}, ${state}` : city,
-    isOfficialStore: isOfficial,
-    isTopSeller: isOfficial || isGoldSpecial,
-  };
-}
-
 export interface UnsupportedListing {
   id: string;
   title: string;
@@ -303,16 +214,21 @@ export interface UnsupportedListing {
   permalink: string;
 }
 
+/**
+ * Productos de catálogo con ofertas activas para una búsqueda. Cada uno lleva el precio de una de sus
+ * ofertas y los datos reales de ese vendedor. `rate` solo se usa para comparar precios al ordenar.
+ */
 async function searchRealMlu(
   query: string,
   token: string | null,
-  unsupported: UnsupportedListing[] = []
-): Promise<RealMluListing[]> {
+  unsupported: UnsupportedListing[] = [],
+  rate: number | null = null
+): Promise<MluItem[]> {
   const cleanQ = query.trim();
-  const listings: RealMluListing[] = [];
+  const listings: MluItem[] = [];
   const seenIds = new Set<string>();
 
-  const addListing = (item: RealMluListing) => {
+  const addListing = (item: MluItem) => {
     if (!item.title || !item.price || item.price <= 0 || seenIds.has(item.id)) return;
     seenIds.add(item.id);
     listings.push(item);
@@ -370,7 +286,7 @@ async function searchRealMlu(
     // 3. Parallel fetch of product details & item availability
     if (token && uniqueProductIds.length > 0) {
       const fetchedResults = await Promise.allSettled(
-        uniqueProductIds.map(async (pid, idx) => {
+        uniqueProductIds.map(async (pid) => {
           const [prodRes, itemsRes] = await Promise.all([
             fetch(`https://api.mercadolibre.com/products/${pid}`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -402,7 +318,6 @@ async function searchRealMlu(
           });
 
           const bestItem = sortedItems[0];
-          const quality = computeSellerQuality(bestItem, prod.name || "", idx);
 
           const title = prod.name || prod.family_name || cleanQ;
           const rawPrice = typeof bestItem.price === "number" && bestItem.price > 0 ? bestItem.price : null;
@@ -420,45 +335,54 @@ async function searchRealMlu(
             return null;
           }
 
-          return {
+          const city = bestItem.seller_address?.city?.name || "";
+          const state = bestItem.seller_address?.state?.name || "";
+          const item: MluItem = {
             id: pid,
             title,
             price: rawPrice,
             currency,
+            condition:
+              bestItem.condition === "new" || bestItem.condition === "used"
+                ? bestItem.condition
+                : bestItem.condition
+                  ? "other"
+                  : null,
             thumbnail: prod.pictures?.[0]?.url ? String(prod.pictures[0].url).replace(/^http:\/\//, "https://") : null,
             permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
             freeShipping: bestItem.shipping?.free_shipping === true,
-            seller: quality.sellerName,
-            isAvailable: true,
-            stockStatus: "En stock disponible",
-            salesVolume: quality.salesVolume,
-            sellerBadge: quality.sellerBadge,
-            sellerReputation: quality.sellerReputation,
-            positivePercentage: quality.positiveRatingPct,
-            ratingAverage: quality.ratingAverage,
-            reviewsCount: quality.reviewsCount,
+            isOfficialStore: !!bestItem.official_store_id,
             activeSellersCount: items.length,
-            sellerCity: quality.sellerCity,
-            isTopChoice: quality.isTopSeller || items.length >= 3,
-            idx,
+            sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
+            seller: null,
           };
+          return { item, sellerId: typeof bestItem.seller_id === "number" ? (bestItem.seller_id as number) : null };
         })
       );
 
       // Collect only valid, in-stock items
-      const validItems = fetchedResults
-        .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled" && !!r.value)
-        .map((r) => r.value);
+      const validItems = fetchedResults.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
 
-      // Sort by UyMargin Top Score: Top Choice first, then seller count, then rating
-      validItems.sort((a, b) => {
-        const aScore = (a.isTopChoice ? 50 : 0) + (a.activeSellersCount * 5) + (a.ratingAverage * 10);
-        const bScore = (b.isTopChoice ? 50 : 0) + (b.activeSellersCount * 5) + (b.ratingAverage * 10);
-        return bScore - aScore;
-      });
+      // Datos reales de los vendedores: una sola consulta a /users para toda la búsqueda (con caché).
+      // Si Mercado Libre no responde, `seller` queda en null y la interfaz muestra "no disponible".
+      const sellers = await lookupSellers(
+        validItems.flatMap((v) => (v.sellerId !== null ? [v.sellerId] : [])),
+        token
+      );
+      for (const v of validItems) {
+        v.item.seller = v.sellerId !== null ? sellers.get(v.sellerId) ?? null : null;
+      }
+
+      // Orden: más ofertas activas del producto primero; a igual cantidad, el más barato.
+      const comparablePrice = (i: MluItem) => (i.currency === "USD" && rate ? i.price * rate : i.price);
+      validItems.sort(
+        (a, b) =>
+          (b.item.activeSellersCount ?? 0) - (a.item.activeSellersCount ?? 0) ||
+          comparablePrice(a.item) - comparablePrice(b.item)
+      );
 
       for (const v of validItems) {
-        addListing(v);
+        addListing(v.item);
       }
     }
   } catch (err) {
@@ -487,7 +411,7 @@ app.get("/api/search-mlu", async (req, res) => {
     const unsupported: UnsupportedListing[] = [];
     // "Productos exactos" va en paralelo con el radar; si falla, el radar responde igual sin esa sección.
     const [items, exact] = await Promise.all([
-      searchRealMlu(query, token, unsupported),
+      searchRealMlu(query, token, unsupported, rate),
       token
         ? resolveExactByName(query, token, rate).catch((err) => {
             console.warn("[api/search-mlu] productos exactos no disponibles:", err?.message || err);
@@ -993,12 +917,12 @@ app.all("/api/analyze-url", async (req, res) => {
       activeSellersCount: built.offers.length,
     };
 
-    // 4. Fetch Similar Competitor Products in the same market (STRICTLY IN-STOCK ONLY)
+    // 4. Productos similares: otros productos de catálogo con ofertas activas para la misma búsqueda
     const searchQuery = slugQuery || match.title;
-    let similarProducts: RealMluListing[] = [];
+    let similarProducts: MluItem[] = [];
     if (!exactOnly && searchQuery) {
-      const allFound = await searchRealMlu(searchQuery, token, unsupported);
-      similarProducts = allFound.filter((item) => item.id !== match.productId && item.isAvailable).slice(0, 8);
+      const allFound = await searchRealMlu(searchQuery, token, unsupported, rate);
+      similarProducts = allFound.filter((item) => item.id !== match.productId).slice(0, 8);
     }
 
     // 5. Compute market benchmark stats across all competitor offers with valid prices
