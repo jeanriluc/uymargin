@@ -15,3 +15,6 @@ docs/**/*.jpeg
 **/capturas/
 **/screenshots/
 .cache/
+
+# Registro de auditoría interno: queda en disco, no se publica
+AUDIT_LOG.md

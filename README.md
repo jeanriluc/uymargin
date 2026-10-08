@@ -18,7 +18,7 @@ Simula el margen neto por unidad después de impuestos (DGI), comisiones y logí
 - **Nube (opcional):** guarda auditorías de "Por enlace" y "Lote CSV" en un proyecto propio de Supabase.
 - **Copiloto (opcional):** un asistente con Gemini que comenta un resultado ya calculado. No calcula ni reemplaza las cifras.
 
-Limitaciones conocidas, documentadas en [`AUDIT_LOG.md`](AUDIT_LOG.md): no hay cuentas de usuario; el seguimiento de competidores está programado pero no tiene acceso desde la interfaz; "Por enlace" solo lee publicaciones de catálogo; las estrellas, opiniones y ventas que acompañan a cada publicación son estimaciones del servidor, no datos reales de Mercado Libre.
+Limitaciones conocidas, documentadas en el registro de auditoría interno (no publicado): no hay cuentas de usuario; el seguimiento de competidores está programado pero no tiene acceso desde la interfaz; "Por enlace" solo lee publicaciones de catálogo; las estrellas, opiniones y ventas que acompañan a cada publicación son estimaciones del servidor, no datos reales de Mercado Libre.
 
 > Es una herramienta de estimación. No reemplaza el asesoramiento de un contador.
 
@@ -77,7 +77,7 @@ Todas son opcionales para la calculadora básica. Sin ellas, la función asociad
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para guardar en la nube. También se pueden cargar desde la interfaz (ícono de engranaje), que las guarda en el navegador |
 | `NODE_ENV` | `production` para servir la interfaz compilada |
 
-La tabla que necesita Supabase se crea con el script SQL que muestra la propia app en la configuración de la nube. Ese script deja la tabla abierta a cualquiera que tenga la clave pública: revisá las políticas antes de usarlo con datos reales (ver `AUDIT_LOG.md`, categoría 7).
+La tabla que necesita Supabase se crea con el script SQL que muestra la propia app en la configuración de la nube. Ese script deja la tabla abierta a cualquiera que tenga la clave pública: revisá las políticas antes de usarlo con datos reales (detalle en el registro de auditoría interno (no publicado)).
 
 ## Estructura
 
@@ -106,7 +106,6 @@ scripts/
   responsive-check.mjs    Medición de desbordes por ancho de pantalla
 docs/                     Documentación y reportes de auditoría
 PRODUCT.md                Qué es el producto, para quién y con qué principios
-AUDIT_LOG.md              Registro de auditorías, cambios y decisiones pendientes
 ```
 
 ## Cotización del dólar
