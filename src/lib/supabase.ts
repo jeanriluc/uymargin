@@ -1,8 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { apiFetch } from "@/lib/api";
 
 export interface CloudAuditRecord {
   id?: string;
   created_at?: string;
+  /** Quién la guardó (lo completa el servidor). Las anteriores al login no tienen autor. */
+  owner_email?: string | null;
   title: string;
   product_url?: string;
   thumbnail?: string | null;
@@ -38,34 +41,14 @@ export interface CloudAuditRecord {
   notes?: string;
 }
 
-const STORAGE_KEY_URL = "uymargin_supabase_url";
-const STORAGE_KEY_KEY = "uymargin_supabase_key";
-
-export function getSupabaseConfig(): { url: string; key: string } {
-  const envUrl = (typeof process !== "undefined" && process.env?.SUPABASE_URL) || (import.meta as any).env?.VITE_SUPABASE_URL || "";
-  const envKey = (typeof process !== "undefined" && process.env?.SUPABASE_ANON_KEY) || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || "";
-
-  if (typeof window !== "undefined") {
-    const localUrl = localStorage.getItem(STORAGE_KEY_URL);
-    const localKey = localStorage.getItem(STORAGE_KEY_KEY);
-    return {
-      url: localUrl || envUrl || "",
-      key: localKey || envKey || "",
-    };
-  }
-
-  return { url: envUrl, key: envKey };
+// Solo la URL y la clave pública (anon): las variables VITE_* quedan en el JavaScript del navegador.
+// La clave secreta vive únicamente en el servidor (server/cloud.ts).
+function getSupabaseConfig(): { url: string; key: string } {
+  return {
+    url: (import.meta.env.VITE_SUPABASE_URL ?? "").trim(),
+    key: (import.meta.env.VITE_SUPABASE_ANON_KEY ?? "").trim(),
+  };
 }
-
-export function setSupabaseConfig(url: string, key: string) {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(STORAGE_KEY_URL, url.trim());
-    localStorage.setItem(STORAGE_KEY_KEY, key.trim());
-  }
-}
-
-let clientInstance: SupabaseClient | null = null;
-let lastUsedConfig = { url: "", key: "" };
 
 /** True when a project URL and anon key are available (does not load the SDK). */
 export function isSupabaseConfigured(): boolean {
@@ -73,122 +56,79 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(url && key);
 }
 
-/** The SDK is ~120 kB; it is fetched the first time the cloud is actually used. */
-export async function getSupabaseClient(): Promise<SupabaseClient | null> {
+let clientPromise: Promise<SupabaseClient | null> | null = null;
+
+/** Cliente del navegador: se usa para la sesión (enlace mágico). El SDK se descarga la primera vez. */
+export function getSupabaseClient(): Promise<SupabaseClient | null> {
   const { url, key } = getSupabaseConfig();
-  if (!url || !key) return null;
+  if (!url || !key) return Promise.resolve(null);
 
-  if (!clientInstance || lastUsedConfig.url !== url || lastUsedConfig.key !== key) {
-    try {
-      const { createClient } = await import("@supabase/supabase-js");
-      clientInstance = createClient(url, key, {
-        auth: { persistSession: true },
-      });
-      lastUsedConfig = { url, key };
-    } catch (e) {
+  clientPromise ??= import("@supabase/supabase-js")
+    .then(({ createClient }) =>
+      createClient(url, key, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      })
+    )
+    .catch((e) => {
       console.error("[supabase] initialization error", e);
+      clientPromise = null;
       return null;
-    }
-  }
-
-  return clientInstance;
+    });
+  return clientPromise;
 }
 
-export const SUPABASE_SCHEMA_SQL = `-- Ejecutá este script en el editor SQL de tu panel de Supabase:
-create table if not exists uymargin_audits (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  title text not null,
-  product_url text,
-  thumbnail text,
-  target_price numeric,
-  target_currency text default 'UYU',
-  target_price_uyu numeric,
-  competitor_min numeric,
-  competitor_median numeric,
-  competitor_max numeric,
-  competitor_count integer default 0,
-  same_product_sellers jsonb default '[]'::jsonb,
-  similar_products jsonb default '[]'::jsonb,
-  financial_simulation jsonb,
-  notes text
-);
+// ------------------------------------------------------------------
+// Auditorías guardadas: pasan por el servidor (/api/audits), que es el único que escribe en Supabase.
+// ------------------------------------------------------------------
+async function errorText(res: Response, fallback: string): Promise<string> {
+  const data = await res.json().catch(() => null);
+  return data?.message || data?.error || fallback;
+}
 
--- Habilitar lectura y escritura pública para la anon key
-alter table uymargin_audits enable row level security;
-create policy "Allow all on uymargin_audits" on uymargin_audits for all using (true) with check (true);
-`;
-
-export async function testSupabaseConnection(): Promise<{ ok: boolean; message: string }> {
-  const client = await getSupabaseClient();
-  if (!client) {
-    return { ok: false, message: "Ingresá la URL del proyecto y la Anon Key de Supabase." };
-  }
-
+/** Lectura mínima para el indicador de la nube. */
+export async function checkCloudConnection(): Promise<{ ok: boolean; configured: boolean }> {
   try {
-    const { error } = await client.from("uymargin_audits").select("id").limit(1);
-    if (error) {
-      if (error.code === "PGRST204" || error.code === "42P01" || error.message?.includes("does not exist")) {
-        return {
-          ok: false,
-          message: "Conexión exitosa, pero la tabla 'uymargin_audits' aún no está creada en Supabase. Creala usando el script SQL adjunto.",
-        };
-      }
-      return { ok: false, message: `Error de Supabase: ${error.message}` };
-    }
-    return { ok: true, message: "¡Conectado exitosamente con Supabase!" };
-  } catch (err: any) {
-    return { ok: false, message: err?.message || "No se pudo conectar a Supabase." };
+    const res = await apiFetch("/api/audits?limit=1");
+    if (res.ok) return { ok: true, configured: true };
+    const data = await res.json().catch(() => null);
+    return { ok: false, configured: data?.code !== "CLOUD_NOT_CONFIGURED" };
+  } catch {
+    return { ok: false, configured: true };
   }
 }
 
-export async function saveAuditToCloud(record: CloudAuditRecord): Promise<{ ok: boolean; data?: any; error?: string }> {
-  const client = await getSupabaseClient();
-  if (!client) {
-    return { ok: false, error: "Supabase no está configurado. Conectá tu proyecto en el botón de la nube." };
-  }
-
+export async function saveAuditToCloud(record: CloudAuditRecord): Promise<{ ok: boolean; data?: CloudAuditRecord; error?: string }> {
   try {
-    const { data, error } = await client.from("uymargin_audits").insert([record]).select();
-    if (error) {
-      return { ok: false, error: error.message };
-    }
-    return { ok: true, data };
-  } catch (err: any) {
-    return { ok: false, error: err?.message || "Error al guardar en la nube" };
+    const res = await apiFetch("/api/audits", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audit: record }),
+    });
+    if (!res.ok) return { ok: false, error: await errorText(res, "No se pudo guardar la auditoría en la nube.") };
+    const data = await res.json();
+    return { ok: true, data: data.audit };
+  } catch {
+    return { ok: false, error: "No se pudo conectar con el servidor para guardar en la nube." };
   }
 }
 
 export async function getCloudAudits(): Promise<{ ok: boolean; data: CloudAuditRecord[]; error?: string }> {
-  const client = await getSupabaseClient();
-  if (!client) {
-    return { ok: false, data: [], error: "Supabase no está configurado." };
-  }
-
   try {
-    const { data, error } = await client
-      .from("uymargin_audits")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      return { ok: false, data: [], error: error.message };
-    }
-    return { ok: true, data: data || [] };
-  } catch (err: any) {
-    return { ok: false, data: [], error: err?.message || "Error al obtener auditorías de la nube" };
+    const res = await apiFetch("/api/audits");
+    if (!res.ok) return { ok: false, data: [], error: await errorText(res, "No se pudieron cargar las auditorías guardadas.") };
+    const data = await res.json();
+    return { ok: true, data: Array.isArray(data.audits) ? data.audits : [] };
+  } catch {
+    return { ok: false, data: [], error: "No se pudo conectar con el servidor." };
   }
 }
 
 export async function deleteCloudAudit(id: string): Promise<{ ok: boolean; error?: string }> {
-  const client = await getSupabaseClient();
-  if (!client) return { ok: false, error: "Supabase no configurado" };
-
   try {
-    const { error } = await client.from("uymargin_audits").delete().eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    const res = await apiFetch(`/api/audits?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) return { ok: false, error: await errorText(res, "No se pudo eliminar la auditoría de la nube.") };
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err?.message || "Error al eliminar" };
+  } catch {
+    return { ok: false, error: "No se pudo conectar con el servidor." };
   }
 }

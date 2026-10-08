@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeftRight, Bot, RefreshCw, Settings, Wifi, WifiOff, Zap } from "lucide-react";
+import { ArrowLeftRight, Bot, LogOut, RefreshCw, Wifi, WifiOff, Zap } from "lucide-react";
 import { NumberField } from "@/components/ui/NumberField";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -7,10 +7,10 @@ export type ConnectionStatus = "online" | "manual" | "offline" | "idle";
 export type CloudStatus = "off" | "checking" | "ok" | "error";
 
 const CLOUD: Record<CloudStatus, { dot: string; label: string }> = {
-  off: { dot: "bg-zinc-400", label: "Nube sin configurar" },
+  off: { dot: "bg-zinc-400", label: "Nube sin configurar en el servidor" },
   checking: { dot: "bg-zinc-400 animate-pulse", label: "Comprobando conexión con la nube" },
   ok: { dot: "bg-emerald-500", label: "Nube conectada" },
-  error: { dot: "bg-amber-500", label: "La nube no responde: revisá la configuración" },
+  error: { dot: "bg-amber-500", label: "La nube no responde" },
 };
 
 const STATUS: Record<ConnectionStatus, { label: string; badgeClass: string; Icon: typeof Wifi }> = {
@@ -31,7 +31,9 @@ interface HeaderProps {
   status: ConnectionStatus;
   cloudStatus: CloudStatus;
   onOpenAiAdvisor: () => void;
-  onOpenCloudModal: () => void;
+  /** Correo de la sesión; null en desarrollo sin login. */
+  userEmail: string | null;
+  onSignOut: () => void;
   onOpenSavedAudits: () => void;
 }
 
@@ -44,7 +46,8 @@ export function Header({
   status,
   cloudStatus,
   onOpenAiAdvisor,
-  onOpenCloudModal,
+  userEmail,
+  onSignOut,
   onOpenSavedAudits,
 }: HeaderProps) {
   const s = STATUS[status];
@@ -152,21 +155,12 @@ export function Header({
             <button
               type="button"
               onClick={onOpenSavedAudits}
-              className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-2 text-xs font-black uppercase tracking-wider rounded-l-md transition-all cursor-pointer text-zinc-800 dark:text-zinc-200"
+              className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-2 text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer text-zinc-800 dark:text-zinc-200"
               title={`${CLOUD[cloudStatus].label}. Ver auditorías guardadas`}
               aria-label={`${CLOUD[cloudStatus].label}. Ver auditorías guardadas en la nube`}
             >
               <span aria-hidden className={`size-2 rounded-full ${CLOUD[cloudStatus].dot}`}></span>
               <span className="hidden sm:inline">Nube</span>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenCloudModal}
-              className="border-y border-r border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2 py-2 text-xs font-bold rounded-r-md transition-all cursor-pointer text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-              title="Configuración de Supabase"
-              aria-label="Configuración de Supabase"
-            >
-              <Settings className="size-3.5" aria-hidden />
             </button>
           </div>
 
@@ -182,6 +176,19 @@ export function Header({
 
           {/* Theme switcher */}
           <ThemeToggle />
+
+          {userEmail && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              title={`Salir (${userEmail})`}
+              aria-label={`Salir. Sesión de ${userEmail}`}
+              className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2.5 py-2 text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer text-zinc-800 dark:text-zinc-200"
+            >
+              <LogOut className="size-3.5" aria-hidden />
+              <span className="hidden md:inline">Salir</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -36,7 +36,9 @@ import { createDefaultInputs } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
 import { loadDraft, saveDraft } from "@/lib/storage/draft";
-import { isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase";
+import { checkCloudConnection } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthGate";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
 import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
 import {
@@ -65,7 +67,6 @@ import type {
 // Loaded on demand: none of these is needed to get the first verdict.
 const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
 const BatchAuditor = lazy(() => import("@/components/search/BatchAuditor").then((m) => ({ default: m.BatchAuditor })));
-const SupabaseModal = lazy(() => import("@/components/cloud/SupabaseModal").then((m) => ({ default: m.SupabaseModal })));
 const SavedAuditsDrawer = lazy(() =>
   import("@/components/cloud/SavedAuditsDrawer").then((m) => ({ default: m.SavedAuditsDrawer }))
 );
@@ -146,12 +147,11 @@ export default function App() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("off");
+  const auth = useAuth();
 
   const [searchTab, setSearchTab] = useState<"keyword" | "url" | "batch">("keyword");
-  const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [savedAuditsOpen, setSavedAuditsOpen] = useState(false);
   const aiEverOpened = useEverTrue(aiAdvisorOpen);
-  const supabaseEverOpened = useEverTrue(supabaseModalOpen);
   const auditsEverOpened = useEverTrue(savedAuditsOpen);
 
   const handleLoadCloudAudit = (audit: CloudAuditRecord) => {
@@ -212,13 +212,9 @@ export default function App() {
 
   // Read-only check so the cloud indicator reflects the real connection.
   const checkCloud = useCallback(async () => {
-    if (!isSupabaseConfigured()) {
-      setCloudStatus("off");
-      return;
-    }
     setCloudStatus("checking");
-    const res = await testSupabaseConnection();
-    setCloudStatus(res.ok ? "ok" : "error");
+    const res = await checkCloudConnection();
+    setCloudStatus(res.ok ? "ok" : res.configured ? "error" : "off");
   }, []);
 
   useEffect(() => {
@@ -233,7 +229,7 @@ export default function App() {
       let fetched: ExchangeRate | null = null;
       let serverLastKnown: ExchangeRate | null = null;
       try {
-        const res = await fetch(`/api/exchange-rate${force ? "?refresh=1" : ""}`);
+        const res = await apiFetch(`/api/exchange-rate${force ? "?refresh=1" : ""}`);
         const data: ExchangeRateResponse = await res.json();
         if (data.ok && data.rate > 0) {
           const rate: ExchangeRate = {
@@ -298,7 +294,7 @@ export default function App() {
     setExactBlock(undefined);
 
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/search-mlu?q=${encodeURIComponent(query)}&rate=${inputs.exchangeRate}`,
         { signal: controller.signal }
       );
@@ -559,7 +555,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         status={status}
         cloudStatus={cloudStatus}
         onOpenAiAdvisor={() => setAiAdvisorOpen(true)}
-        onOpenCloudModal={() => setSupabaseModalOpen(true)}
+        userEmail={auth.email}
+        onSignOut={auth.signOut}
         onOpenSavedAudits={() => setSavedAuditsOpen(true)}
       />
 
@@ -898,7 +895,6 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 updateInputs({ salePrice: p, productName: name, query: name });
                 scrollToSection("resultado");
               }}
-              onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
               ) : (
             <BatchAuditor
@@ -909,7 +905,6 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 setSearchTab("keyword");
                 scrollToSection("resultado");
               }}
-              onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
               )}
             </Suspense>
@@ -941,28 +936,12 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
       />
       )}
 
-      {/* Supabase Cloud Settings Modal */}
-      {supabaseEverOpened && (
-      <SupabaseModal
-        isOpen={supabaseModalOpen}
-        onClose={() => {
-          setSupabaseModalOpen(false);
-          checkCloud();
-        }}
-        onConnected={() => {
-          setSupabaseModalOpen(false);
-          checkCloud();
-        }}
-      />
-      )}
-
       {/* Supabase Saved Audits Drawer */}
       {auditsEverOpened && (
       <SavedAuditsDrawer
         isOpen={savedAuditsOpen}
         onClose={() => setSavedAuditsOpen(false)}
         onLoadAudit={handleLoadCloudAudit}
-        onOpenSettings={() => setSupabaseModalOpen(true)}
       />
       )}
       </Suspense>

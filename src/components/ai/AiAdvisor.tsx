@@ -1,4 +1,5 @@
 import { useDialog } from "@/lib/hooks/useDialog";
+import { apiFetch } from "@/lib/api";
 import {
   Brain,
   Loader2,
@@ -79,7 +80,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
     setLoading(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

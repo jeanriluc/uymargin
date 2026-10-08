@@ -27,6 +27,9 @@ import {
 } from "../src/lib/mlu/relevance.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import { createAuthMiddleware, isAuthDisabled, requestUser } from "./auth.js";
+import { createMemoryRateStore, createRateLimiter, RATE_RULES } from "./rateLimit.js";
+import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabaseToken } from "./cloud.js";
 
 dotenv.config();
 
@@ -45,6 +48,24 @@ const SELF_HOST = HOST === "0.0.0.0" || HOST === "::" ? "127.0.0.1" : HOST;
 export const isProduction = process.env.NODE_ENV === "production";
 
 app.use(express.json({ limit: "256kb" }));
+
+// ------------------------------------------------------------------
+// 0. Acceso: todas las rutas /api/* exigen sesión de Supabase y correo en ALLOWED_EMAILS (server/auth.ts).
+//    Va antes de cualquier ruta; en Vercel cada archivo de api/ exporta este mismo app, así que aplica igual.
+// ------------------------------------------------------------------
+if (isAuthDisabled()) {
+  console.warn("[auth] AUTH_DISABLED=true: las rutas /api/* no piden sesión. Solo para desarrollo local.");
+}
+app.use("/api", createAuthMiddleware({ verifyToken: verifySupabaseToken }));
+
+// Límite de uso por usuario. El contador vive en Supabase (compartido entre instancias de Vercel);
+// si no responde, o sin sesión real en desarrollo, se cuenta en la memoria de esta instancia.
+const memoryRateStore = createMemoryRateStore();
+const rateLimit = createRateLimiter({
+  store: () => (isAuthDisabled() ? memoryRateStore : supabaseRateStore),
+  fallback: memoryRateStore,
+  userId: (res) => requestUser(res).id,
+});
 
 // ------------------------------------------------------------------
 // 1. Exchange Rate Endpoint (USD -> UYU)
@@ -630,7 +651,7 @@ async function findSimilarProducts(
   return { items: shown.map((l) => l.item), criteria };
 }
 
-app.get("/api/search-mlu", async (req, res) => {
+app.get("/api/search-mlu", rateLimit(RATE_RULES.market), async (req, res) => {
   const query = String(req.query.q ?? "").trim();
   const rate = rateFromRequest(req.query.rate);
 
@@ -928,7 +949,7 @@ async function buildExactOffers(
 // ------------------------------------------------------------------
 // 2.2 Mercado Libre URL Product & Competitors Analysis Endpoint
 // ------------------------------------------------------------------
-app.all("/api/analyze-url", async (req, res) => {
+app.all("/api/analyze-url", rateLimit(RATE_RULES.market), async (req, res) => {
   const urlParam = req.method === "POST" ? req.body?.url : req.query?.url;
   const rawUrl = String(urlParam || "").trim();
   const rate = rateFromRequest(req.query?.rate || req.body?.rate);
@@ -1124,7 +1145,7 @@ function ctxText(value: unknown, max = 200): string {
   return String(value ?? "").slice(0, max);
 }
 
-app.post("/api/chat", async (req, res) => {
+app.post("/api/chat", rateLimit(RATE_RULES.chat), async (req, res) => {
   const { message, history, model, enableThinking, context } = req.body ?? {};
 
   if (!message || typeof message !== "string") {
@@ -1290,7 +1311,8 @@ app.post("/api/tracking/check", async (req, res) => {
         if (targetUrl) {
           const analyzeUrl = `http://${SELF_HOST}:${PORT}/api/analyze-url?url=${encodeURIComponent(targetUrl)}&rate=${exchangeRate}`;
           const r = await fetch(analyzeUrl, {
-            headers: { Accept: "application/json" },
+            // La llamada interna pasa por el mismo control de acceso: se reenvía la sesión del pedido.
+            headers: { Accept: "application/json", ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}) },
             signal: AbortSignal.timeout(6000),
           });
           if (r.ok) {
@@ -1380,5 +1402,21 @@ app.post("/api/tracking/check", async (req, res) => {
     return res.status(500).json({ ok: false, error: err?.message || "Error al verificar tracking" });
   }
 });
+
+// ------------------------------------------------------------------
+// 5. Auditorías guardadas en la nube (server/cloud.ts): el navegador ya no escribe en Supabase.
+// ------------------------------------------------------------------
+const cloudRoute =
+  (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
+  (req, res) => {
+    handler(req, res).catch((err) => {
+      console.error("[api/audits] error:", err?.message || err);
+      const message = "La nube no respondió. Probá de nuevo en un rato.";
+      if (!res.headersSent) res.status(502).json({ ok: false, code: "CLOUD_ERROR", message, error: message });
+    });
+  };
+app.get("/api/audits", cloudRoute(listAudits));
+app.post("/api/audits", cloudRoute(createAudit));
+app.delete("/api/audits", cloudRoute(deleteAudit));
 
 export default app;

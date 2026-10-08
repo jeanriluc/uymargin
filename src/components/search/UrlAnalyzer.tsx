@@ -22,7 +22,8 @@ import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { formatRate } from "@/lib/format";
 import { FAR_FROM_MEDIAN_FACTOR, computeMarketStats, isFarFromMedian } from "@/lib/mlu/statistics";
 import { formatUyu } from "@/lib/format";
-import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
+import { saveAuditToCloud, type CloudAuditRecord } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 
 export interface AnalyzedProductData {
   id: string;
@@ -74,7 +75,6 @@ interface UrlAnalyzerProps {
   /** Cotización en uso, con fecha y fuente, para mostrar equivalentes en pesos. */
   rate: ExchangeRate | null;
   onSimulatePrice: (price: number, productName: string) => void;
-  onOpenCloudSettings: () => void;
 }
 
 const SAMPLE_URLS = [
@@ -96,7 +96,6 @@ export function UrlAnalyzer({
   exchangeRate,
   rate,
   onSimulatePrice,
-  onOpenCloudSettings,
 }: UrlAnalyzerProps) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -116,7 +115,7 @@ export function UrlAnalyzer({
     setCloudError(null);
 
     try {
-      const res = await fetch("/api/analyze-url", {
+      const res = await apiFetch("/api/analyze-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: inputUrl, rate: exchangeRate }),
@@ -138,10 +137,6 @@ export function UrlAnalyzer({
 
   async function handleSaveToSupabase() {
     if (!result) return;
-    if (!isSupabaseConfigured()) {
-      onOpenCloudSettings();
-      return;
-    }
 
     setSavingToCloud(true);
     setCloudError(null);
@@ -360,14 +355,8 @@ export function UrlAnalyzer({
             )}
 
             {cloudError && (
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
-                <span>{cloudError}</span>
-                <button
-                  onClick={onOpenCloudSettings}
-                  className="underline font-bold"
-                >
-                  Configurar Supabase
-                </button>
+              <div role="alert" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
+                {cloudError}
               </div>
             )}
 

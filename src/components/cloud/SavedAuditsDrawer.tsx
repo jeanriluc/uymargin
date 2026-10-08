@@ -8,10 +8,9 @@ interface SavedAuditsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onLoadAudit: (audit: CloudAuditRecord) => void;
-  onOpenSettings?: () => void;
 }
 
-export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings }: SavedAuditsDrawerProps) {
+export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit }: SavedAuditsDrawerProps) {
   const dialogRef = useDialog(isOpen, onClose);
   const [audits, setAudits] = useState<CloudAuditRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,9 +73,9 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
             </div>
             <div>
               <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                Auditorías en Supabase ({audits.length})
+                Auditorías en la nube ({audits.length})
               </h3>
-              <p className="text-[11px] text-zinc-600 dark:text-zinc-400">Historial sincronizado en la nube</p>
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400">Compartidas entre los usuarios con acceso</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -128,18 +127,6 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300">
               <p className="font-bold">Aviso de conexión:</p>
               <p className="mt-1">{error}</p>
-              {onOpenSettings && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenSettings();
-                  }}
-                  className="mt-3 block w-full rounded-md bg-amber-600 text-white font-bold py-1.5 text-center hover:bg-amber-700 transition-colors"
-                >
-                  Configurar Credenciales de Supabase
-                </button>
-              )}
             </div>
           )}
 
@@ -200,6 +187,7 @@ loading="lazy" decoding="async"                       src={item.thumbnail}
                 <div className="mt-3 flex items-center justify-between border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2.5">
                   <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
                     {item.created_at ? new Date(item.created_at).toLocaleDateString("es-UY") : ""}
+                    {item.owner_email ? ` · ${item.owner_email}` : ""}
                   </span>
                   <div className="flex items-center gap-1.5">
                     {item.product_url && (
