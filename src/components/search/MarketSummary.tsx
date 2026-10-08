@@ -2,7 +2,8 @@ import { AlertTriangle, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatRate, formatUyu } from "@/lib/format";
 import type { MarketStats, MluItem, MluSearchError, RadarRelevance, UnsupportedListing } from "@/lib/mlu/types";
-import { describeRate, type ExchangeRate } from "@/lib/currency";
+import { convertToUyu, describeRate, type ExchangeRate } from "@/lib/currency";
+import { FAR_FROM_MEDIAN_FACTOR, isFarFromMedian } from "@/lib/mlu/statistics";
 import { CatalogProductCard } from "@/components/search/CatalogProductCard";
 
 export type MarketState =
@@ -99,6 +100,13 @@ export function MarketSummary({
   const smallSample = fromRadar && matching.length > 0 && matching.length < SMALL_SAMPLE;
   // Solo los que coinciden entran al rango: son los que importan para la conversión a pesos.
   const usdCount = matching.filter((i) => i.currency === "USD").length;
+  // Marca "precio muy distinto a la mediana": solo señala, no saca a nadie de las estadísticas.
+  const isFar = (item: MluItem) => {
+    if (!fromRadar || !stats) return false;
+    const c = convertToUyu(item.price, item.currency, rate);
+    return c.status === "ok" && isFarFromMedian(c.amountUyu, stats.median);
+  };
+  const farCount = matching.filter(isFar).length;
   const quoted = (terms: string[]) => terms.map((t) => `«${t}»`).join(", ");
 
   return (
@@ -193,6 +201,20 @@ export function MarketSummary({
             promedio y el máximo usan solo esos productos, cada uno con el precio de su oferta activa más barata.
           </p>
 
+          {relevance?.searchUnavailable && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <div>
+                <strong className="font-bold">La búsqueda por palabras de Mercado Libre no respondió.</strong> Solo se
+                revisaron los más vendidos de la categoría, así que pueden faltar productos que coinciden. Volvé a
+                buscar en unos segundos.
+              </div>
+            </div>
+          )}
+
           {matching.length === 0 && (
             <div
               role="alert"
@@ -222,6 +244,18 @@ export function MarketSummary({
                 Tomá estos números como referencia, no como el rango del mercado.
               </div>
             </div>
+          )}
+
+          {farCount > 0 && stats && (
+            <p role="status" className="text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+              <strong className="font-bold">
+                {farCount === 1 ? "1 producto tiene" : `${farCount} productos tienen`} un precio muy distinto a la mediana,
+                de {matching.length} que {matching.length === 1 ? "coincide" : "coinciden"}
+              </strong>{" "}
+              (más de {FAR_FROM_MEDIAN_FACTOR} veces {formatUyu(stats.median)} o menos de un tercio).{" "}
+              {farCount === 1 ? "Está marcado en su tarjeta y está incluido" : "Están marcados en sus tarjetas y están incluidos"}{" "}
+              en el mínimo, la mediana, el promedio y el máximo: no se recorta nada.
+            </p>
           )}
 
           {relevance && (related.length > 0 || relevance.matchedWithoutOffers > 0 || relevance.matchedNotChecked > 0) && (
@@ -369,7 +403,13 @@ export function MarketSummary({
           {matching.length > 0 ? (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
               {matching.map((item) => (
-                <CatalogProductCard key={item.id} item={item} rate={rate} onSimulate={onSelectPrice} />
+                <CatalogProductCard
+                  key={item.id}
+                  item={item}
+                  rate={rate}
+                  onSimulate={onSelectPrice}
+                  farFromMedian={isFar(item)}
+                />
               ))}
             </div>
           ) : (
@@ -386,7 +426,8 @@ export function MarketSummary({
               </summary>
               <p className="mt-2 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
                 Son los más vendidos de la misma categoría de Mercado Libre y resultados a los que les falta algo de lo
-                que escribiste; cada tarjeta dice qué le falta. Mismo criterio de precio: la oferta activa más barata.
+                que escribiste; cada tarjeta dice qué le falta. Mismo criterio de precio: la oferta activa más barata. No se
+                comparan contra la mediana porque no son lo que buscaste.
               </p>
               <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
                 {related.map((item) => (

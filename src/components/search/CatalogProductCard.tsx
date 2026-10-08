@@ -1,4 +1,4 @@
-import { ExternalLink, PackageSearch, Store, Truck } from "lucide-react";
+import { AlertTriangle, ExternalLink, PackageSearch, Store, Truck } from "lucide-react";
 import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
 import { CONDITION, POWER_SELLER, REPUTATION, activeOffersLabel } from "@/lib/mlu/sellerLabels";
@@ -12,13 +12,15 @@ interface CatalogProductCardProps {
   onSimulate: (priceUyu: number) => void;
   /** Aclaración corta bajo el nombre (por ejemplo, qué le falta para coincidir con la búsqueda). */
   note?: string;
+  /** Marca visible "precio muy distinto a la mediana" (ver isFarFromMedian). No excluye el producto de nada. */
+  farFromMedian?: boolean;
 }
 
 /**
  * Tarjeta de un producto de catálogo del radar o de "Similares". Muestra solo lo que informa
  * Mercado Libre: precio de su oferta activa más barata, cantidad de ofertas activas y datos de ese vendedor.
  */
-export function CatalogProductCard({ item, rate, onSimulate, note }: CatalogProductCardProps) {
+export function CatalogProductCard({ item, rate, onSimulate, note, farFromMedian = false }: CatalogProductCardProps) {
   const conversion = convertToUyu(item.price, item.currency, rate);
   const canSimulate = conversion.status === "ok";
   const seller = item.seller ?? null;
@@ -107,6 +109,14 @@ export function CatalogProductCard({ item, rate, onSimulate, note }: CatalogProd
             Oferta más barata
           </span>
           <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
+          {farFromMedian && (
+            <span
+              title="Más de 3 veces la mediana o menos de un tercio. Revisá si es el mismo producto, otra presentación o un error de precio."
+              className="mt-0.5 inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 text-[11px] font-black uppercase text-amber-800 dark:text-amber-300"
+            >
+              <AlertTriangle className="size-3 shrink-0" aria-hidden /> Precio muy distinto a la mediana
+            </span>
+          )}
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5 text-[11px] text-zinc-600 dark:text-zinc-400">
             {item.freeShipping && (
               <span className="inline-flex items-center gap-0.5 whitespace-nowrap font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">

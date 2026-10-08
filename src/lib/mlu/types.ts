@@ -41,6 +41,8 @@ export interface RadarRelevance {
   matchedNotChecked: number;
   /** Tope de productos de la búsqueda a los que se les consultan las ofertas. */
   searchCheckLimit: number;
+  /** La búsqueda por palabras de Mercado Libre no respondió: solo hay más vendidos de la categoría. */
+  searchUnavailable?: boolean;
   /** Por cada término, cuántos de los relacionados no lo mencionan. */
   missingCounts: { term: string; count: number }[];
 }
@@ -93,8 +95,10 @@ export interface MluSearchSuccess {
   rateUsed?: number;
   /** Publicaciones en una moneda que no convertimos: se informan, no se calculan. */
   unsupported?: UnsupportedListing[];
-  /** Ofertas del producto de catálogo que mejor coincide con la búsqueda. null = no disponible. */
+  /** Ofertas del producto de catálogo elegido para la búsqueda. null = no se eligió ninguno (ver `exactSelection`). */
   exact?: ExactProductBlock | null;
+  /** Cómo se eligió (o por qué no se eligió) el producto de "Productos exactos". */
+  exactSelection?: ExactSelection | null;
   fetchedAt: string;
 }
 
@@ -185,6 +189,27 @@ export interface ExactMatch extends CatalogCandidate {
   confidence: "exacta" | "alta" | "dudosa";
   /** Motivos de la duda, en texto para mostrar. */
   reasons: string[];
+}
+
+/**
+ * Elección del producto de "Productos exactos" en una búsqueda por nombre. Candidatos = productos de catálogo
+ * que mencionan todo lo buscado. Regla: el de más ofertas activas; no se elige si no hay candidatos con
+ * ofertas o si son de más de una marca (búsqueda genérica).
+ */
+export interface ExactSelection {
+  status: "elegido" | "generica" | "sin_ofertas" | "sin_coincidencias";
+  /** Candidatos con ofertas activas en Uruguay. */
+  candidatesWithOffers: number;
+  /** Candidatos para los que Mercado Libre no informa ofertas activas. */
+  candidatesWithoutOffers: number;
+  /** Marcas (atributo BRAND) de los candidatos con ofertas. */
+  brands: string[];
+  /** Ofertas activas del elegido. null = no se eligió ninguno. */
+  chosenOffers: number | null;
+  /** Otros candidatos con la misma cantidad de ofertas que el elegido (se eligió el más barato). */
+  tiedWith: number;
+  /** Candidatos con ofertas, de más a menos ofertas, para elegir a mano. */
+  candidates: CatalogCandidate[];
 }
 
 /** Mínimo, mediana y máximo de las ofertas exactas, en pesos, sin excluir ninguna. */

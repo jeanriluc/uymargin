@@ -29,7 +29,7 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
       <StepHeader title="Radar de competencia en Mercado Libre Uruguay" aside="Opcional" />
 
       <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
-        Buscá por producto o modelo para auditar precios en vivo en MLU y calcular mediana real sin publicaciones atípicas.
+        Buscá por producto o modelo para auditar precios en vivo en MLU y calcular la mediana de los productos que coinciden con lo que buscaste.
       </p>
 
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5">

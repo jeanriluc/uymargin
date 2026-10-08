@@ -45,6 +45,15 @@ export function computeMarketStats(
   };
 }
 
+/** Un precio se marca "muy distinto a la mediana" si es más de 3 veces la mediana o menos de un tercio. */
+export const FAR_FROM_MEDIAN_FACTOR = 3;
+
+/** Solo marca: el precio no se excluye de ninguna estadística. Sin mediana no se marca nada. */
+export function isFarFromMedian(priceUyu: number, medianUyu: number | null | undefined): boolean {
+  if (!medianUyu || medianUyu <= 0 || !Number.isFinite(priceUyu) || priceUyu <= 0) return false;
+  return priceUyu > medianUyu * FAR_FROM_MEDIAN_FACTOR || priceUyu < medianUyu / FAR_FROM_MEDIAN_FACTOR;
+}
+
 export function priceToUyu(price: number, currency: Currency, exchangeRate: number): number {
   return currency === "USD" ? price * exchangeRate : price;
 }

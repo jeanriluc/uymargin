@@ -199,6 +199,16 @@ export function BatchAuditor({
           marketError = data.message;
         } else if (!res.ok) {
           marketError = `Mercado Libre no respondió (HTTP ${res.status}).`;
+        } else if (data?.ok && data.relevance) {
+          // Hubo resultados pero ninguno coincide: se dice qué faltó. Los relacionados no se usan como precio.
+          const rel = data.relevance;
+          const missing = rel.missingCounts.map((m) => `«${m.term}»`).join(", ");
+          const related = `${rel.related} ${rel.related === 1 ? "producto relacionado" : "productos relacionados"}`;
+          marketError = rel.searchUnavailable
+            ? "La búsqueda por palabras de Mercado Libre no respondió. Volvé a ejecutar el lote."
+            : rel.matchedWithoutOffers > 0
+              ? `${rel.matchedWithoutOffers === 1 ? "1 producto coincide" : `${rel.matchedWithoutOffers} productos coinciden`} por nombre pero sin ofertas activas en Uruguay. Hay ${related} que no se ${rel.related === 1 ? "usó" : "usaron"} como precio.`
+              : `Ningún producto con ofertas menciona todo el nombre${missing ? `: a los ${related} les falta ${missing}` : ""}. Probá con un nombre más corto (marca, modelo y medida).`;
         } else {
           marketError = "La búsqueda no devolvió precios.";
         }
@@ -652,7 +662,7 @@ export function BatchAuditor({
                             <span className="font-bold text-zinc-900 dark:text-zinc-100 num">
                               {formatUyu(r.marketPriceUyu)}
                             </span>
-                            <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} publicaciones</span>
+                            <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} {r.sampleSize === 1 ? "producto que coincide" : "productos que coinciden"}</span>
                           </>
                         )}
                       </td>
