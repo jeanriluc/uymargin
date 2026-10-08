@@ -398,7 +398,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                   </span>
                   <span className="text-zinc-300 dark:text-zinc-700">·</span>
                   <span className="text-[11px] font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">
-                    {inputs.tax.regime === "literal_e" ? "LITERAL E / MONOTRIBUTO" : "RÉGIMEN GENERAL (22%)"}
+                    {inputs.tax.regime === "literal_e"
+                      ? "LITERAL E"
+                      : `RÉGIMEN GENERAL (IVA ${Math.round((inputs.tax.vatRate ?? 0.22) * 100)}%)`}
                   </span>
                 </div>
                 <h1 className="heading-grotesk text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase mt-0.5">
@@ -552,6 +554,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               icon={<ShoppingBag className="size-5" />}
               subtitle="Mercado Libre Uruguay (Comisión + Mercado Envíos + Cargo Fijo)"
               regime={inputs.tax.regime}
+              vatRate={inputs.tax.vatRate ?? 0.22}
               isWinner={bestChannel === "ml" && isReady}
               settings={<MlSettings value={inputs.ml} onChange={updateMl} />}
             />
@@ -561,6 +564,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               icon={<Store className="size-5" />}
               subtitle="Tienda Propia / POS / Redes Sociales (Pasarela + Flete Local)"
               regime={inputs.tax.regime}
+              vatRate={inputs.tax.vatRate ?? 0.22}
               isWinner={bestChannel === "direct" && isReady}
               settings={<DirectSettings value={inputs.direct} onChange={updateDirect} />}
             />

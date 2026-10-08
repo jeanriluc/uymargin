@@ -12,6 +12,8 @@ interface ChannelCardProps {
   subtitle: string;
   settings: ReactNode;
   regime: TaxRegime;
+  /** IVA rate of the product, shown in the tax breakdown label. */
+  vatRate: number;
   isWinner: boolean;
 }
 
@@ -64,6 +66,7 @@ export function ChannelCard({
   subtitle,
   settings,
   regime,
+  vatRate,
   isWinner,
 }: ChannelCardProps) {
   const hasPrice = r.salePrice > 0;
@@ -203,7 +206,7 @@ export function ChannelCard({
 
             {regime === "general" ? (
               <>
-                <BreakdownRow label="IVA Débito Fiscal Ventas (22%)" value={-r.taxes.vatDebit} muted />
+                <BreakdownRow label={`IVA Débito Fiscal Ventas (${Math.round(vatRate * 100)}%)`} value={-r.taxes.vatDebit} muted />
                 <BreakdownRow label="IVA Crédito Fiscal Compras" value={r.taxes.vatCreditCost} muted />
                 <BreakdownRow label="IVA Crédito Fiscal Comisiones/Servicios" value={r.taxes.vatCreditServices} muted />
                 <BreakdownRow
