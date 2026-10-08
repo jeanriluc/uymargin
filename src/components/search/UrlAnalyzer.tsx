@@ -20,6 +20,8 @@ import type { ExactProductBlock, MluItem, SimilarCriteria, UnsupportedListing } 
 import { CatalogProductCard } from "@/components/search/CatalogProductCard";
 import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { formatRate } from "@/lib/format";
+import { FAR_FROM_MEDIAN_FACTOR, computeMarketStats, isFarFromMedian } from "@/lib/mlu/statistics";
+import { formatUyu } from "@/lib/format";
 import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
 
 export interface AnalyzedProductData {
@@ -193,6 +195,18 @@ export function UrlAnalyzer({
     const uyu = uyuOf(price, currency);
     if (uyu !== null) onSimulatePrice(uyu, title);
   };
+  // Mediana de las ofertas del producto exacto con la cotización vigente: referencia para marcar similares
+  // con precio muy distinto. Es solo una marca: los similares no entran a ningún rango.
+  const exactPricesUyu = (result?.exact.offers ?? []).flatMap((o) => {
+    const uyu = uyuOf(o.price, o.currency);
+    return uyu !== null ? [uyu] : [];
+  });
+  const exactMedian = computeMarketStats(exactPricesUyu, { excludeOutliers: false })?.median ?? null;
+  const similarIsFar = (item: MluItem) => {
+    const uyu = uyuOf(item.price, item.currency);
+    return uyu !== null && isFarFromMedian(uyu, exactMedian);
+  };
+  const farSimilarCount = (result?.similarProducts ?? []).filter(similarIsFar).length;
   const rateChangedSinceAnalysis =
     !!result?.rateUsed && !!rate && Math.abs(result.rateUsed - rate.rate) > 0.005;
 
@@ -508,6 +522,18 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                   {result.similarProducts.length > 0 &&
                     "Ordenados por cantidad de ofertas activas; a igual cantidad, primero el más barato. El precio de cada tarjeta es el de la oferta activa más barata de ese producto y el vendedor es el de esa oferta."}
                 </p>
+                {farSimilarCount > 0 && exactMedian !== null && (
+                  <p role="status" className="mt-1 text-[11px] leading-relaxed text-amber-900 dark:text-amber-200">
+                    <strong className="font-bold">
+                      {farSimilarCount === 1 ? "1 similar tiene" : `${farSimilarCount} similares tienen`} un precio muy
+                      distinto a la mediana del producto auditado
+                    </strong>{" "}
+                    (más de {FAR_FROM_MEDIAN_FACTOR} veces {formatUyu(exactMedian)} o menos de un tercio), de{" "}
+                    {result.similarProducts.length} que se muestran.{" "}
+                    {farSimilarCount === 1 ? "Está marcado" : "Están marcados"} en la tarjeta; ningún similar entra al
+                    rango de mercado.
+                  </p>
+                )}
               </div>
 
               {result.similarProducts.length > 0 ? (
@@ -518,6 +544,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                       item={item}
                       rate={rate}
                       onSimulate={(priceUyu) => onSimulatePrice(priceUyu, item.title)}
+                      farFromMedian={similarIsFar(item)}
                     />
                   ))}
                 </div>

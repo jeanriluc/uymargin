@@ -54,7 +54,13 @@ import type {
   MlChannelSettings,
   DirectChannelSettings,
 } from "@/lib/finance/types";
-import type { MarketStats, ExchangeRateResponse, ExactProductBlock, UnsupportedListing } from "@/lib/mlu/types";
+import type {
+  MarketStats,
+  ExchangeRateResponse,
+  ExactProductBlock,
+  ExactSelection,
+  UnsupportedListing,
+} from "@/lib/mlu/types";
 
 // Loaded on demand: none of these is needed to get the first verdict.
 const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
@@ -106,6 +112,8 @@ export default function App() {
   const [unsupportedListings, setUnsupportedListings] = useState<UnsupportedListing[]>([]);
   // Ofertas del producto de catálogo que coincide con la búsqueda. undefined = todavía no se buscó.
   const [exactBlock, setExactBlock] = useState<ExactProductBlock | null | undefined>(undefined);
+  // Cómo se eligió (o por qué no se eligió) ese producto.
+  const [exactSelection, setExactSelection] = useState<ExactSelection | null>(null);
   const [manualPrices, setManualPrices] = useState<string>("");
 
   const [searchLoading, setSearchLoading] = useState(false);
@@ -309,6 +317,7 @@ export default function App() {
 
         setUnsupportedListings(Array.isArray(data.unsupported) ? data.unsupported : []);
         setExactBlock(data.exact ?? null);
+        setExactSelection(data.exactSelection ?? null);
         // Sin productos que coincidan no hay estadística: no se arrastra la de una búsqueda anterior.
         setStats(data.stats ?? null);
         if (data.stats) {
@@ -862,6 +871,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               {marketState.status === "success" && exactBlock !== undefined && (
                 <ExactOffersSection
                   exact={exactBlock}
+                  selection={exactSelection}
                   rate={currentRate}
                   onSimulate={(p) => updateInputs({ salePrice: p })}
                 />

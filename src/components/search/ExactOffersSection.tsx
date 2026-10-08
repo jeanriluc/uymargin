@@ -3,12 +3,14 @@ import { AlertTriangle, ExternalLink, Loader2, PackageSearch, SlidersHorizontal,
 import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
 import { formatUyu } from "@/lib/format";
-import type { CatalogCandidate, ExactOffer, ExactProductBlock } from "@/lib/mlu/types";
+import type { CatalogCandidate, ExactOffer, ExactProductBlock, ExactSelection } from "@/lib/mlu/types";
 import { CONDITION, POWER_SELLER, REPUTATION } from "@/lib/mlu/sellerLabels";
 
 interface ExactOffersSectionProps {
   /** null = no disponible (sin coincidencia en el catálogo o Mercado Libre no respondió). */
   exact: ExactProductBlock | null;
+  /** Búsqueda por nombre: cómo se eligió el producto, o por qué no se eligió ninguno. */
+  selection?: ExactSelection | null;
   /** Cotización en uso: los equivalentes y las estadísticas se calculan con la vigente. */
   rate: ExchangeRate | null;
   onSimulate: (priceUyu: number, title: string) => void;
@@ -72,7 +74,13 @@ function FilterChip({
   );
 }
 
-export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChooseAlternative }: ExactOffersSectionProps) {
+export function ExactOffersSection({
+  exact: exactProp,
+  selection = null,
+  rate,
+  onSimulate,
+  onChooseAlternative,
+}: ExactOffersSectionProps) {
   // Candidato elegido a mano en el radar: reemplaza el producto y sus ofertas sin repetir la búsqueda.
   const [override, setOverride] = useState<ExactProductBlock | null>(null);
   const [choosingId, setChoosingId] = useState<string | null>(null);
@@ -88,7 +96,7 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
     setOverride(null);
     setChoosingId(null);
     setChooseError(null);
-  }, [exactProp]);
+  }, [exactProp, selection]);
 
   const exact = override ?? exactProp;
   const productId = exact?.match.productId;
@@ -155,8 +163,10 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
     setCurrencyFilter("all");
   };
 
+  // Candidatos entre los que se puede elegir a mano: los del bloque o, si no se eligió ninguno, los de la selección.
+  const baseCandidates = exactProp?.candidates ?? selection?.candidates ?? [];
+
   async function chooseCandidate(candidate: CatalogCandidate) {
-    if (!exactProp) return;
     if (onChooseAlternative) {
       onChooseAlternative(candidate);
       return;
@@ -174,7 +184,7 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
         const next = data.exact as ExactProductBlock;
         setOverride({
           ...next,
-          candidates: exactProp.candidates,
+          candidates: baseCandidates,
           match: { ...next.match, source: "elegido", confidence: "exacta", reasons: [] },
         });
       } else {
@@ -205,17 +215,98 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
     </div>
   );
 
+  const candidateList = (list: CatalogCandidate[]) => (
+    <>
+    <ul className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-2">
+      {list.map((candidate) => (
+        <li
+          key={candidate.productId}
+          className="flex min-w-0 items-center gap-2.5 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2"
+        >
+          <div className="size-10 shrink-0 overflow-hidden rounded border border-zinc-200 dark:border-zinc-700 bg-white p-0.5">
+            {candidate.thumbnail ? (
+              <img loading="lazy" decoding="async" src={candidate.thumbnail} alt="" className="size-full object-contain" />
+            ) : (
+              <PackageSearch className="m-auto mt-2 size-4 text-zinc-500" aria-hidden />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <a
+              href={candidate.permalink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="line-clamp-2 text-xs font-bold leading-snug text-zinc-800 dark:text-zinc-200 hover:underline"
+              title={candidate.title}
+            >
+              {candidate.title}
+            </a>
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400">{offersLabel(candidate.offersCount)}</p>
+          </div>
+          <button
+            type="button"
+            disabled={choosingId !== null}
+            onClick={() => chooseCandidate(candidate)}
+            className="tap-target inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer disabled:opacity-50"
+          >
+            {choosingId === candidate.productId && <Loader2 className="size-3 animate-spin" aria-hidden />}
+            Usar este
+          </button>
+        </li>
+      ))}
+    </ul>
+    {chooseError && (
+      <p role="alert" className="mt-2 text-xs font-bold text-red-600 dark:text-red-400">
+        {chooseError}
+      </p>
+    )}
+    </>
+  );
+
   if (!exact) {
+    const noun = (n: number) => `${n} ${n === 1 ? "producto de catálogo" : "productos de catálogo"}`;
     return (
       <section
         aria-label="Productos exactos"
         className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm"
       >
         {header}
-        <p className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-xs text-zinc-600 dark:text-zinc-400">
-          No disponible: no encontramos un producto de catálogo que coincida con la búsqueda, o Mercado Libre no
-          respondió. Los similares de abajo no son el mismo producto.
-        </p>
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+          {selection?.status === "generica" ? (
+            <>
+              <p>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                  No se eligió un producto exacto: la búsqueda es genérica.
+                </span>{" "}
+                Coinciden {noun(selection.candidatesWithOffers)} con ofertas activas, de {selection.brands.length}{" "}
+                marcas distintas ({selection.brands.slice(0, 5).join(", ")}
+                {selection.brands.length > 5 ? "…" : ""}): no son un mismo producto. Agregá marca y modelo a la
+                búsqueda, o elegí uno de la lista para ver sus ofertas. El radar de abajo sigue mostrando todos.
+              </p>
+              {candidateList(selection.candidates)}
+            </>
+          ) : selection?.status === "sin_ofertas" ? (
+            <p>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">
+                No hay un producto exacto con ofertas activas.
+              </span>{" "}
+              {selection.candidatesWithoutOffers === 1
+                ? "1 producto de catálogo coincide con tu búsqueda, pero Mercado Libre no informa ofertas activas en Uruguay para él."
+                : `${selection.candidatesWithoutOffers} productos de catálogo coinciden con tu búsqueda, pero Mercado Libre no informa ofertas activas en Uruguay para ninguno.`}{" "}
+              No se muestra un producto sin ofertas; el radar de abajo lista los relacionados que sí tienen.
+            </p>
+          ) : selection?.status === "sin_coincidencias" ? (
+            <p>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">No hay un producto exacto.</span> Ningún
+              producto de catálogo menciona todo lo que buscaste. Probá con menos palabras; el radar de abajo lista los
+              relacionados.
+            </p>
+          ) : (
+            <p>
+              No disponible: no encontramos un producto de catálogo que coincida con la búsqueda, o Mercado Libre no
+              respondió. Los similares de abajo no son el mismo producto.
+            </p>
+          )}
+        </div>
       </section>
     );
   }
@@ -278,7 +369,23 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
                 <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
                   {match.source === "elegido"
                     ? "Lo elegiste entre los resultados del catálogo."
-                    : "Coincide con todas las palabras de tu búsqueda. Abrí el enlace para confirmar que es el que buscás."}
+                    : selection?.status === "elegido" && selection.chosenOffers !== null
+                      ? `Se eligió porque es el que más ofertas activas tiene (${selection.chosenOffers}) entre ${
+                          selection.candidatesWithOffers === 1
+                            ? "1 producto de catálogo que coincide"
+                            : `${selection.candidatesWithOffers} productos de catálogo que coinciden`
+                        } con tu búsqueda y tienen ofertas${
+                          selection.brands.length === 1 ? `, todos de la marca ${selection.brands[0]}` : ""
+                        }.${
+                          selection.tiedWith > 0
+                            ? ` Hay ${selection.tiedWith === 1 ? "otro" : `otros ${selection.tiedWith}`} con la misma cantidad de ofertas: se tomó el más barato.`
+                            : ""
+                        }${
+                          selection.candidatesWithoutOffers > 0
+                            ? ` Otros ${selection.candidatesWithoutOffers} coinciden pero no tienen ofertas activas en Uruguay.`
+                            : ""
+                        } Abrí el enlace para confirmar que es el que buscás.`
+                      : "Coincide con todas las palabras de tu búsqueda. Abrí el enlace para confirmar que es el que buscás."}
                 </p>
               )}
             </div>
@@ -287,50 +394,9 @@ export function ExactOffersSection({ exact: exactProp, rate, onSimulate, onChoos
           {others.length > 0 && (
             <details className="group mt-3 border-t border-zinc-200/70 dark:border-zinc-700/70 pt-2.5" open={doubtful || undefined}>
               <summary className="cursor-pointer text-[11px] font-black uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                Otros productos de catálogo parecidos ({others.length})
+                Otros candidatos con ofertas ({others.length})
               </summary>
-              <ul className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-2">
-                {others.map((candidate) => (
-                  <li
-                    key={candidate.productId}
-                    className="flex min-w-0 items-center gap-2.5 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-2"
-                  >
-                    <div className="size-10 shrink-0 overflow-hidden rounded border border-zinc-200 dark:border-zinc-700 bg-white p-0.5">
-                      {candidate.thumbnail ? (
-                        <img loading="lazy" decoding="async" src={candidate.thumbnail} alt="" className="size-full object-contain" />
-                      ) : (
-                        <PackageSearch className="m-auto mt-2 size-4 text-zinc-500" aria-hidden />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <a
-                        href={candidate.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="line-clamp-2 text-xs font-bold leading-snug text-zinc-800 dark:text-zinc-200 hover:underline"
-                        title={candidate.title}
-                      >
-                        {candidate.title}
-                      </a>
-                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400">{offersLabel(candidate.offersCount)}</p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={choosingId !== null}
-                      onClick={() => chooseCandidate(candidate)}
-                      className="tap-target inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer disabled:opacity-50"
-                    >
-                      {choosingId === candidate.productId && <Loader2 className="size-3 animate-spin" aria-hidden />}
-                      Usar este
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {chooseError && (
-                <p role="alert" className="mt-2 text-xs font-bold text-red-600 dark:text-red-400">
-                  {chooseError}
-                </p>
-              )}
+              {candidateList(others)}
             </details>
           )}
         </div>

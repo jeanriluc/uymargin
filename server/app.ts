@@ -11,11 +11,20 @@ import type {
   ExactOffer,
   ExactOfferSeller,
   ExactProductBlock,
+  ExactSelection,
   MluItem,
   RadarRelevance,
   SimilarCriteria,
 } from "../src/lib/mlu/types.js";
-import { nameHasTypeWords, productTexts, productTypeWords, queryTerms, relevanceOf } from "../src/lib/mlu/relevance.js";
+import {
+  brandKey,
+  nameHasTypeWords,
+  productBrand,
+  productTexts,
+  productTypeWords,
+  queryTerms,
+  relevanceOf,
+} from "../src/lib/mlu/relevance.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
@@ -209,16 +218,33 @@ export interface UnsupportedListing {
 
 /** Resultados de la búsqueda por palabras en el catálogo: una sola llamada, trae nombre, ficha y dominio. */
 const RADAR_SEARCH_LIMIT = 50;
-/** Tope de productos de la búsqueda a los que se les consultan las ofertas (una llamada cada uno, en paralelo). */
-const RADAR_MAX_SEARCH_PICKS = 24;
-/** Tope de productos más vendidos de la categoría que se consultan (dos llamadas cada uno, en paralelo). */
+/**
+ * Tope de productos de la búsqueda a los que se les consultan las ofertas: toda la página de resultados.
+ * Medido con la API real (2026-10): cada /products/{id}/items tarda ~200 ms; 50 consultas de a 25 ≈ 0,5–1,0 s.
+ */
+const RADAR_MAX_SEARCH_PICKS = 50;
+/** Tope de productos más vendidos de la categoría que se consultan (dos llamadas cada uno). */
 const RADAR_MAX_HIGHLIGHTS = 16;
+/** Productos consultados a la vez (cada uno hace una o dos llamadas a Mercado Libre). */
+const RADAR_CONCURRENCY = 25;
+/**
+ * Presupuesto de tiempo para consultar ofertas. Lo que no llegó a consultarse se informa como "sin consultar".
+ * Peor caso de una búsqueda: 6,9 s de candidatos (búsqueda 3,5 s + pausa 0,4 s + reintento 3 s) + 4 s de ofertas
+ * + 4 s de vendedores ≈ 14,9 s (Vercel corta a 60 s). Lo habitual medido: 1,5–3 s.
+ */
+const RADAR_OFFERS_BUDGET_MS = 4000;
+const RADAR_DISCOVERY_TIMEOUT_MS = 3000;
+const RADAR_SEARCH_TIMEOUT_MS = 3500;
+const RADAR_SEARCH_RETRY_PAUSE_MS = 400;
+const RADAR_SEARCH_RETRY_TIMEOUT_MS = 3000;
 
 interface CatalogCandidates {
   /** domain_id que Mercado Libre asigna al texto buscado. null = no informado. */
   discoveredDomain: string | null;
   /** Productos de catálogo que devuelve la búsqueda por palabras, en el orden de Mercado Libre. */
   search: any[];
+  /** La búsqueda por palabras no respondió (error o tiempo agotado): no es lo mismo que "sin resultados". */
+  searchFailed: boolean;
   /** Ids de los productos más vendidos de la categoría que Mercado Libre asigna al texto. */
   highlightIds: string[];
 }
@@ -231,12 +257,22 @@ interface CatalogCandidates {
 async function gatherCandidates(query: string, token: string): Promise<CatalogCandidates> {
   const q = encodeURIComponent(query.trim());
   const [searchData, discovery] = await Promise.all([
-    mlGet(`/products/search?status=active&site_id=MLU&q=${q}&limit=${RADAR_SEARCH_LIMIT}`, token, 5000),
     (async () => {
-      const domains = await mlGet(`/sites/MLU/domain_discovery/search?limit=3&q=${q}`, token, 4000);
+      // La búsqueda es la llamada de la que depende todo el radar: si falla (Mercado Libre responde 429 cuando
+      // hay muchas consultas seguidas, medido el 2026-10-08) se reintenta una vez tras una pausa corta.
+      const path = `/products/search?status=active&site_id=MLU&q=${q}&limit=${RADAR_SEARCH_LIMIT}`;
+      const first = await mlGet(path, token, RADAR_SEARCH_TIMEOUT_MS);
+      if (first) return first;
+      await new Promise((resolve) => setTimeout(resolve, RADAR_SEARCH_RETRY_PAUSE_MS));
+      return mlGet(path, token, RADAR_SEARCH_RETRY_TIMEOUT_MS);
+    })(),
+    (async () => {
+      const domains = await mlGet(`/sites/MLU/domain_discovery/search?limit=3&q=${q}`, token, RADAR_DISCOVERY_TIMEOUT_MS);
       const first = Array.isArray(domains) ? domains[0] : null;
       const categoryId = typeof first?.category_id === "string" ? first.category_id : null;
-      const highlights = categoryId ? await mlGet(`/highlights/MLU/category/${categoryId}`, token, 4000) : null;
+      const highlights = categoryId
+        ? await mlGet(`/highlights/MLU/category/${categoryId}`, token, RADAR_DISCOVERY_TIMEOUT_MS)
+        : null;
       return {
         domain: typeof first?.domain_id === "string" ? (first.domain_id as string) : null,
         ids: (Array.isArray(highlights?.content) ? highlights.content : [])
@@ -247,6 +283,7 @@ async function gatherCandidates(query: string, token: string): Promise<CatalogCa
   ]);
   return {
     discoveredDomain: discovery.domain,
+    searchFailed: searchData === null,
     search: Array.isArray(searchData?.results) ? searchData.results.filter((p: any) => typeof p?.id === "string") : [],
     highlightIds: Array.from(new Set<string>(discovery.ids)),
   };
@@ -256,99 +293,132 @@ interface LoadedCatalogProduct {
   item: MluItem;
   /** Producto de catálogo tal como lo informa Mercado Libre (nombre, ficha, domain_id). */
   product: any;
+  /** Ofertas activas tal como las informa /products/{id}/items. */
+  rawItems: any[];
+  /** Vendedor de la oferta más barata. null = Mercado Libre no lo informa. */
+  sellerId: number | null;
+}
+
+/** Ejecuta `task` sobre cada elemento con un máximo de `limit` a la vez. */
+async function runPool<T>(items: T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) await task(items[next++]);
+    })
+  );
 }
 
 /**
- * Ofertas activas de cada producto pedido. Cada producto queda con el precio de su oferta más barata
- * (en la moneda de esa oferta) y el vendedor de esa oferta. `product: null` = hay que pedir también la ficha.
- * `withoutOffers` recibe los ids para los que Mercado Libre informó cero ofertas activas.
+ * Ofertas activas de cada producto pedido, de a RADAR_CONCURRENCY y dentro del presupuesto de tiempo.
+ * Cada producto queda con el precio de su oferta más barata (en la moneda de esa oferta).
+ * `product: null` = hay que pedir también la ficha. `tracking.withoutOffers` recibe los ids para los que
+ * Mercado Libre informó cero ofertas; `tracking.notChecked`, los que no se llegaron a consultar o no respondieron.
  */
-async function loadCatalogProducts(
+async function fetchCatalogOffers(
   picks: { id: string; product: any | null }[],
   token: string,
   rate: number | null,
   unsupported: UnsupportedListing[],
-  withoutOffers: Set<string> = new Set()
+  tracking: { withoutOffers: Set<string>; notChecked: Set<string> } = { withoutOffers: new Set(), notChecked: new Set() }
 ): Promise<LoadedCatalogProduct[]> {
-  const fetched = await Promise.all(
-    picks.map(async (pick) => {
-      const [product, rawItems] = await Promise.all([
-        pick.product ?? mlGet(`/products/${pick.id}`, token, 4500),
-        fetchRawOffers(pick.id, token),
-      ]);
-      if (!product || !rawItems) return null;
-      if (rawItems.length === 0) {
-        withoutOffers.add(pick.id);
-        return null;
+  const deadline = Date.now() + RADAR_OFFERS_BUDGET_MS;
+  const valid: LoadedCatalogProduct[] = [];
+
+  await runPool(picks, RADAR_CONCURRENCY, async (pick) => {
+    const remaining = deadline - Date.now();
+    if (remaining < 250) {
+      tracking.notChecked.add(pick.id);
+      return;
+    }
+    const timeoutMs = Math.min(RADAR_OFFERS_BUDGET_MS, remaining);
+    const [product, rawItems] = await Promise.all([
+      pick.product ?? mlGet(`/products/${pick.id}`, token, timeoutMs),
+      fetchRawOffers(pick.id, token, timeoutMs),
+    ]);
+    if (!product || !rawItems) {
+      tracking.notChecked.add(pick.id);
+      return;
+    }
+    if (rawItems.length === 0) {
+      tracking.withoutOffers.add(pick.id);
+      return;
+    }
+
+    const title = product.name || product.family_name || pick.id;
+    const priced = rawItems.filter((it) => typeof it?.price === "number" && it.price > 0);
+    const supported = priced.flatMap((it) => {
+      const currency = normalizeCurrency(it.currency_id);
+      return currency ? [{ it, currency, comparable: currency === "USD" && rate ? it.price * rate : it.price }] : [];
+    });
+    if (supported.length === 0) {
+      // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
+      const first = priced[0];
+      if (first) {
+        unsupported.push({
+          id: pick.id,
+          title,
+          price: first.price,
+          currency: String(first.currency_id ?? ""),
+          permalink: productPermalink(pick.id),
+        });
       }
+      return;
+    }
 
-      const title = product.name || product.family_name || pick.id;
-      const priced = rawItems.filter((it) => typeof it?.price === "number" && it.price > 0);
-      const supported = priced.flatMap((it) => {
-        const currency = normalizeCurrency(it.currency_id);
-        return currency ? [{ it, currency, comparable: currency === "USD" && rate ? it.price * rate : it.price }] : [];
-      });
-      if (supported.length === 0) {
-        // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
-        const first = priced[0];
-        if (first) {
-          unsupported.push({
-            id: pick.id,
-            title,
-            price: first.price,
-            currency: String(first.currency_id ?? ""),
-            permalink: productPermalink(pick.id),
-          });
-        }
-        return null;
-      }
+    // La oferta activa más barata, igual que el precio de referencia de "Productos exactos".
+    supported.sort((x, y) => x.comparable - y.comparable || String(x.it.item_id).localeCompare(String(y.it.item_id)));
+    const { it: cheapest, currency } = supported[0];
+    const city = cheapest.seller_address?.city?.name || "";
+    const state = cheapest.seller_address?.state?.name || "";
+    const item: MluItem = {
+      id: pick.id,
+      title,
+      price: cheapest.price,
+      currency,
+      condition:
+        cheapest.condition === "new" || cheapest.condition === "used"
+          ? cheapest.condition
+          : cheapest.condition
+            ? "other"
+            : null,
+      thumbnail: pictureUrl(product),
+      permalink: productPermalink(pick.id),
+      freeShipping: cheapest.shipping?.free_shipping === true,
+      isOfficialStore: !!cheapest.official_store_id,
+      activeSellersCount: rawItems.length,
+      sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
+      seller: null,
+    };
+    valid.push({
+      item,
+      product,
+      rawItems,
+      sellerId: typeof cheapest.seller_id === "number" ? (cheapest.seller_id as number) : null,
+    });
+  });
 
-      // La oferta activa más barata, igual que el precio de referencia de "Productos exactos".
-      supported.sort((x, y) => x.comparable - y.comparable || String(x.it.item_id).localeCompare(String(y.it.item_id)));
-      const { it: cheapest, currency } = supported[0];
-      const city = cheapest.seller_address?.city?.name || "";
-      const state = cheapest.seller_address?.state?.name || "";
-      const item: MluItem = {
-        id: pick.id,
-        title,
-        price: cheapest.price,
-        currency,
-        condition:
-          cheapest.condition === "new" || cheapest.condition === "used"
-            ? cheapest.condition
-            : cheapest.condition
-              ? "other"
-              : null,
-        thumbnail: pictureUrl(product),
-        permalink: productPermalink(pick.id),
-        freeShipping: cheapest.shipping?.free_shipping === true,
-        isOfficialStore: !!cheapest.official_store_id,
-        activeSellersCount: rawItems.length,
-        sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
-        seller: null,
-      };
-      return { item, product, sellerId: typeof cheapest.seller_id === "number" ? (cheapest.seller_id as number) : null };
-    })
-  );
-
-  const valid = fetched.flatMap((v) => (v ? [v] : []));
-
-  // Datos reales de los vendedores: una sola consulta a /users para todos (con caché).
-  // Si Mercado Libre no responde, `seller` queda en null y la interfaz muestra "no disponible".
-  const sellers = await lookupSellers(
-    valid.flatMap((v) => (v.sellerId !== null ? [v.sellerId] : [])),
-    token
-  );
-  for (const v of valid) v.item.seller = v.sellerId !== null ? sellers.get(v.sellerId) ?? null : null;
-
-  // Orden: más ofertas activas del producto primero; a igual cantidad, el más barato.
+  // Orden: más ofertas activas del producto primero; a igual cantidad, el más barato; a igual precio, por id.
   const comparablePrice = (i: MluItem) => (i.currency === "USD" && rate ? i.price * rate : i.price);
   valid.sort(
     (a, b) =>
       (b.item.activeSellersCount ?? 0) - (a.item.activeSellersCount ?? 0) ||
-      comparablePrice(a.item) - comparablePrice(b.item)
+      comparablePrice(a.item) - comparablePrice(b.item) ||
+      a.item.id.localeCompare(b.item.id)
   );
-  return valid.map(({ item, product }) => ({ item, product }));
+  return valid;
+}
+
+/**
+ * Datos reales de los vendedores de las ofertas mostradas: una sola consulta a /users para todos (con caché).
+ * Si Mercado Libre no responde, `seller` queda en null y la interfaz muestra "no disponible".
+ */
+async function attachSellers(loaded: LoadedCatalogProduct[], token: string): Promise<void> {
+  const sellers = await lookupSellers(
+    loaded.flatMap((v) => (v.sellerId !== null ? [v.sellerId] : [])),
+    token
+  );
+  for (const v of loaded) v.item.seller = v.sellerId !== null ? sellers.get(v.sellerId) ?? null : null;
 }
 
 /** Productos de la búsqueda (ya traen ficha) más los destacados que no estén entre ellos, sin repetir. */
@@ -363,16 +433,86 @@ function buildPicks(searchPicks: any[], highlightIds: string[]): { id: string; p
   return picks;
 }
 
+interface RadarLoad {
+  /** Productos con ofertas activas, con `item.match` calculado. Primero los que coinciden. */
+  loaded: LoadedCatalogProduct[];
+  relevance: RadarRelevance;
+  selection: ExactSelection;
+  /** Producto elegido para "Productos exactos". null = no se eligió ninguno (ver `selection.status`). */
+  chosen: LoadedCatalogProduct | null;
+}
+
+function toCandidate(l: LoadedCatalogProduct): CatalogCandidate {
+  return {
+    productId: l.item.id,
+    title: l.item.title,
+    thumbnail: l.item.thumbnail,
+    permalink: l.item.permalink,
+    offersCount: l.rawItems.length,
+  };
+}
+
+/**
+ * Producto exacto para una búsqueda por nombre: entre los productos de catálogo que coinciden con la búsqueda
+ * (relevance.ts) y tienen ofertas activas en Uruguay, el de más ofertas. No se elige ninguno si no hay
+ * candidatos con ofertas o si son de más de una marca (la búsqueda es genérica: no hay "un mismo producto").
+ */
+function selectExact(
+  matchedWithOffers: LoadedCatalogProduct[],
+  candidatesWithoutOffers: number
+): { selection: ExactSelection; chosen: LoadedCatalogProduct | null } {
+  // Marcas tal como las informa la ficha (BRAND); los productos sin marca informada forman su propio grupo.
+  const brandNames = new Map<string, string>();
+  for (const l of matchedWithOffers) {
+    const brand = productBrand(l.product);
+    const key = brandKey(brand);
+    if (!brandNames.has(key)) brandNames.set(key, brand || "sin marca informada");
+  }
+  const base = {
+    candidatesWithOffers: matchedWithOffers.length,
+    candidatesWithoutOffers,
+    brands: Array.from(brandNames.values()),
+    // Ya vienen ordenados: más ofertas primero; a igual cantidad, el más barato.
+    candidates: matchedWithOffers.map(toCandidate),
+  };
+
+  if (matchedWithOffers.length === 0) {
+    return {
+      selection: {
+        ...base,
+        status: candidatesWithoutOffers > 0 ? "sin_ofertas" : "sin_coincidencias",
+        chosenOffers: null,
+        tiedWith: 0,
+      },
+      chosen: null,
+    };
+  }
+  if (brandNames.size > 1) {
+    return { selection: { ...base, status: "generica", chosenOffers: null, tiedWith: 0 }, chosen: null };
+  }
+  const chosen = matchedWithOffers[0];
+  return {
+    selection: {
+      ...base,
+      status: "elegido",
+      chosenOffers: chosen.rawItems.length,
+      tiedWith: matchedWithOffers.filter((l) => l !== chosen && l.rawItems.length === chosen.rawItems.length).length,
+    },
+    chosen,
+  };
+}
+
 /**
  * Radar por nombre: productos de catálogo con ofertas activas, separados entre los que mencionan todo lo
- * que se buscó (`match.matches`) y los relacionados. Primero van los que coinciden.
+ * que se buscó (`match.matches`) y los relacionados, y el producto elegido para "Productos exactos".
+ * No consulta vendedores (ver attachSellers).
  */
-async function searchRealMlu(
+async function loadRadar(
   query: string,
-  token: string | null,
-  unsupported: UnsupportedListing[] = [],
-  rate: number | null = null
-): Promise<{ items: MluItem[]; relevance: RadarRelevance }> {
+  token: string,
+  rate: number | null,
+  unsupported: UnsupportedListing[]
+): Promise<RadarLoad> {
   const terms = queryTerms(query);
   const relevance: RadarRelevance = {
     terms,
@@ -382,51 +522,71 @@ async function searchRealMlu(
     matchedWithoutOffers: 0,
     matchedNotChecked: 0,
     searchCheckLimit: RADAR_MAX_SEARCH_PICKS,
+    searchUnavailable: false,
     missingCounts: [],
   };
-  if (!token) return { items: [], relevance };
 
-  try {
-    const candidates = await gatherCandidates(query, token);
+  const candidates = await gatherCandidates(query, token);
+  relevance.searchUnavailable = candidates.searchFailed;
 
-    // La búsqueda ya trae nombre y ficha: la relevancia se calcula antes de gastar llamadas en ofertas,
-    // y se consultan primero los productos que coinciden.
-    const ranked = candidates.search.map((product) => ({ product, rel: relevanceOf(query, productTexts(product)) }));
-    const matching = ranked.filter((r) => r.rel.matches);
-    const searchPicks = [...matching, ...ranked.filter((r) => !r.rel.matches)]
-      .slice(0, RADAR_MAX_SEARCH_PICKS)
-      .map((r) => r.product);
-    const pickedIds = new Set<string>(searchPicks.map((p) => p.id));
-    relevance.matchedNotChecked = matching.filter((r) => !pickedIds.has(r.product.id)).length;
+  // La búsqueda ya trae nombre y ficha: la relevancia se calcula antes de gastar llamadas en ofertas,
+  // y se consultan primero los productos que coinciden.
+  const ranked = candidates.search.map((product) => ({ product, rel: relevanceOf(query, productTexts(product)) }));
+  const matching = ranked.filter((r) => r.rel.matches);
+  const searchPicks = [...matching, ...ranked.filter((r) => !r.rel.matches)]
+    .slice(0, RADAR_MAX_SEARCH_PICKS)
+    .map((r) => r.product);
+  const pickedIds = new Set<string>(searchPicks.map((p) => p.id));
 
-    const withoutOffers = new Set<string>();
-    const loaded = await loadCatalogProducts(
-      buildPicks(searchPicks, candidates.highlightIds.slice(0, RADAR_MAX_HIGHLIGHTS)),
-      token,
-      rate,
-      unsupported,
-      withoutOffers
-    );
-    relevance.matchedWithoutOffers = matching.filter((r) => withoutOffers.has(r.product.id)).length;
+  const tracking = { withoutOffers: new Set<string>(), notChecked: new Set<string>() };
+  const all = await fetchCatalogOffers(
+    buildPicks(searchPicks, candidates.highlightIds.slice(0, RADAR_MAX_HIGHLIGHTS)),
+    token,
+    rate,
+    unsupported,
+    tracking
+  );
+  relevance.matchedWithoutOffers = matching.filter((r) => tracking.withoutOffers.has(r.product.id)).length;
+  // Sin consultar: quedaron fuera del tope, del presupuesto de tiempo, o Mercado Libre no respondió.
+  relevance.matchedNotChecked = matching.filter(
+    (r) => !pickedIds.has(r.product.id) || tracking.notChecked.has(r.product.id)
+  ).length;
 
-    for (const l of loaded) l.item.match = relevanceOf(query, productTexts(l.product));
-    const items = loaded.map((l) => l.item);
-    const matched = items.filter((i) => i.match?.matches);
-    const related = items.filter((i) => !i.match?.matches);
+  for (const l of all) l.item.match = relevanceOf(query, productTexts(l.product));
+  const matched = all.filter((l) => l.item.match?.matches);
+  const related = all.filter((l) => !l.item.match?.matches);
 
-    relevance.matched = matched.length;
-    relevance.related = related.length;
-    relevance.matchedOffers = matched.reduce((acc, i) => acc + (i.activeSellersCount ?? 0), 0);
-    relevance.missingCounts = terms
-      .map((term) => ({ term, count: related.filter((i) => i.match?.missing.includes(term)).length }))
-      .filter((m) => m.count > 0);
+  relevance.matched = matched.length;
+  relevance.related = related.length;
+  relevance.matchedOffers = matched.reduce((acc, l) => acc + (l.item.activeSellersCount ?? 0), 0);
+  relevance.missingCounts = terms
+    .map((term) => ({ term, count: related.filter((l) => l.item.match?.missing.includes(term)).length }))
+    .filter((m) => m.count > 0);
 
-    return { items: [...matched, ...related], relevance };
-  } catch (err) {
-    console.error("[searchRealMlu] error:", err);
-    // Sin resultados: quien llama informa "sin resultados"; nunca se calcula una mediana con otra cosa.
-    return { items: [], relevance };
-  }
+  return { loaded: [...matched, ...related], relevance, ...selectExact(matched, relevance.matchedWithoutOffers) };
+}
+
+/** Bloque "Productos exactos" del producto elegido: sus ofertas con los datos de cada vendedor. */
+async function buildExactBlock(
+  chosen: LoadedCatalogProduct,
+  selection: ExactSelection,
+  token: string,
+  rate: number
+): Promise<ExactProductBlock> {
+  const built = await buildExactOffers(chosen.item.id, chosen.item.title, chosen.rawItems, token, rate);
+  return {
+    match: {
+      ...toCandidate(chosen),
+      offersCount: built.offers.length,
+      source: "busqueda",
+      // Coincide con todo lo buscado y es de la única marca entre los candidatos; el porqué va en `exactSelection`.
+      confidence: "alta",
+      reasons: [],
+    },
+    candidates: selection.candidates,
+    ...built,
+    rateUsed: rate,
+  };
 }
 
 /**
@@ -461,11 +621,13 @@ async function findSimilarProducts(
   // Los de la búsqueda ya traen dominio y nombre: se filtran antes de consultar ofertas.
   const searchPicks = candidates.search.filter((p) => p.id !== targetId && sameType(p)).slice(0, RADAR_MAX_SEARCH_PICKS);
   const highlightIds = candidates.highlightIds.filter((id) => id !== targetId).slice(0, RADAR_MAX_HIGHLIGHTS);
-  const loaded = await loadCatalogProducts(buildPicks(searchPicks, highlightIds), token, rate, unsupported);
+  const loaded = await fetchCatalogOffers(buildPicks(searchPicks, highlightIds), token, rate, unsupported);
 
   const similar = loaded.filter((l) => sameType(l.product));
   criteria.discarded = loaded.length - similar.length;
-  return { items: similar.slice(0, 8).map((l) => l.item), criteria };
+  const shown = similar.slice(0, 8);
+  await attachSellers(shown, token);
+  return { items: shown.map((l) => l.item), criteria };
 }
 
 app.get("/api/search-mlu", async (req, res) => {
@@ -483,17 +645,27 @@ app.get("/api/search-mlu", async (req, res) => {
   try {
     const token = await getAppToken();
     const unsupported: UnsupportedListing[] = [];
-    // "Productos exactos" va en paralelo con el radar; si falla, el radar responde igual sin esa sección.
-    const [radar, exact] = await Promise.all([
-      searchRealMlu(query, token, unsupported, rate),
-      token
-        ? resolveExactByName(query, token, rate).catch((err) => {
-            console.warn("[api/search-mlu] productos exactos no disponibles:", err?.message || err);
-            return null;
-          })
-        : Promise.resolve(null),
-    ]);
-    const { items, relevance } = radar;
+    let items: MluItem[] = [];
+    let relevance: RadarRelevance | null = null;
+    let exact: ExactProductBlock | null = null;
+    let exactSelection: ExactSelection | null = null;
+    if (token) {
+      const radar = await loadRadar(query, token, rate, unsupported);
+      items = radar.loaded.map((l) => l.item);
+      relevance = radar.relevance;
+      exactSelection = radar.selection;
+      // Vendedores de las tarjetas y ofertas del producto exacto, en paralelo. Si "Productos exactos" falla,
+      // el radar responde igual sin esa sección.
+      [, exact] = await Promise.all([
+        attachSellers(radar.loaded, token),
+        radar.chosen
+          ? buildExactBlock(radar.chosen, radar.selection, token, rate).catch((err) => {
+              console.warn("[api/search-mlu] productos exactos no disponibles:", err?.message || err);
+              return null;
+            })
+          : Promise.resolve(null),
+      ]);
+    }
 
     if (items.length === 0 && unsupported.length > 0) {
       const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
@@ -538,13 +710,14 @@ app.get("/api/search-mlu", async (req, res) => {
     return res.json({
       ok: true,
       query,
-      total: relevance.matched,
+      total: relevance?.matched ?? 0,
       items,
       stats,
       relevance,
       rateUsed: rate,
       unsupported,
       exact,
+      exactSelection,
       fetchedAt: new Date().toISOString(),
     });
   } catch (err: any) {
@@ -569,8 +742,6 @@ const SELLER_BATCH_SIZE = 20;
 /** Tope de vendedores consultados por producto (2 llamadas en paralelo); el resto queda "no disponible". */
 const MAX_SELLERS_PER_PRODUCT = 40;
 const SELLER_LOOKUP_TIMEOUT_MS = 4000;
-/** Candidatos de catálogo por búsqueda; a todos se les cuentan las ofertas (una llamada cada uno, en paralelo). */
-const MATCH_SEARCH_LIMIT = 8;
 
 const sellerCache = new Map<number, { info: ExactOfferSeller; expiresAt: number }>();
 
@@ -597,8 +768,14 @@ async function mlGet(pathAndQuery: string, token: string, timeoutMs: number): Pr
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(timeoutMs),
     });
-    return r.ok ? await r.json() : null;
-  } catch {
+    if (!r.ok) {
+      // 404 es una respuesta normal (producto sin ficha u ofertas); el resto se deja en el log para diagnosticar.
+      if (r.status !== 404) console.warn(`[mercadolibre] HTTP ${r.status} en ${pathAndQuery.split("?")[0]}`);
+      return null;
+    }
+    return await r.json();
+  } catch (err: any) {
+    console.warn(`[mercadolibre] sin respuesta (${err?.name || "error"}) en ${pathAndQuery.split("?")[0]}`);
     return null;
   }
 }
@@ -653,17 +830,21 @@ async function lookupSellers(sellerIds: number[], token: string): Promise<Map<nu
  * Ofertas activas de un producto de catálogo. Sin ofertas Mercado Libre responde 404 ("No winners found"): es [].
  * null = Mercado Libre no respondió (error o tiempo agotado).
  */
-async function fetchRawOffers(pid: string, token: string): Promise<any[] | null> {
+async function fetchRawOffers(pid: string, token: string, timeoutMs = 5000): Promise<any[] | null> {
   try {
     const r = await fetch(`${ML_API}/products/${pid}/items`, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (r.status === 404) return [];
-    if (!r.ok) return null;
+    if (!r.ok) {
+      console.warn(`[mercadolibre] HTTP ${r.status} en /products/${pid}/items`);
+      return null;
+    }
     const data = await r.json();
     return Array.isArray(data?.results) ? data.results : [];
-  } catch {
+  } catch (err: any) {
+    console.warn(`[mercadolibre] sin respuesta (${err?.name || "error"}) en /products/${pid}/items`);
     return null;
   }
 }
@@ -744,125 +925,6 @@ async function buildExactOffers(
   };
 }
 
-const MATCH_STOPWORDS = new Set(["de", "del", "la", "el", "los", "las", "para", "con", "sin", "en", "por", "un", "una"]);
-
-function foldText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-}
-
-/** Singular aproximado, solo para comparar palabras ("auriculares" con "auricular"). */
-function stemWord(word: string): string {
-  if (/\d/.test(word)) return word;
-  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
-  if (word.length > 3 && word.endsWith("s")) return word.slice(0, -1);
-  return word;
-}
-
-function matchWords(text: string): string[] {
-  return foldText(text)
-    .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 1 && !MATCH_STOPWORDS.has(w));
-}
-
-/** Palabras de la búsqueda que no aparecen en el nombre ni en los atributos del producto. */
-function missingQueryWords(query: string, product: any): string[] {
-  const attributes = Array.isArray(product?.attributes) ? product.attributes.map((a: any) => a?.value_name || "") : [];
-  const text = [product?.name || "", ...attributes].join(" ");
-  const words = new Set(matchWords(text).map(stemWord));
-  const compact = foldText(text).replace(/[^a-z0-9]+/g, "");
-  return Array.from(new Set(matchWords(query))).filter((w) =>
-    // "1l" tiene que encontrar "1 L": las palabras con números se buscan en el texto sin separadores.
-    /\d/.test(w) ? !compact.includes(w) : !words.has(stemWord(w))
-  );
-}
-
-/**
- * Producto de catálogo que mejor coincide con un texto. Devuelve el elegido, los demás candidatos
- * y las ofertas ya consultadas del elegido. La coincidencia nunca se da por segura: si faltan
- * palabras o hay variantes igual de cercanas, queda marcada como dudosa con el motivo.
- */
-async function findCatalogMatch(
-  query: string,
-  token: string
-): Promise<{ match: ExactMatch; candidates: CatalogCandidate[]; rawItems: any[] | null } | null> {
-  const data = await mlGet(
-    `/products/search?status=active&site_id=MLU&q=${encodeURIComponent(query)}&limit=${MATCH_SEARCH_LIMIT}`,
-    token,
-    5000
-  );
-  const results: any[] = Array.isArray(data?.results) ? data.results.filter((p: any) => p?.id) : [];
-  if (results.length === 0) return null;
-
-  const queryWordCount = new Set(matchWords(query)).size;
-  const ranked = results
-    .map((product, rank) => ({ product, rank, missing: missingQueryWords(query, product) }))
-    .sort((a, b) => a.missing.length - b.missing.length || a.rank - b.rank);
-
-  const rawByPid = new Map<string, any[] | null>();
-  await Promise.all(
-    ranked.map(async (c) => {
-      rawByPid.set(c.product.id, await fetchRawOffers(c.product.id, token));
-    })
-  );
-
-  // Entre los igual de cercanos por nombre, el que tiene ofertas activas.
-  const best = ranked[0].missing.length;
-  const chosen =
-    ranked.find((c) => c.missing.length === best && (rawByPid.get(c.product.id)?.length ?? 0) > 0) ?? ranked[0];
-  const ties = ranked.filter((c) => c !== chosen && c.missing.length === best).length;
-
-  const toCandidate = (product: any): CatalogCandidate => ({
-    productId: product.id,
-    title: product.name || product.id,
-    thumbnail: pictureUrl(product),
-    permalink: productPermalink(product.id),
-    offersCount: rawByPid.get(product.id)?.length ?? null,
-  });
-
-  const reasons: string[] = [];
-  if (queryWordCount === 0 || chosen.missing.length > 0) {
-    reasons.push(
-      chosen.missing.length > 0
-        ? `El producto no menciona: ${chosen.missing.join(", ")}.`
-        : "La búsqueda no tiene palabras para comparar con el nombre del producto."
-    );
-  }
-  if (ties > 0) {
-    reasons.push(
-      ties === 1
-        ? "Hay otro producto de catálogo igual de cercano a lo que buscaste (por ejemplo, otro color o tamaño)."
-        : `Hay ${ties} productos de catálogo igual de cercanos a lo que buscaste (por ejemplo, otros colores o tamaños).`
-    );
-  }
-
-  return {
-    match: {
-      ...toCandidate(chosen.product),
-      source: "busqueda",
-      confidence: reasons.length > 0 ? "dudosa" : "alta",
-      reasons,
-    },
-    candidates: ranked.map((c) => toCandidate(c.product)),
-    rawItems: rawByPid.get(chosen.product.id) ?? null,
-  };
-}
-
-/** Bloque "Productos exactos" para una búsqueda por nombre. null = sin coincidencia o Mercado Libre no respondió. */
-async function resolveExactByName(query: string, token: string, rate: number): Promise<ExactProductBlock | null> {
-  const found = await findCatalogMatch(query, token);
-  if (!found || !found.rawItems) return null;
-  const built = await buildExactOffers(found.match.productId, found.match.title, found.rawItems, token, rate);
-  return {
-    match: { ...found.match, offersCount: built.offers.length },
-    candidates: found.candidates,
-    ...built,
-    rateUsed: rate,
-  };
-}
-
 // ------------------------------------------------------------------
 // 2.2 Mercado Libre URL Product & Competitors Analysis Endpoint
 // ------------------------------------------------------------------
@@ -895,7 +957,8 @@ app.all("/api/analyze-url", async (req, res) => {
       .replace(/-p-MLU[0-9]+/i, "")
       .replace(/_JM/i, "")
       .split("-")
-      .filter((w) => w.length > 1 && !w.toLowerCase().startsWith("mlu"))
+      // Los números sueltos se conservan ("5 litros"): son parte de lo que identifica al producto.
+      .filter((w) => (w.length > 1 || /\d/.test(w)) && !w.toLowerCase().startsWith("mlu"))
       .join(" ");
   } catch (e) {
     const m = rawUrl.match(/(MLU[0-9]+)/i);
@@ -933,17 +996,21 @@ app.all("/api/analyze-url", async (req, res) => {
 
     // 2. Sin product_id en el enlace: se busca en el catálogo por las palabras del enlace.
     //    Puede ser un producto parecido y no el mismo, así que siempre queda marcado como dudoso.
+    let slugSelection: ExactSelection | null = null;
     if (!match && slugQuery && token) {
-      const found = await findCatalogMatch(slugQuery, token);
-      if (found) {
-        rawItems = found.rawItems ?? [];
-        candidates = found.candidates;
+      // Misma elección que el radar por nombre: entre los que coinciden, el de más ofertas activas.
+      const radar = await loadRadar(slugQuery, token, rate, []);
+      slugSelection = radar.selection;
+      if (radar.chosen) {
+        rawItems = radar.chosen.rawItems;
+        candidates = radar.selection.candidates;
         match = {
-          ...found.match,
+          ...toCandidate(radar.chosen),
+          source: "busqueda",
           confidence: "dudosa",
           reasons: [
             "El enlace no es de un producto de catálogo (/p/MLU…): se buscó por las palabras del enlace y puede no ser la misma publicación.",
-            ...found.match.reasons,
+            `Se eligió el producto con más ofertas activas (${radar.selection.chosenOffers}) entre ${radar.selection.candidatesWithOffers} ${radar.selection.candidatesWithOffers === 1 ? "candidato que coincide" : "candidatos que coinciden"} con esas palabras.`,
           ],
         };
       }
@@ -951,10 +1018,18 @@ app.all("/api/analyze-url", async (req, res) => {
 
     // 3. Without a real listing there is nothing to audit: report it instead of inventing a price.
     if (!match || !token) {
+      // El enlace se buscó por palabras y no se pudo elegir un único producto: se dice por qué, sin mostrar uno vacío.
+      const why =
+        slugSelection?.status === "generica"
+          ? `Las palabras del enlace coinciden con ${slugSelection.candidatesWithOffers} productos de catálogo de marcas distintas (${slugSelection.brands.slice(0, 4).join(", ")}): no se puede saber cuál es. Pegá el enlace del producto de catálogo (/p/MLU…).`
+          : slugSelection?.status === "sin_ofertas"
+            ? `Las palabras del enlace coinciden con ${slugSelection.candidatesWithoutOffers} productos de catálogo, pero ninguno tiene ofertas activas en Uruguay. Pegá el enlace del producto de catálogo (/p/MLU…).`
+            : slugSelection?.status === "sin_coincidencias"
+              ? "Ningún producto de catálogo menciona todas las palabras del enlace. Pegá el enlace del producto de catálogo (/p/MLU…)."
+              : "Revisá que el enlace sea de mercadolibre.com.uy y que la publicación siga activa.";
       return res.status(404).json({
         ok: false,
-        message:
-          "No pudimos leer esa publicación de Mercado Libre. Revisá que el enlace sea de mercadolibre.com.uy y que la publicación siga activa.",
+        message: `No pudimos leer esa publicación de Mercado Libre. ${why}`,
       });
     }
 

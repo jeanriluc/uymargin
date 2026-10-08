@@ -5,11 +5,32 @@
 
 const STOPWORDS = new Set(["de", "del", "la", "el", "los", "las", "para", "con", "sin", "en", "por", "un", "una", "y"]);
 
-/** Unidades que se pegan al número anterior: "950 ml" se compara como "950ml". */
-const UNITS = new Set([
-  "ml", "cc", "l", "lt", "lts", "litro", "litros", "g", "gr", "grs", "kg", "mg", "oz",
-  "mm", "cm", "m", "mts", "pulgadas", "w", "v", "hz", "mah", "gb", "tb", "mb", "mp",
-]);
+/**
+ * Unidades que se pegan al número anterior ("950 ml" se compara como "950ml"), agrupadas por formas de
+ * escribir la misma unidad: "5 litros" coincide con "5 L" y "5 Lts". No se convierten entre sí
+ * (1 L no es 1000 ml para esta regla).
+ */
+const UNIT_FAMILIES: string[][] = [
+  ["l", "lt", "lts", "litro", "litros"],
+  ["ml", "cc"],
+  ["g", "gr", "grs", "gramo", "gramos"],
+  ["kg", "kgs", "kilo", "kilos"],
+  ["mg"],
+  ["oz"],
+  ["mm"],
+  ["cm"],
+  ["m", "mt", "mts", "metro", "metros"],
+  ["pulgadas", "pulgada", "pulg"],
+  ["w", "watt", "watts"],
+  ["v", "volt", "volts"],
+  ["hz"],
+  ["mah"],
+  ["gb"],
+  ["tb"],
+  ["mb"],
+  ["mp"],
+];
+const UNIT_FAMILY = new Map<string, string[]>(UNIT_FAMILIES.flatMap((family) => family.map((u) => [u, family] as const)));
 
 function fold(text: string): string {
   return text
@@ -42,7 +63,7 @@ export function queryTerms(query: string): string[] {
   const terms: string[] = [];
   for (let i = 0; i < raw.length; i++) {
     let term = raw[i];
-    if (/^\d+(?:[.,]\d+)?$/.test(term) && UNITS.has(raw[i + 1] ?? "")) {
+    if (/^\d+(?:[.,]\d+)?$/.test(term) && UNIT_FAMILY.has(raw[i + 1] ?? "")) {
       term += raw[i + 1];
       i++;
     }
@@ -67,7 +88,7 @@ export interface QueryRelevance {
 /**
  * Un producto coincide cuando su nombre o su ficha técnica mencionan todas las palabras y números de la
  * búsqueda. Los números se comparan enteros ("950" no coincide con "1950" ni con "9,50") y con su unidad
- * si se escribió ("1l" coincide con "1 L" y "1 litro", no con "1,2 L").
+ * si se escribió ("1l" coincide con "1 L" y "1 litro", no con "1,2 L" ni con "1 kg").
  */
 export function relevanceOf(query: string, texts: string[]): QueryRelevance {
   const terms = queryTerms(query);
@@ -82,9 +103,14 @@ export function relevanceOf(query: string, texts: string[]): QueryRelevance {
     if (numeric) {
       const value = escapeRegExp(numeric[1]).replace(/\\\.|,/g, "[.,]");
       const unit = numeric[2];
-      const pattern = unit
-        ? `(?<![0-9.,])${value}\\s*${escapeRegExp(unit)}`
-        : `(?<![0-9.,])${value}(?![0-9])(?![.,][0-9])`;
+      // Con unidad: cualquiera de sus formas de escribirla, y que la unidad termine ahí ("1 l" no es "1 lava").
+      // Una unidad que no está en la lista se compara tal cual, como prefijo ("520bt").
+      const family = UNIT_FAMILY.get(unit);
+      const pattern = !unit
+        ? `(?<![0-9.,])${value}(?![0-9])(?![.,][0-9])`
+        : family
+          ? `(?<![0-9.,])${value}\\s*(?:${family.map(escapeRegExp).join("|")})(?![a-z])`
+          : `(?<![0-9.,])${value}\\s*${escapeRegExp(unit)}`;
       return !new RegExp(pattern).test(folded);
     }
     // Códigos de modelo ("op105", "s24"): pueden venir con guiones o espacios en el nombre.
@@ -134,4 +160,14 @@ export function nameHasTypeWords(name: string, typeWords: string[]): boolean {
   if (typeWords.length === 0) return false;
   const stems = new Set(significantWords(name).map(stem));
   return typeWords.every((w) => stems.has(stem(fold(w))));
+}
+
+/** Marca del producto según su ficha (atributo BRAND). "" = Mercado Libre no la informa. */
+export function productBrand(product: any): string {
+  return attributeValue(product, "BRAND").trim();
+}
+
+/** Para agrupar marcas escritas distinto ("JBL" y "Jbl" son la misma). */
+export function brandKey(brand: string): string {
+  return fold(brand).replace(/[^a-z0-9]+/g, "");
 }
