@@ -20,6 +20,7 @@ import {
 import { Header, type CloudStatus, type ConnectionStatus } from "@/components/layout/Header";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { MarketSummary, type MarketState } from "@/components/search/MarketSummary";
+import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { CostPanel } from "@/components/calculator/CostPanel";
 import { ProfitHeroCard } from "@/components/calculator/ProfitHeroCard";
 import { BundleOptimizer } from "@/components/calculator/BundleOptimizer";
@@ -53,7 +54,7 @@ import type {
   MlChannelSettings,
   DirectChannelSettings,
 } from "@/lib/finance/types";
-import type { MarketStats, ExchangeRateResponse, UnsupportedListing } from "@/lib/mlu/types";
+import type { MarketStats, ExchangeRateResponse, ExactProductBlock, UnsupportedListing } from "@/lib/mlu/types";
 
 // Loaded on demand: none of these is needed to get the first verdict.
 const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
@@ -103,6 +104,8 @@ export default function App() {
   const [stats, setStats] = useState<MarketStats | null>(null);
   const [marketSource, setMarketSource] = useState<"mlu" | "manual" | null>(null);
   const [unsupportedListings, setUnsupportedListings] = useState<UnsupportedListing[]>([]);
+  // Ofertas del producto de catálogo que coincide con la búsqueda. undefined = todavía no se buscó.
+  const [exactBlock, setExactBlock] = useState<ExactProductBlock | null | undefined>(undefined);
   const [manualPrices, setManualPrices] = useState<string>("");
 
   const [searchLoading, setSearchLoading] = useState(false);
@@ -284,6 +287,7 @@ export default function App() {
     setSearchLoading(true);
     setStatus("idle");
     setMarketState({ status: "loading", query });
+    setExactBlock(undefined);
 
     try {
       const res = await fetch(
@@ -303,6 +307,7 @@ export default function App() {
         });
 
         setUnsupportedListings(Array.isArray(data.unsupported) ? data.unsupported : []);
+        setExactBlock(data.exact ?? null);
         if (data.stats) {
           setStats(data.stats);
           if (inputs.salePrice <= 0) {
@@ -846,6 +851,14 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 onSearch={handleSearch}
                 loading={searchLoading}
               />
+
+              {marketState.status === "success" && exactBlock !== undefined && (
+                <ExactOffersSection
+                  exact={exactBlock}
+                  rate={currentRate}
+                  onSimulate={(p) => updateInputs({ salePrice: p })}
+                />
+              )}
 
               <MarketSummary
                 state={marketState}
