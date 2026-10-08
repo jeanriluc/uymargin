@@ -672,7 +672,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
 
         {/* Steps 1 and 2: what you pay, what you charge */}
         {/* Dos columnas recién desde xl: en tablet (hasta 1279 px) cada panel a media página queda demasiado angosto. */}
-        <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        <div className="grid gap-6 xl:grid-cols-2">
           <CostPanel
             inputs={inputs}
             costs={analysis.costs}
@@ -722,7 +722,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             </p>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+          <div className="grid gap-6 xl:grid-cols-2">
             <ChannelCard
               result={analysis.ml}
               icon={<ShoppingBag className="size-5" />}

@@ -73,16 +73,14 @@ export function ChannelCard({
 
   return (
     <article
-      className={`flex flex-col rounded-xl border transition-all duration-200 shadow-sm overflow-hidden bg-surface ${
+      // En dos columnas (xl) cada tarjeta es una subgrilla de 7 filas compartidas con su vecina:
+      // encabezado, ajustes, ganancia, indicadores, chips, cascada y auditoría arrancan a la misma altura.
+      className={`relative flex flex-col gap-5 p-5 pt-6 sm:p-6 sm:pt-7 xl:grid xl:grid-rows-subgrid xl:row-span-7 rounded-xl border transition-all duration-200 shadow-sm overflow-hidden bg-surface before:absolute before:inset-x-0 before:top-0 before:h-1 before:bg-black dark:before:bg-white ${
         isWinner && hasPrice
           ? "border-black dark:border-white ring-1 ring-black dark:ring-white"
           : "border-zinc-200 dark:border-zinc-800"
       }`}
     >
-      {/* Top Banner Accent in solid black */}
-      <div className="h-1 w-full bg-black dark:bg-white" />
-
-      <div className="p-5 sm:p-6 flex flex-col gap-5 flex-1">
         {/* Header */}
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-zinc-100 dark:border-zinc-800 pb-4">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
@@ -108,7 +106,7 @@ export function ChannelCard({
         </div>
 
         {/* Channel parameter toggles */}
-        {settings}
+        <div>{settings}</div>
 
         {/* Hero KPI: Ganancia Neta Líquida */}
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-4">
@@ -229,7 +227,6 @@ export function ChannelCard({
             </div>
           </div>
         </details>
-      </div>
     </article>
   );
 }
