@@ -21,3 +21,6 @@ AUDIT_LOG.md
 
 # Reportes y mediciones de auditoría: quedan en disco, no se publican
 docs/audit/
+
+# Herramientas locales del asistente: quedan en disco, no se publican
+.claude/
