@@ -813,7 +813,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           </div>
 
           {searchTab === "keyword" ? (
-            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div className="grid gap-6">
               <SearchPanel
                 query={inputs.query}
                 onQueryChange={(q) => updateInputs({ query: q })}
