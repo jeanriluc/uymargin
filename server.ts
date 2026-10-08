@@ -1095,7 +1095,12 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    // Hashed build assets never change; index.html must always be revalidated.
+    app.use(
+      "/assets",
+      express.static(path.join(distPath, "assets"), { immutable: true, maxAge: "1y" })
+    );
+    app.use(express.static(distPath, { setHeaders: (res) => res.setHeader("Cache-Control", "no-cache") }));
     app.get("*", (_req, res) => {
       res.sendFile(path.resolve(distPath, "index.html"));
     });

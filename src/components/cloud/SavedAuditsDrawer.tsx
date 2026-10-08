@@ -162,7 +162,7 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
                 <div className="flex items-start gap-3">
                   {item.thumbnail ? (
                     <img
-                      src={item.thumbnail}
+loading="lazy" decoding="async"                       src={item.thumbnail}
                       alt=""
                       className="size-12 shrink-0 rounded-lg object-contain bg-white border border-zinc-200 dark:border-zinc-700 p-0.5"
                     />

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import {
   Bot,
   Check,
@@ -16,10 +16,6 @@ import {
 import { Header, type CloudStatus, type ConnectionStatus } from "@/components/layout/Header";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { MarketSummary, type MarketState } from "@/components/search/MarketSummary";
-import { UrlAnalyzer } from "@/components/search/UrlAnalyzer";
-import { BatchAuditor } from "@/components/search/BatchAuditor";
-import { SupabaseModal } from "@/components/cloud/SupabaseModal";
-import { SavedAuditsDrawer } from "@/components/cloud/SavedAuditsDrawer";
 import { CostPanel } from "@/components/calculator/CostPanel";
 import { ProfitHeroCard } from "@/components/calculator/ProfitHeroCard";
 import { BundleOptimizer } from "@/components/calculator/BundleOptimizer";
@@ -28,7 +24,6 @@ import { StickyResultBar } from "@/components/calculator/StickyResultBar";
 import { ChannelCard } from "@/components/calculator/ChannelCard";
 import { MlSettings, DirectSettings } from "@/components/calculator/ChannelSettings";
 import { HistorySection } from "@/components/history/HistorySection";
-import { AiAdvisor } from "@/components/ai/AiAdvisor";
 import type { CloudAuditRecord } from "@/lib/supabase";
 import { exportAuditToCsv } from "@/lib/export/csv";
 
@@ -36,7 +31,7 @@ import { createDefaultInputs } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
 import { loadDraft, saveDraft } from "@/lib/storage/draft";
-import { getSupabaseConfig, testSupabaseConnection } from "@/lib/supabase";
+import { isSupabaseConfigured, testSupabaseConnection } from "@/lib/supabase";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
 import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
 
@@ -47,6 +42,33 @@ import type {
   DirectChannelSettings,
 } from "@/lib/finance/types";
 import type { MarketStats, ExchangeRateResponse } from "@/lib/mlu/types";
+
+// Loaded on demand: none of these is needed to get the first verdict.
+const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
+const BatchAuditor = lazy(() => import("@/components/search/BatchAuditor").then((m) => ({ default: m.BatchAuditor })));
+const SupabaseModal = lazy(() => import("@/components/cloud/SupabaseModal").then((m) => ({ default: m.SupabaseModal })));
+const SavedAuditsDrawer = lazy(() =>
+  import("@/components/cloud/SavedAuditsDrawer").then((m) => ({ default: m.SavedAuditsDrawer }))
+);
+const AiAdvisor = lazy(() => import("@/components/ai/AiAdvisor").then((m) => ({ default: m.AiAdvisor })));
+
+function PanelFallback() {
+  return (
+    <div
+      role="status"
+      className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-6 text-xs font-semibold text-zinc-600 dark:text-zinc-400"
+    >
+      Cargando…
+    </div>
+  );
+}
+
+/** Stays true once `flag` has been true, so a lazy overlay keeps its state after closing. */
+function useEverTrue(flag: boolean): boolean {
+  const [ever, setEver] = useState(flag);
+  if (flag && !ever) setEver(true);
+  return ever;
+}
 
 export default function App() {
   const [inputs, setInputs] = useState<AnalysisInputs>(() => loadDraft(createDefaultInputs()));
@@ -72,6 +94,9 @@ export default function App() {
   const [searchTab, setSearchTab] = useState<"keyword" | "url" | "batch">("keyword");
   const [supabaseModalOpen, setSupabaseModalOpen] = useState(false);
   const [savedAuditsOpen, setSavedAuditsOpen] = useState(false);
+  const aiEverOpened = useEverTrue(aiAdvisorOpen);
+  const supabaseEverOpened = useEverTrue(supabaseModalOpen);
+  const auditsEverOpened = useEverTrue(savedAuditsOpen);
 
   const handleLoadCloudAudit = (audit: CloudAuditRecord) => {
     const targetPrice = audit.target_price_uyu || Math.round(audit.target_price || 1200);
@@ -123,8 +148,7 @@ export default function App() {
 
   // Read-only check so the cloud indicator reflects the real connection.
   const checkCloud = useCallback(async () => {
-    const { url, key } = getSupabaseConfig();
-    if (!url || !key) {
+    if (!isSupabaseConfigured()) {
       setCloudStatus("off");
       return;
     }
@@ -653,7 +677,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 onSelectPrice={(p) => updateInputs({ salePrice: p })}
               />
             </div>
-          ) : searchTab === "url" ? (
+          ) : (
+            <Suspense fallback={<PanelFallback />}>
+              {searchTab === "url" ? (
             <UrlAnalyzer
               exchangeRate={inputs.exchangeRate}
               onSimulatePrice={(p, name) => {
@@ -662,7 +688,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               }}
               onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
-          ) : (
+              ) : (
             <BatchAuditor
               baseInputs={inputs}
               exchangeRate={inputs.exchangeRate}
@@ -673,6 +699,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               }}
               onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
+              )}
+            </Suspense>
           )}
         </section>
 
@@ -690,15 +718,19 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         />
       )}
 
+      <Suspense fallback={null}>
       {/* AI Financial Advisor Drawer / Modal */}
+      {aiEverOpened && (
       <AiAdvisor
         isOpen={aiAdvisorOpen}
         onClose={() => setAiAdvisorOpen(false)}
         inputs={inputs}
         analysis={analysis}
       />
+      )}
 
       {/* Supabase Cloud Settings Modal */}
+      {supabaseEverOpened && (
       <SupabaseModal
         isOpen={supabaseModalOpen}
         onClose={() => {
@@ -710,14 +742,18 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           checkCloud();
         }}
       />
+      )}
 
       {/* Supabase Saved Audits Drawer */}
+      {auditsEverOpened && (
       <SavedAuditsDrawer
         isOpen={savedAuditsOpen}
         onClose={() => setSavedAuditsOpen(false)}
         onLoadAudit={handleLoadCloudAudit}
         onOpenSettings={() => setSupabaseModalOpen(true)}
       />
+      )}
+      </Suspense>
     </div>
   );
 }

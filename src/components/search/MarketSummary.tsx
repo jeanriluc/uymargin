@@ -253,7 +253,7 @@ export function MarketSummary({
                   <div className="flex items-start gap-2.5">
                     <div className="relative size-12 shrink-0 rounded bg-white overflow-hidden p-0.5 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
                       {item.thumbnail ? (
-                        <img src={item.thumbnail} alt="" className="size-full object-contain" />
+                        <img loading="lazy" decoding="async" src={item.thumbnail} alt="" className="size-full object-contain" />
                       ) : (
                         <PackageSearch className="m-auto size-5 text-zinc-500 dark:text-zinc-400" />
                       )}

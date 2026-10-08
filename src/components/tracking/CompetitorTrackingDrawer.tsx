@@ -458,7 +458,7 @@ export function CompetitorTrackingDrawer({
                       <div className="flex items-start gap-3">
                         <div className="size-14 shrink-0 rounded-lg bg-white overflow-hidden p-1 border border-zinc-200 dark:border-zinc-700">
                           {item.thumbnail ? (
-                            <img src={item.thumbnail} alt="" className="size-full object-contain" />
+                            <img loading="lazy" decoding="async" src={item.thumbnail} alt="" className="size-full object-contain" />
                           ) : (
                             <div className="size-full flex items-center justify-center text-zinc-500 dark:text-zinc-400 text-xs font-bold">MLU</div>
                           )}

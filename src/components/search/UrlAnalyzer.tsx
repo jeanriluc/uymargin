@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { formatMoney, formatUyu } from "@/lib/format";
 import { StepHeader } from "@/components/ui/StepHeader";
-import { saveAuditToCloud, getSupabaseClient, CloudAuditRecord } from "@/lib/supabase";
+import { saveAuditToCloud, isSupabaseConfigured, type CloudAuditRecord } from "@/lib/supabase";
 
 export interface AnalyzedProductData {
   id: string;
@@ -177,8 +177,7 @@ export function UrlAnalyzer({
 
   async function handleSaveToSupabase() {
     if (!result) return;
-    const client = getSupabaseClient();
-    if (!client) {
+    if (!isSupabaseConfigured()) {
       onOpenCloudSettings();
       return;
     }
@@ -424,7 +423,7 @@ export function UrlAnalyzer({
               <div className="relative size-24 sm:size-28 shrink-0 rounded-xl bg-white border border-zinc-200 dark:border-zinc-700 p-2 overflow-hidden shadow-sm">
                 {result.targetProduct.thumbnail ? (
                   <img
-                    src={result.targetProduct.thumbnail}
+loading="lazy" decoding="async"                     src={result.targetProduct.thumbnail}
                     alt=""
                     className="size-full object-contain"
                   />
@@ -867,7 +866,7 @@ export function UrlAnalyzer({
                         <div className="relative size-12 shrink-0 rounded bg-white border border-zinc-200 dark:border-zinc-700 p-0.5 overflow-hidden">
                           {item.thumbnail ? (
                             <img
-                              src={item.thumbnail}
+loading="lazy" decoding="async"                               src={item.thumbnail}
                               alt=""
                               className="size-full object-contain"
                             />

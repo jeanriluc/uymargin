@@ -114,7 +114,7 @@ export function getTrackedCompetitors(): TrackedCompetitor[] {
 /** Sync tracked items to Supabase cloud if connected */
 export async function syncTrackedToSupabase(items: TrackedCompetitor[]): Promise<{ ok: boolean; failed: number }> {
   if (typeof window === "undefined") return { ok: true, failed: 0 };
-  const client = getSupabaseClient();
+  const client = await getSupabaseClient();
   if (!client || items.length === 0) return { ok: true, failed: 0 };
 
   let failed = 0;

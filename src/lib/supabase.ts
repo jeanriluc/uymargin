@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface CloudAuditRecord {
   id?: string;
@@ -67,12 +67,20 @@ export function setSupabaseConfig(url: string, key: string) {
 let clientInstance: SupabaseClient | null = null;
 let lastUsedConfig = { url: "", key: "" };
 
-export function getSupabaseClient(): SupabaseClient | null {
+/** True when a project URL and anon key are available (does not load the SDK). */
+export function isSupabaseConfigured(): boolean {
+  const { url, key } = getSupabaseConfig();
+  return Boolean(url && key);
+}
+
+/** The SDK is ~120 kB; it is fetched the first time the cloud is actually used. */
+export async function getSupabaseClient(): Promise<SupabaseClient | null> {
   const { url, key } = getSupabaseConfig();
   if (!url || !key) return null;
 
   if (!clientInstance || lastUsedConfig.url !== url || lastUsedConfig.key !== key) {
     try {
+      const { createClient } = await import("@supabase/supabase-js");
       clientInstance = createClient(url, key, {
         auth: { persistSession: true },
       });
@@ -112,7 +120,7 @@ create policy "Allow all on uymargin_audits" on uymargin_audits for all using (t
 `;
 
 export async function testSupabaseConnection(): Promise<{ ok: boolean; message: string }> {
-  const client = getSupabaseClient();
+  const client = await getSupabaseClient();
   if (!client) {
     return { ok: false, message: "Ingresá la URL del proyecto y la Anon Key de Supabase." };
   }
@@ -135,7 +143,7 @@ export async function testSupabaseConnection(): Promise<{ ok: boolean; message: 
 }
 
 export async function saveAuditToCloud(record: CloudAuditRecord): Promise<{ ok: boolean; data?: any; error?: string }> {
-  const client = getSupabaseClient();
+  const client = await getSupabaseClient();
   if (!client) {
     return { ok: false, error: "Supabase no está configurado. Conectá tu proyecto en el botón de la nube." };
   }
@@ -152,7 +160,7 @@ export async function saveAuditToCloud(record: CloudAuditRecord): Promise<{ ok: 
 }
 
 export async function getCloudAudits(): Promise<{ ok: boolean; data: CloudAuditRecord[]; error?: string }> {
-  const client = getSupabaseClient();
+  const client = await getSupabaseClient();
   if (!client) {
     return { ok: false, data: [], error: "Supabase no está configurado." };
   }
@@ -173,7 +181,7 @@ export async function getCloudAudits(): Promise<{ ok: boolean; data: CloudAuditR
 }
 
 export async function deleteCloudAudit(id: string): Promise<{ ok: boolean; error?: string }> {
-  const client = getSupabaseClient();
+  const client = await getSupabaseClient();
   if (!client) return { ok: false, error: "Supabase no configurado" };
 
   try {
