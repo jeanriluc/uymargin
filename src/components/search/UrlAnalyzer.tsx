@@ -268,7 +268,7 @@ export function UrlAnalyzer({
               Auditor de Publicación por Enlace (MLU)
             </h2>
           </div>
-          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">
             FILTRO DE STOCK Y CALIDAD ACTIVA
           </span>
         </div>
@@ -285,14 +285,14 @@ export function UrlAnalyzer({
           className="flex flex-col sm:flex-row gap-2.5"
         >
           <div className="relative flex-1 group">
-            <LinkIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
+            <LinkIcon className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-500 dark:text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
             <input
               type="url"
               required
               placeholder="https://www.mercadolibre.com.uy/... o https://articulo.mercadolibre.com.uy/MLU-..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="h-12 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
+              className="h-12 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
             />
           </div>
 
@@ -317,7 +317,7 @@ export function UrlAnalyzer({
 
         {/* Quick sample chips */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
-          <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mr-1">
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1">
             PROBAR EJEMPLOS CON STOCK ACTIVO:
           </span>
           {SAMPLE_URLS.map((item) => (
@@ -347,17 +347,17 @@ export function UrlAnalyzer({
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   PRODUCTO AUDITADO
                 </span>
                 {/* Real Availability Badge */}
                 {targetIsAvailable ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                     <span className="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     En Stock Disponible ({result.sameProductSellers.length || 1} en UY)
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-red-600 dark:text-red-400">
                     <AlertTriangle className="size-3" />
                     Pausada / Sin Stock en Uruguay
                   </span>
@@ -419,7 +419,7 @@ export function UrlAnalyzer({
             )}
 
             {cloudError && (
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
+              <div className="mb-4 flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300">
                 <span>{cloudError}</span>
                 <button
                   onClick={onOpenCloudSettings}
@@ -439,7 +439,7 @@ export function UrlAnalyzer({
                     className="size-full object-contain"
                   />
                 ) : (
-                  <PackageSearch className="m-auto size-8 text-zinc-400" />
+                  <PackageSearch className="m-auto size-8 text-zinc-500 dark:text-zinc-400" />
                 )}
               </div>
 
@@ -453,46 +453,46 @@ export function UrlAnalyzer({
                   <span className="line-clamp-2 leading-snug">
                     {result.targetProduct.title}
                   </span>
-                  <ExternalLink className="size-4 shrink-0 text-zinc-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
+                  <ExternalLink className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white transition-colors" />
                 </a>
 
                 {/* Pre-Click Seller Quality, Volume & Reviews Bar */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {/* Seller badge */}
                   {result.targetProduct.sellerBadge === "Tienda Oficial" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 rounded bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                       <Store className="size-3" /> Tienda Oficial
                     </span>
                   ) : result.targetProduct.sellerBadge === "MercadoLíder Platinum" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
                       <Award className="size-3" /> MercadoLíder Platinum
                     </span>
                   ) : result.targetProduct.sellerBadge === "MercadoLíder Gold" ? (
-                    <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">
                       <Award className="size-3" /> MercadoLíder Gold
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">
+                    <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase">
                       <ShieldCheck className="size-3 text-emerald-500" /> Vendedor Destacado
                     </span>
                   )}
 
                   {/* Rating with stars */}
-                  <span className="inline-flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-300">
+                  <span className="inline-flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[11px] font-black text-amber-800 dark:text-amber-300">
                     <Star className="size-3 fill-amber-500 text-amber-500" />
                     <span>{result.targetProduct.ratingAverage ?? 4.8}</span>
-                    <span className="text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                    <span className="text-[11px] font-normal text-amber-700 dark:text-amber-400">
                       ({result.targetProduct.reviewsCount ?? 64} opiniones)
                     </span>
                   </span>
 
                   {/* Sales Volume badge */}
-                  <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-700 dark:text-zinc-300">
+                  <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
                     📦 {result.targetProduct.salesVolume ?? "+500 vendidos"}
                   </span>
 
                   {/* Positive reputation % */}
-                  <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                     <Check className="size-3 text-emerald-500" />
                     {result.targetProduct.positivePercentage ?? 98}% opiniones positivas
                   </span>
@@ -500,7 +500,7 @@ export function UrlAnalyzer({
 
                 <div className="mt-3.5 flex flex-wrap items-center gap-4 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
                   <div>
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
                       PRECIO DE REFERENCIA
                     </span>
                     <span className="num text-2xl font-black text-black dark:text-white">
@@ -512,25 +512,25 @@ export function UrlAnalyzer({
                         : "Sin Precio Activo"}
                     </span>
                     {targetIsAvailable && result.targetProduct.currency === "USD" && (
-                      <span className="text-xs text-zinc-500 ml-1.5 num font-semibold">
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400 ml-1.5 num font-semibold">
                         (≈ {formatUyu(result.targetProduct.priceUyu)})
                       </span>
                     )}
                   </div>
 
                   <div className="border-l border-zinc-200 dark:border-zinc-800 pl-4">
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
+                    <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block">
                       TIENDA / VENDEDOR
                     </span>
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-700 dark:text-zinc-300 mt-0.5">
-                      <Store className="size-3.5 text-zinc-400" />
+                      <Store className="size-3.5 text-zinc-500 dark:text-zinc-400" />
                       <span>{result.targetProduct.seller}</span>
-                      <span className="text-[10px] text-zinc-400">({result.targetProduct.sellerCity})</span>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">({result.targetProduct.sellerCity})</span>
                     </div>
                   </div>
 
                   {result.targetProduct.freeShipping && (
-                    <span className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1 rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
                       <Truck className="size-3" /> Envío Gratis
                     </span>
                   )}
@@ -541,7 +541,7 @@ export function UrlAnalyzer({
             {/* Benchmark Cards */}
             <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 p-3">
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                   MÍNIMO ENCONTRADO
                 </span>
                 <p className="num text-lg font-black text-zinc-900 dark:text-zinc-100 mt-1">
@@ -550,7 +550,7 @@ export function UrlAnalyzer({
               </div>
 
               <div className="rounded-lg border border-black dark:border-white bg-black dark:bg-white text-white dark:text-black p-3 shadow-sm">
-                <span className="text-[10px] font-black uppercase tracking-wider opacity-80">
+                <span className="text-[11px] font-black uppercase tracking-wider opacity-80">
                   MEDIANA DE MERCADO
                 </span>
                 <p className="num text-lg font-black mt-1">
@@ -559,7 +559,7 @@ export function UrlAnalyzer({
               </div>
 
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 p-3">
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                   PROMEDIO
                 </span>
                 <p className="num text-lg font-black text-zinc-900 dark:text-zinc-100 mt-1">
@@ -568,7 +568,7 @@ export function UrlAnalyzer({
               </div>
 
               <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-900/40 p-3">
-                <span className="text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                   MÁXIMO ENCONTRADO
                 </span>
                 <p className="num text-lg font-black text-zinc-900 dark:text-zinc-100 mt-1">
@@ -582,12 +582,12 @@ export function UrlAnalyzer({
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
-                <Users className="size-4 text-zinc-500" />
+                <Users className="size-4 text-zinc-600 dark:text-zinc-400" />
                 <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
                   Mismo Producto: Tiendas que lo venden con Stock en Uruguay
                 </h3>
               </div>
-              <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+              <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
                 {result.sameProductSellers.length} VENDEDORES ACTIVOS EN UY
               </span>
             </div>
@@ -596,7 +596,7 @@ export function UrlAnalyzer({
             {result.sameProductSellers.length > 0 && (
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5 bg-zinc-50 dark:bg-zinc-900/60 p-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-800">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mr-1 flex items-center gap-1">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1 flex items-center gap-1">
                     <SlidersHorizontal className="size-3" /> FILTRAR:
                   </span>
                   <button
@@ -635,7 +635,7 @@ export function UrlAnalyzer({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     ORDENAR:
                   </span>
                   <select
@@ -652,7 +652,7 @@ export function UrlAnalyzer({
             )}
 
             {filteredSellers.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center text-xs text-zinc-500">
+              <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center text-xs text-zinc-600 dark:text-zinc-400">
                 {result.sameProductSellers.length === 0
                   ? "No se detectaron vendedores adicionales para este código de publicación específico."
                   : "No hay vendedores que coincidan con los filtros seleccionados."}
@@ -661,7 +661,7 @@ export function UrlAnalyzer({
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[10px] font-black uppercase text-zinc-400 tracking-wider">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-800 text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider">
                       <th className="pb-2.5">Tienda / Vendedor</th>
                       <th className="pb-2.5">Calidad & Ventas</th>
                       <th className="pb-2.5">Disponibilidad</th>
@@ -680,7 +680,7 @@ export function UrlAnalyzer({
                         {/* Tienda & Badge */}
                         <td className="py-3">
                           <div className="flex items-start gap-2">
-                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-800 text-[9px] font-bold mt-0.5">
+                            <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-800 text-[11px] font-bold mt-0.5">
                               {idx + 1}
                             </span>
                             <div>
@@ -689,20 +689,20 @@ export function UrlAnalyzer({
                                   {seller.seller}
                                 </p>
                                 {seller.sellerBadge === "Tienda Oficial" ? (
-                                  <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
+                                  <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
                                     Oficial
                                   </span>
                                 ) : seller.sellerBadge === "MercadoLíder Platinum" ? (
-                                  <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase">
+                                  <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
                                     Platinum
                                   </span>
                                 ) : seller.sellerBadge === "MercadoLíder Gold" ? (
-                                  <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[9px] font-black text-amber-600 dark:text-amber-400 uppercase">
+                                  <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
                                     Gold
                                   </span>
                                 ) : null}
                               </div>
-                              <p className="text-[10px] text-zinc-400 mt-0.5">
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                                 {seller.sellerCity}
                               </p>
                             </div>
@@ -712,15 +712,15 @@ export function UrlAnalyzer({
                         {/* Calidad & Reviews (Pre-click insight) */}
                         <td className="py-3">
                           <div>
-                            <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 dark:text-amber-400">
+                            <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 dark:text-amber-400">
                               <Star className="size-3 fill-amber-500 text-amber-500" />
                               <span>{seller.ratingAverage ?? 4.8}</span>
-                              <span className="text-[9px] text-zinc-400 font-semibold">
+                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold">
                                 ({seller.reviewsCount ?? 45})
                               </span>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] text-zinc-500 mt-0.5">
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                            <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                              <span className="font-bold text-emerald-700 dark:text-emerald-400">
                                 {seller.salesVolume ?? "+500 vendidos"}
                               </span>
                               <span>·</span>
@@ -731,7 +731,7 @@ export function UrlAnalyzer({
 
                         {/* Disponibilidad */}
                         <td className="py-3">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                             <span className="size-1.5 rounded-full bg-emerald-500"></span>
                             En Stock UY
                           </span>
@@ -744,7 +744,7 @@ export function UrlAnalyzer({
                               {formatUyu(seller.priceUyu)}
                             </p>
                             {seller.currency === "USD" && (
-                              <p className="text-[10px] text-zinc-400 font-medium">
+                              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
                                 {formatMoney(seller.price, seller.currency)}
                               </p>
                             )}
@@ -756,9 +756,9 @@ export function UrlAnalyzer({
                           {seller.differencePercent !== undefined &&
                           seller.differencePercent !== 0 ? (
                             <span
-                              className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold num ${
+                              className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-bold num ${
                                 seller.differencePercent < 0
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                  ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                                   : "bg-red-500/10 text-red-600 dark:text-red-400"
                               }`}
                             >
@@ -771,7 +771,7 @@ export function UrlAnalyzer({
                               {seller.differencePercent}%
                             </span>
                           ) : (
-                            <span className="text-[10px] text-zinc-400 font-bold uppercase">
+                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-bold uppercase">
                               Igual
                             </span>
                           )}
@@ -780,11 +780,11 @@ export function UrlAnalyzer({
                         {/* Envío */}
                         <td className="py-3">
                           {seller.freeShipping ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                               <Truck className="size-3" /> Gratis
                             </span>
                           ) : (
-                            <span className="text-[10px] text-zinc-400">
+                            <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
                               A cargo comprador
                             </span>
                           )}
@@ -801,7 +801,7 @@ export function UrlAnalyzer({
                                 )
                               }
                               title="Simular margen con este precio de venta"
-                              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[10px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
+                              className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
                             >
                               Simular
                             </button>
@@ -809,7 +809,7 @@ export function UrlAnalyzer({
                               href={seller.permalink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="rounded p-1 text-zinc-400 hover:text-black dark:hover:text-white"
+                              className="rounded p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                               title="Ver publicación directa en Mercado Libre Uruguay"
                             >
                               <ExternalLink className="size-3.5" />
@@ -829,12 +829,12 @@ export function UrlAnalyzer({
             <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center gap-2">
-                  <PackageSearch className="size-4 text-zinc-500" />
+                  <PackageSearch className="size-4 text-zinc-600 dark:text-zinc-400" />
                   <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
                     Productos Similares y Tops Verificados en Uruguay
                   </h3>
                 </div>
-                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                   <span className="size-2 rounded-full bg-emerald-500"></span>
                   {result.similarProducts.length} alternativas con stock activo
                 </span>
@@ -849,12 +849,12 @@ export function UrlAnalyzer({
                     <div>
                       {/* Top Choice Badge & Stock */}
                       <div className="flex items-center justify-between gap-1 mb-2">
-                        <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
                           <span className="size-1.5 rounded-full bg-emerald-500"></span>
                           En Stock
                         </span>
                         {item.isTopChoice && (
-                          <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[9px] font-black uppercase tracking-wider">
+                          <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[11px] font-black uppercase tracking-wider">
                             <Sparkles className="size-2.5" /> TOP
                           </span>
                         )}
@@ -869,7 +869,7 @@ export function UrlAnalyzer({
                               className="size-full object-contain"
                             />
                           ) : (
-                            <PackageSearch className="m-auto size-5 text-zinc-400" />
+                            <PackageSearch className="m-auto size-5 text-zinc-500 dark:text-zinc-400" />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
@@ -886,13 +886,13 @@ export function UrlAnalyzer({
 
                       {/* Seller & Reviews Pre-click summary */}
                       <div className="mt-2.5 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-1">
-                        <span className="text-[10px] text-zinc-500 font-medium truncate max-w-[120px]">
+                        <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[120px]">
                           {item.seller || "Vendedor Verificado"}
                         </span>
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
                           <Star className="size-2.5 fill-amber-500 text-amber-500" />
                           <span>{item.ratingAverage ?? 4.8}</span>
-                          <span className="text-zinc-400 text-[9px]">
+                          <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">
                             ({item.reviewsCount ?? 35})
                           </span>
                         </div>
@@ -905,7 +905,7 @@ export function UrlAnalyzer({
                           {formatMoney(item.price, item.currency)}
                         </span>
                         {item.salesVolume && (
-                          <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                          <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                             {item.salesVolume}
                           </span>
                         )}
@@ -920,7 +920,7 @@ export function UrlAnalyzer({
                             )
                           }
                           title="Simular rentabilidad con este competidor"
-                          className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[9px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white"
+                          className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white"
                         >
                           Simular
                         </button>
@@ -929,7 +929,7 @@ export function UrlAnalyzer({
                           target="_blank"
                           rel="noopener noreferrer"
                           title="Ver en Mercado Libre"
-                          className="p-1 text-zinc-400 hover:text-black dark:hover:text-white"
+                          className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                         >
                           <ExternalLink className="size-3" />
                         </a>

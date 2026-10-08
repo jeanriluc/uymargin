@@ -26,11 +26,11 @@ function StatBox({
 }) {
   return (
     <div className="flex flex-col justify-between rounded-md border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-3">
-      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">{label}</span>
+      <span className="text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400">{label}</span>
       <div className="num text-base font-black tracking-tight mt-1 text-zinc-900 dark:text-zinc-100">
         {value}
       </div>
-      {subtext && <span className="text-[9px] font-semibold text-zinc-400 mt-0.5">{subtext}</span>}
+      {subtext && <span className="text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 mt-0.5">{subtext}</span>}
     </div>
   );
 }
@@ -50,7 +50,7 @@ function BreakdownRow({
     <div
       className={`flex items-center justify-between py-1.5 text-xs ${
         strong ? "font-black text-black dark:text-white" : ""
-      } ${muted ? "text-zinc-500" : ""}`}
+      } ${muted ? "text-zinc-600 dark:text-zinc-400" : ""}`}
     >
       <span className="uppercase text-[11px] tracking-wide">{label}</span>
       <span className={`num font-bold ${strong ? "text-sm font-black" : ""}`}>{formatUyu(value)}</span>
@@ -92,12 +92,12 @@ export function ChannelCard({
                   {r.label}
                 </h3>
                 {isWinner && hasPrice && (
-                  <span className="inline-flex items-center gap-1 bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[9px] font-black uppercase tracking-widest rounded">
+                  <span className="inline-flex items-center gap-1 bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[11px] font-black uppercase tracking-widest rounded">
                     <Trophy className="size-2.5" /> RECOMENDADO
                   </span>
                 )}
               </div>
-              <p className="text-xs text-zinc-500 mt-0.5">{subtitle}</p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">{subtitle}</p>
             </div>
           </div>
 
@@ -109,10 +109,10 @@ export function ChannelCard({
 
         {/* Hero KPI: Ganancia Neta Líquida */}
         <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-4">
-          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-zinc-500 mb-1">
+          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1">
             <span>Ganancia Neta Líquida por Unidad</span>
             {hasPrice && (
-              <span className="font-semibold text-zinc-400">
+              <span className="font-semibold text-zinc-500 dark:text-zinc-400">
                 IVA & Deducciones Incluidas
               </span>
             )}
@@ -122,7 +122,7 @@ export function ChannelCard({
             <p className="num text-3xl sm:text-4xl font-black tracking-tight text-black dark:text-white">
               <AnimatedNumber value={r.netProfit} format={formatUyu} />
             </p>
-            <p className="num text-sm font-bold text-zinc-400">
+            <p className="num text-sm font-bold text-zinc-500 dark:text-zinc-400">
               ≈ <AnimatedNumber value={r.netProfitUsd} format={formatUsd} />
             </p>
           </div>
@@ -168,7 +168,7 @@ export function ChannelCard({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
             <span>Cascada de Rentabilidad</span>
-            <span className="text-[10px] font-normal text-zinc-400">Desglose secuencial</span>
+            <span className="text-[11px] font-normal text-zinc-500 dark:text-zinc-400">Desglose secuencial</span>
           </div>
           <WaterfallChart id={`${r.channel}-waterfall`} steps={r.waterfall} />
         </div>

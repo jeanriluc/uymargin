@@ -53,11 +53,11 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
                 <span>Estrategia de Packs & Bundles (MLU)</span>
               </h3>
               {isEligibleForBundleBoost ? (
-                <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
                   <Zap className="size-3" /> Anti-Cargo Fijo
                 </span>
               ) : (
-                <span className="rounded bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-muted uppercase">
+                <span className="rounded bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 text-[11px] font-bold text-muted uppercase">
                   Multiplicador
                 </span>
               )}
@@ -86,7 +86,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
         <div className="p-4 sm:p-5">
           {isEligibleForBundleBoost && (
             <div className="mb-4 rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
-              <Sparkles className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+              <Sparkles className="size-4 shrink-0 text-amber-700 dark:text-amber-400 mt-0.5" />
               <div>
                 <strong className="font-bold">Efecto Palanca Financiero:</strong> Al empaquetar 2 o más unidades superás los $U 1.200. Mercado Libre <strong>elimina el cargo fijo unitario</strong> y el costo de despacho se amortiza en una sola entrega.
               </div>
@@ -106,7 +106,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
                   }`}
                 >
                   {crosses && isEligibleForBundleBoost && (
-                    <div className="absolute -top-2.5 right-3 rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-white shadow-sm flex items-center gap-1">
+                    <div className="absolute -top-2.5 right-3 rounded-full bg-emerald-700 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-white shadow-sm flex items-center gap-1">
                       <ShieldCheck className="size-2.5" /> Sin cargo fijo
                     </div>
                   )}
@@ -116,13 +116,13 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
                       <span className="text-xs font-black uppercase tracking-wider text-foreground">
                         {opt.label}
                       </span>
-                      <span className="rounded bg-surface px-1.5 py-0.5 text-[10px] font-bold text-muted border border-border">
+                      <span className="rounded bg-surface px-1.5 py-0.5 text-[11px] font-bold text-muted border border-border">
                         −{opt.discountPct}% promo
                       </span>
                     </div>
 
                     <div className="mt-2.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
                         PVP Sugerido Pack
                       </div>
                       <div className="num text-xl font-black text-foreground">
@@ -136,7 +136,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
                     <div className="mt-3 space-y-1.5 border-t border-border/50 pt-2.5 text-xs">
                       <div className="flex items-center justify-between">
                         <span className="text-muted">Ganancia neta total:</span>
-                        <strong className="num font-bold text-emerald-600 dark:text-emerald-400">
+                        <strong className="num font-bold text-emerald-700 dark:text-emerald-400">
                           {formatUyu(opt.bundleAnalysis.netProfit)}
                         </strong>
                       </div>

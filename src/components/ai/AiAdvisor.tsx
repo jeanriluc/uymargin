@@ -1,3 +1,4 @@
+import { useDialog } from "@/lib/hooks/useDialog";
 import {
   Brain,
   Loader2,
@@ -33,6 +34,7 @@ const MODELS = [
 ];
 
 export function AiAdvisor({ isOpen, onClose, inputs, analysis }: AiAdvisorProps) {
+  const dialogRef = useDialog(isOpen, onClose);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -157,7 +159,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Copiloto de inteligencia artificial" className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="flex flex-col w-full max-w-2xl h-[85vh] max-h-[780px] rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#121214] shadow-2xl overflow-hidden">
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60">
@@ -170,11 +172,11 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
                 <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
                   Asesor Financiero IA UyMargin
                 </h3>
-                <span className="rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider">
+                <span className="rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[11px] font-black uppercase tracking-wider">
                   GEMINI
                 </span>
               </div>
-              <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+              <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
                 Especialista en Márgenes, Comisiones de ML y Tributación DGI
               </p>
             </div>
@@ -185,14 +187,15 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
               type="button"
               onClick={() => setMessages(messages.slice(0, 1))}
               title="Limpiar conversación"
-              className="size-8 rounded border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-black dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="size-8 rounded border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             >
               <Trash2 className="size-3.5" />
             </button>
             <button
               type="button"
+              aria-label="Cerrar"
               onClick={onClose}
-              className="size-8 rounded border border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:text-black dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="size-8 rounded border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="size-4" />
             </button>
@@ -203,8 +206,9 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
         <div className="px-6 py-2.5 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* Model picker */}
           <div className="flex items-center gap-2">
-            <span className="text-zinc-500 text-[10px] font-black uppercase tracking-wider">MODELO:</span>
+            <span className="text-zinc-600 dark:text-zinc-400 text-[11px] font-black uppercase tracking-wider">MODELO:</span>
             <select
+              aria-label="Modelo de inteligencia artificial"
               value={selectedModel}
               onChange={(e) => handleModelChange(e.target.value)}
               className="h-8 rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 text-xs font-bold text-zinc-800 dark:text-zinc-200 outline-none focus:border-black dark:focus:border-white cursor-pointer"
@@ -217,7 +221,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
             </select>
 
             {selectedModel === "gemini-3.1-pro-preview" && (
-              <label className="flex items-center gap-1.5 ml-2 cursor-pointer text-black dark:text-white font-black text-[10px] uppercase tracking-wider">
+              <label className="flex items-center gap-1.5 ml-2 cursor-pointer text-black dark:text-white font-black text-[11px] uppercase tracking-wider">
                 <input
                   type="checkbox"
                   checked={enableThinking}
@@ -230,7 +234,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
           </div>
 
           {/* Current product badge */}
-          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
             <span>SIMULANDO:</span>
             <span className="text-black dark:text-white truncate max-w-[150px]">
               {inputs.productName || inputs.query || "Producto"}
@@ -259,7 +263,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
               </div>
 
               {m.modelUsed && (
-                <div className="flex items-center gap-1.5 mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 px-1">
+                <div className="flex items-center gap-1.5 mt-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 px-1">
                   <span>Generado con {m.modelUsed}</span>
                   {m.thinkingMode && (
                     <span className="text-black dark:text-white font-black">
@@ -272,7 +276,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
           ))}
 
           {loading && (
-            <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 p-2 uppercase tracking-wider">
+            <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 dark:text-zinc-400 p-2 uppercase tracking-wider">
               <Loader2 className="size-4 animate-spin text-black dark:text-white" />
               <span>
                 {selectedModel === "gemini-3.1-pro-preview" && enableThinking
@@ -312,11 +316,12 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
           >
             <input
               type="text"
+              aria-label="Tu pregunta para el copiloto"
               placeholder="Preguntale al asesor sobre márgenes, precios o impuestos DGI..."
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
               disabled={loading}
-              className="flex-1 h-12 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
+              className="flex-1 h-12 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-4 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
             />
             <button
               type="submit"

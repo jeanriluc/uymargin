@@ -34,9 +34,10 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
 
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5">
         <div className="relative flex-1 group">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-zinc-500 dark:text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
           <input
             id="mlu-search-input"
+            aria-label="Producto o modelo a buscar en Mercado Libre Uruguay"
             type="search"
             required
             minLength={2}
@@ -44,7 +45,7 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
             placeholder="Ej: Termo Stanley 1L o Auriculares F9..."
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            className="h-12 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
+            className="h-12 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
           />
         </div>
 
@@ -69,7 +70,7 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
 
       {/* Suggested chips */}
       <div className="mt-4 flex flex-wrap items-center gap-1.5 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
-        <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mr-1">
+        <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mr-1">
           SUGERENCIAS:
         </span>
         {EXAMPLES.map((ex) => (

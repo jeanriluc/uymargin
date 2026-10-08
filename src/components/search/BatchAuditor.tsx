@@ -322,12 +322,12 @@ export function BatchAuditor({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
               <FileSpreadsheet className="size-3.5" /> Módulo Business
             </span>
-            <span className="text-xs text-zinc-400 font-bold uppercase">· Auditoría Mayorista en Lote</span>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase">· Auditoría Mayorista en Lote</span>
           </div>
           <h3 className="text-xl font-black text-zinc-900 dark:text-zinc-100 mt-1.5">
             Evaluador de Listas de Precios y Catálogos
           </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
             Cargá un catálogo mayorista para cotizar automáticamente en Mercado Libre Uruguay y rankear por margen neto real.
           </p>
         </div>
@@ -361,11 +361,11 @@ export function BatchAuditor({
           value={rawText}
           onChange={handleTextChange}
           placeholder="Ej:&#10;STAN-950, Botella termo Stanley Classic 950 ml, 26, USD&#10;F9-TWS, Auriculares Bluetooth F9-5 TWS, 3.8, USD&#10;XION-105, Olla a presion electrica 5 lts Xion, 1750, UYU"
-          className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 font-mono text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-hidden focus:ring-1 focus:ring-black dark:focus:ring-white"
+          className="w-full rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-3 font-mono text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-hidden focus:ring-1 focus:ring-black dark:focus:ring-white"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="text-xs font-semibold text-zinc-500 flex items-center gap-2">
+          <div className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
             <span>{items.length} productos detectados</span>
             <span className="text-zinc-300 dark:text-zinc-700">·</span>
             <span>Tipo de cambio: {formatRate(exchangeRate)}</span>
@@ -398,7 +398,7 @@ export function BatchAuditor({
               style={{ width: `${(progress.current / progress.total) * 100}%` }}
             />
           </div>
-          <span className="text-[11px] text-zinc-500 truncate block mt-1">«{progress.currentName}»</span>
+          <span className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate block mt-1">«{progress.currentName}»</span>
         </div>
       )}
 
@@ -423,42 +423,42 @@ export function BatchAuditor({
             {/* Lot Summary KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3.5">
-                <span className="text-[10px] font-black uppercase text-zinc-400 block tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 block tracking-wider">
                   Inversión Total del Lote
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
                   <span className="text-lg font-black text-zinc-900 dark:text-zinc-100 num">
                     {formatUyu(totalInvestmentUyu)}
                   </span>
-                  <span className="text-xs text-zinc-500 font-bold">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400 font-bold">
                     (≈ USD {Math.round(totalInvestmentUyu / exchangeRate)})
                   </span>
                 </div>
               </div>
 
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3.5">
-                <span className="text-[10px] font-black uppercase text-zinc-400 block tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 block tracking-wider">
                   Ganancia Neta en Bolsillo
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className={`text-lg font-black num ${totalProfitUyu >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"}`}>
+                  <span className={`text-lg font-black num ${totalProfitUyu >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>
                     {formatUyu(totalProfitUyu)}
                   </span>
-                  <span className="text-xs text-zinc-500 font-bold">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400 font-bold">
                     (margen {formatPct(totalInvestmentUyu > 0 ? (totalProfitUyu / (totalInvestmentUyu + totalProfitUyu)) * 100 : 0)})
                   </span>
                 </div>
               </div>
 
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3.5">
-                <span className="text-[10px] font-black uppercase text-zinc-400 block tracking-wider">
+                <span className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 block tracking-wider">
                   Retorno Global de Capital (ROI)
                 </span>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
                   <span className="text-lg font-black text-indigo-600 dark:text-indigo-400 num">
                     {formatPct(overallRoi)}
                   </span>
-                  <span className="text-xs text-zinc-500 font-bold">
+                  <span className="text-xs text-zinc-600 dark:text-zinc-400 font-bold">
                     s/ costo puesto
                   </span>
                 </div>
@@ -474,7 +474,7 @@ export function BatchAuditor({
                   className={`px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-all ${
                     filterStatus === "all"
                       ? "bg-white dark:bg-zinc-800 text-black dark:text-white shadow-xs"
-                      : "text-zinc-500 hover:text-black dark:hover:text-white"
+                      : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                   }`}
                 >
                   Todos ({results.length})
@@ -485,7 +485,7 @@ export function BatchAuditor({
                   className={`px-2.5 py-1 text-xs font-bold rounded cursor-pointer transition-all ${
                     filterStatus === "viable"
                       ? "bg-emerald-500 text-white shadow-xs"
-                      : "text-emerald-600 dark:text-emerald-400 hover:opacity-80"
+                      : "text-emerald-700 dark:text-emerald-400 hover:opacity-80"
                   }`}
                 >
                   Solo Viables ({viableCount})
@@ -538,7 +538,7 @@ export function BatchAuditor({
             <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-[11px] font-black uppercase tracking-wider text-zinc-500">
+                  <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
                     <th className="py-2.5 px-3">SKU & Producto</th>
                     <th className="py-2.5 px-3">Costo Unitario</th>
                     <th className="py-2.5 px-3">Mercado MLU</th>
@@ -560,7 +560,7 @@ export function BatchAuditor({
                       className="hover:bg-zinc-50 dark:hover:bg-zinc-900/30 transition-colors"
                     >
                       <td className="py-3 px-3">
-                        <span className="font-mono text-[10px] text-zinc-400 block">{r.sku}</span>
+                        <span className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400 block">{r.sku}</span>
                         <span className="font-bold text-zinc-900 dark:text-zinc-100">{r.name}</span>
                       </td>
                       <td className="py-3 px-3">
@@ -568,49 +568,49 @@ export function BatchAuditor({
                           {r.currency === "USD" ? formatUsd(r.cost) : formatUyu(r.cost)}
                         </span>
                         {r.currency === "USD" && (
-                          <span className="block text-[10px] text-zinc-400">≈ {formatUyu(r.costUyu)}</span>
+                          <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">≈ {formatUyu(r.costUyu)}</span>
                         )}
                       </td>
                       <td className="py-3 px-3">
                         <span className="font-bold text-zinc-900 dark:text-zinc-100 num">
                           {formatUyu(r.marketPriceUyu)}
                         </span>
-                        <span className="block text-[10px] text-zinc-400">{r.sampleSize} ventas/ofertas</span>
+                        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} ventas/ofertas</span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`font-bold ${r.mlProfit > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                        <span className={`font-bold ${r.mlProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}>
                           {formatUyu(r.mlProfit)}
                         </span>
-                        <span className="block text-[10px] text-zinc-500 font-bold">{formatPct(r.mlMargin)}</span>
+                        <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.mlMargin)}</span>
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`font-bold ${r.directProfit > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}`}>
+                        <span className={`font-bold ${r.directProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}>
                           {formatUyu(r.directProfit)}
                         </span>
-                        <span className="block text-[10px] text-zinc-500 font-bold">{formatPct(r.directMargin)}</span>
+                        <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.directMargin)}</span>
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1 font-bold text-zinc-900 dark:text-zinc-100">
                           <Trophy className="size-3 text-amber-500 shrink-0" />
                           <span>{r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"}</span>
                         </div>
-                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
                           +{formatUyu(winningProfit)} ({formatPct(winningMargin)})
                         </span>
                       </td>
                       <td className="py-3 px-3">
                         {r.status === "viable" && (
-                          <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase">
+                          <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
                             🟢 Viable
                           </span>
                         )}
                         {r.status === "tight" && (
-                          <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase">
+                          <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
                             🟡 Ajustado
                           </span>
                         )}
                         {r.status === "loss" && (
-                          <span className="inline-flex rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-black text-red-600 dark:text-red-400 uppercase">
+                          <span className="inline-flex rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-black text-red-600 dark:text-red-400 uppercase">
                             🔴 Pérdida
                           </span>
                         )}

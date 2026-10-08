@@ -59,7 +59,7 @@ export function NumberField({
       )}
       <div className="relative flex items-center group">
         {prefix && (
-          <span className="pointer-events-none absolute left-3.5 text-sm font-bold text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors">
+          <span className="pointer-events-none absolute left-3.5 text-sm font-bold text-zinc-500 dark:text-zinc-400 group-focus-within:text-black dark:group-focus-within:text-white transition-colors">
             {prefix}
           </span>
         )}
@@ -97,7 +97,7 @@ export function NumberField({
             }
             setDraft(toDraft(value));
           }}
-          className={`h-11 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100 num transition-all outline-none placeholder:text-zinc-400 hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white disabled:opacity-50 ${
+          className={`h-11 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100 num transition-all outline-none placeholder:text-zinc-500 dark:placeholder:text-zinc-400 hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white disabled:opacity-50 ${
             prefix ? "pl-11" : ""
           } ${suffix ? "pr-24" : ""} ${invalid ? "border-red-600 focus:border-red-600 focus:ring-red-600" : ""} ${inputClassName}`}
         />
@@ -109,7 +109,7 @@ export function NumberField({
         </p>
       ) : (
         hint && (
-          <p id={hintId} className="text-[11px] text-zinc-500 leading-tight">
+          <p id={hintId} className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-tight">
             {hint}
           </p>
         )

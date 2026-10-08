@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, RefreshCw, Wifi, WifiOff, Zap } from "lucide-react";
+import { ArrowLeftRight, Bot, RefreshCw, Settings, Wifi, WifiOff, Zap } from "lucide-react";
 import type { ExchangeRateResponse } from "@/lib/mlu/types";
 import { NumberField } from "@/components/ui/NumberField";
 import { ThemeToggle } from "./ThemeToggle";
@@ -56,11 +56,11 @@ export function Header({
               <span className="hidden min-[420px]:inline heading-grotesk text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
                 UyMargin
               </span>
-              <span className="hidden bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest sm:inline-block">
+              <span className="hidden bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[11px] font-black uppercase tracking-widest sm:inline-block">
                 MONTEVIDEO
               </span>
             </div>
-            <p className="hidden text-[10px] font-semibold text-zinc-500 uppercase tracking-wider sm:block">
+            <p className="hidden text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider sm:block">
               Analizador Financiero & Rentabilidad Mayorista
             </p>
           </div>
@@ -70,7 +70,7 @@ export function Header({
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Status pill */}
           <span
-            className={`hidden items-center gap-1.5 px-2.5 py-1 text-[10px] font-black tracking-wider uppercase border rounded-md sm:inline-flex ${s.badgeClass}`}
+            className={`hidden items-center gap-1.5 px-2.5 py-1 text-[11px] font-black tracking-wider uppercase border rounded-md sm:inline-flex ${s.badgeClass}`}
             role="status"
           >
             <s.Icon className="size-3" aria-hidden />
@@ -80,7 +80,7 @@ export function Header({
           {/* Dólar BCU / UYU rate ticker */}
           <div className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1 rounded-md">
             <div className="flex flex-col">
-              <div className="flex items-center gap-1 text-[9px] font-black text-zinc-500 uppercase tracking-widest">
+              <div className="flex items-center gap-1 text-[11px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
                 <ArrowLeftRight className="size-2.5 text-zinc-800 dark:text-zinc-200" />
                 <span>USD/UYU</span>
               </div>
@@ -116,6 +116,7 @@ export function Header({
               onClick={onOpenSavedAudits}
               className="flex items-center gap-1.5 border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-3 py-2 text-xs font-black uppercase tracking-wider rounded-l-md transition-all cursor-pointer text-zinc-800 dark:text-zinc-200"
               title="Ver auditorías en Supabase"
+              aria-label="Ver auditorías guardadas en la nube"
             >
               <span className="size-2 rounded-full bg-emerald-500"></span>
               <span className="hidden sm:inline">Nube</span>
@@ -123,10 +124,11 @@ export function Header({
             <button
               type="button"
               onClick={onOpenCloudModal}
-              className="border-y border-r border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2 py-2 text-xs font-bold rounded-r-md transition-all cursor-pointer text-zinc-500 hover:text-black dark:hover:text-white"
+              className="border-y border-r border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 px-2 py-2 text-xs font-bold rounded-r-md transition-all cursor-pointer text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
               title="Configuración de Supabase"
+              aria-label="Configuración de Supabase"
             >
-              ⚙
+              <Settings className="size-3.5" aria-hidden />
             </button>
           </div>
 

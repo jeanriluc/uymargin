@@ -76,7 +76,7 @@ export function MlSettings({ value, onChange }: MlSettingsProps) {
             hint="Estimado según peso volumétrico en Mercado Envíos UY."
           />
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted mr-1">Tramos MLU:</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">Tramos MLU:</span>
             {[
               { label: "Ligero (<1kg)", cost: 180 },
               { label: "Estándar (1-3kg)", cost: 210 },
@@ -86,7 +86,7 @@ export function MlSettings({ value, onChange }: MlSettingsProps) {
                 key={t.cost}
                 type="button"
                 onClick={() => onChange({ sellerShippingCost: t.cost })}
-                className={`rounded border px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
+                className={`rounded border px-2 py-0.5 text-[11px] font-bold transition-all cursor-pointer ${
                   value.sellerShippingCost === t.cost
                     ? "border-brand bg-brand-soft text-brand-strong"
                     : "border-border bg-surface hover:bg-surface-2 text-muted hover:text-foreground"
@@ -155,7 +155,7 @@ export function DirectSettings({ value, onChange }: DirectSettingsProps) {
                   className="visually-hidden"
                 />
                 <span className="text-sm font-semibold">{g.label}</span>
-                <span className="text-[0.7rem] leading-tight text-muted">{g.description}</span>
+                <span className="text-xs leading-tight text-muted">{g.description}</span>
               </label>
             );
           })}
@@ -184,13 +184,13 @@ export function DirectSettings({ value, onChange }: DirectSettingsProps) {
               prefix="$U"
             />
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted mr-1">Tarifas UY:</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted mr-1">Tarifas UY:</span>
               {URUGUAY_CARRIERS.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => onChange({ shippingCost: c.defaultCost })}
-                  className={`rounded border px-2 py-0.5 text-[10px] font-bold transition-all cursor-pointer ${
+                  className={`rounded border px-2 py-0.5 text-[11px] font-bold transition-all cursor-pointer ${
                     value.shippingCost === c.defaultCost
                       ? "border-brand bg-brand-soft text-brand-strong"
                       : "border-border bg-surface hover:bg-surface-2 text-muted hover:text-foreground"

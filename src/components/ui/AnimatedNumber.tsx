@@ -9,7 +9,8 @@ export function useAnimatedNumber(target: number, durationMs = 350): number {
   useEffect(() => {
     const from = displayRef.current;
     fromRef.current = from;
-    if (from === target || !Number.isFinite(target)) {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (from === target || !Number.isFinite(target) || reduceMotion) {
       displayRef.current = target;
       setDisplay(target);
       return;

@@ -79,7 +79,7 @@ export function CurrencyToggle({ value, onChange, label }: CurrencyToggleProps) 
         className={`tap-compact px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
           value === "UYU"
             ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
-            : "text-zinc-500 hover:text-black dark:hover:text-white"
+            : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
         }`}
       >
         $U
@@ -92,7 +92,7 @@ export function CurrencyToggle({ value, onChange, label }: CurrencyToggleProps) 
         className={`tap-compact px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
           value === "USD"
             ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
-            : "text-zinc-500 hover:text-black dark:hover:text-white"
+            : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
         }`}
       >
         U$S

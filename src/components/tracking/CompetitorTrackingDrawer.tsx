@@ -1,5 +1,6 @@
 "use client";
 
+import { useDialog } from "@/lib/hooks/useDialog";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -54,6 +55,7 @@ export function CompetitorTrackingDrawer({
   currentProductTitle,
   currentProductLandedCost,
 }: CompetitorTrackingDrawerProps) {
+  const dialogRef = useDialog(isOpen, onClose);
   const [items, setItems] = useState<TrackedCompetitor[]>([]);
   const [stats, setStats] = useState(getTrackingStats());
   const [activeTab, setActiveTab] = useState<"tracked" | "alerts" | "add">("tracked");
@@ -209,9 +211,9 @@ export function CompetitorTrackingDrawer({
 
     return (
       <div className="mt-2.5 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white/60 dark:bg-zinc-900/60 p-2.5">
-        <div className="flex items-center justify-between text-[10px] text-zinc-500 font-semibold mb-1">
+        <div className="flex items-center justify-between text-[11px] text-zinc-600 dark:text-zinc-400 font-semibold mb-1">
           <span>Evolución en el tiempo</span>
-          <span className={isDropping ? "text-emerald-600 dark:text-emerald-400 font-bold" : "text-zinc-600 dark:text-zinc-300"}>
+          <span className={isDropping ? "text-emerald-700 dark:text-emerald-400 font-bold" : "text-zinc-600 dark:text-zinc-300"}>
             Min: {formatUyu(minP)} | Max: {formatUyu(maxP)}
           </span>
         </div>
@@ -251,7 +253,7 @@ export function CompetitorTrackingDrawer({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Seguimiento de competidores" className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       {/* Backdrop click */}
       <div className="flex-1" onClick={onClose} />
 
@@ -270,12 +272,12 @@ export function CompetitorTrackingDrawer({
                   Radar de Tracking & Alertas MLU
                 </h2>
                 {stats.unreadAlertsCount > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                  <span className="bg-red-500 text-white text-[11px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
                     {stats.unreadAlertsCount} nuevas
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-zinc-500 font-medium">
+              <p className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium">
                 Monitoreo continuo de precios, caídas agresivas y riesgo de margen en Uruguay
               </p>
             </div>
@@ -292,8 +294,10 @@ export function CompetitorTrackingDrawer({
               <span className="hidden sm:inline">Comprobar en Vivo</span>
             </button>
             <button
+              type="button"
+              aria-label="Cerrar"
               onClick={onClose}
-              className="p-1.5 rounded-md text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
             >
               <X className="size-5" />
             </button>
@@ -311,19 +315,19 @@ export function CompetitorTrackingDrawer({
         {/* KPI Summary Bar */}
         <div className="grid grid-cols-4 gap-2 p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#111113]">
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2.5 bg-zinc-50 dark:bg-zinc-900/40">
-            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block">Monitoreados</span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">Monitoreados</span>
             <span className="text-lg font-black text-zinc-900 dark:text-zinc-100 num">{stats.totalTracked}</span>
           </div>
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2.5 bg-zinc-50 dark:bg-zinc-900/40">
-            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block">Caídas Precio</span>
-            <span className="text-lg font-black text-emerald-600 dark:text-emerald-400 num">{stats.priceDropsCount}</span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">Caídas Precio</span>
+            <span className="text-lg font-black text-emerald-700 dark:text-emerald-400 num">{stats.priceDropsCount}</span>
           </div>
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2.5 bg-zinc-50 dark:bg-zinc-900/40">
-            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block">Alertas Activas</span>
-            <span className="text-lg font-black text-amber-600 dark:text-amber-400 num">{stats.activeAlertsCount}</span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">Alertas Activas</span>
+            <span className="text-lg font-black text-amber-700 dark:text-amber-400 num">{stats.activeAlertsCount}</span>
           </div>
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2.5 bg-zinc-50 dark:bg-zinc-900/40">
-            <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 block">Variación Prom.</span>
+            <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">Variación Prom.</span>
             <span className={`text-lg font-black num ${stats.averageVariationPct < 0 ? "text-emerald-600" : "text-zinc-900 dark:text-zinc-100"}`}>
               {formatPct(stats.averageVariationPct)}
             </span>
@@ -337,7 +341,7 @@ export function CompetitorTrackingDrawer({
             className={`pb-2.5 px-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer ${
               activeTab === "tracked"
                 ? "border-black dark:border-white text-zinc-900 dark:text-zinc-100"
-                : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
             Competidores ({items.length})
@@ -347,7 +351,7 @@ export function CompetitorTrackingDrawer({
             className={`pb-2.5 px-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
               activeTab === "alerts"
                 ? "border-black dark:border-white text-zinc-900 dark:text-zinc-100"
-                : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
             <span>Feed de Alertas</span>
@@ -360,7 +364,7 @@ export function CompetitorTrackingDrawer({
             className={`pb-2.5 px-2 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1 ${
               activeTab === "add"
                 ? "border-black dark:border-white text-zinc-900 dark:text-zinc-100"
-                : "border-transparent text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                : "border-transparent text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
             }`}
           >
             <Plus className="size-3" />
@@ -376,9 +380,9 @@ export function CompetitorTrackingDrawer({
             <div className="space-y-3.5">
               {items.length === 0 ? (
                 <div className="p-8 text-center rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700">
-                  <Bell className="size-10 mx-auto text-zinc-400 mb-2" />
+                  <Bell className="size-10 mx-auto text-zinc-500 dark:text-zinc-400 mb-2" />
                   <h3 className="font-bold text-zinc-800 dark:text-zinc-200">No hay competidores en seguimiento</h3>
-                  <p className="text-xs text-zinc-500 mt-1 max-w-md mx-auto">
+                  <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 max-w-md mx-auto">
                     Añade publicaciones desde el radar de búsqueda o pega un enlace directo de Mercado Libre Uruguay para recibir alertas automáticas si bajan el precio.
                   </p>
                   <button
@@ -410,25 +414,25 @@ export function CompetitorTrackingDrawer({
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {item.sellerBadge === "Tienda Oficial" ? (
-                            <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase flex items-center gap-1">
+                            <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.5 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase flex items-center gap-1">
                               <Store className="size-2.5" /> Oficial
                             </span>
                           ) : item.sellerBadge === "MercadoLíder Platinum" ? (
-                            <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase flex items-center gap-1">
+                            <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase flex items-center gap-1">
                               <Award className="size-2.5" /> Platinum
                             </span>
                           ) : (
-                            <span className="rounded bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 text-[9px] font-black text-zinc-700 dark:text-zinc-300 uppercase">
+                            <span className="rounded bg-zinc-200 dark:bg-zinc-800 px-1.5 py-0.5 text-[11px] font-black text-zinc-700 dark:text-zinc-300 uppercase">
                               {item.seller}
                             </span>
                           )}
 
                           {item.inStock ? (
-                            <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                               <span className="size-1.5 rounded-full bg-emerald-500" /> En Stock
                             </span>
                           ) : (
-                            <span className="text-[9px] font-bold text-red-500 flex items-center gap-1">
+                            <span className="text-[11px] font-bold text-red-500 flex items-center gap-1">
                               <span className="size-1.5 rounded-full bg-red-500" /> Sin Stock / Pausado
                             </span>
                           )}
@@ -436,15 +440,15 @@ export function CompetitorTrackingDrawer({
 
                         {/* Status chip */}
                         {item.status === "alert_triggered" ? (
-                          <span className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1">
                             <AlertTriangle className="size-2.5" /> Alerta Activa
                           </span>
                         ) : item.status === "paused" ? (
-                          <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-500 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full">
+                          <span className="bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[11px] font-bold uppercase px-2 py-0.5 rounded-full">
                             Pausado
                           </span>
                         ) : (
-                          <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full">
+                          <span className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[11px] font-bold uppercase px-2 py-0.5 rounded-full">
                             Monitoreando
                           </span>
                         )}
@@ -456,7 +460,7 @@ export function CompetitorTrackingDrawer({
                           {item.thumbnail ? (
                             <img src={item.thumbnail} alt="" className="size-full object-contain" />
                           ) : (
-                            <div className="size-full flex items-center justify-center text-zinc-400 text-xs font-bold">MLU</div>
+                            <div className="size-full flex items-center justify-center text-zinc-500 dark:text-zinc-400 text-xs font-bold">MLU</div>
                           )}
                         </div>
 
@@ -468,21 +472,21 @@ export function CompetitorTrackingDrawer({
                             className="font-bold text-xs text-zinc-900 dark:text-zinc-100 leading-snug line-clamp-2 hover:underline flex items-center gap-1"
                           >
                             <span>{item.title}</span>
-                            <ExternalLink className="size-3 shrink-0 text-zinc-400" />
+                            <ExternalLink className="size-3 shrink-0 text-zinc-500 dark:text-zinc-400" />
                           </a>
 
                           {/* Prices bar */}
                           <div className="mt-2 flex items-baseline gap-3 flex-wrap">
                             <div>
-                              <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Precio Actual</span>
+                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold block">Precio Actual</span>
                               <span className="text-base font-black text-black dark:text-white num">
                                 {formatUyu(item.currentPrice)}
                               </span>
                             </div>
 
                             <div>
-                              <span className="text-[10px] text-zinc-400 uppercase font-semibold block">Precio Base</span>
-                              <span className="text-xs font-bold text-zinc-500 num line-through">
+                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 uppercase font-semibold block">Precio Base</span>
+                              <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 num line-through">
                                 {formatUyu(item.initialPrice)}
                               </span>
                             </div>
@@ -490,7 +494,7 @@ export function CompetitorTrackingDrawer({
                             {dropPct !== 0 && (
                               <div className="flex items-center gap-1">
                                 {isDropping ? (
-                                  <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                  <span className="inline-flex items-center gap-0.5 text-xs font-black text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                                     <TrendingDown className="size-3" /> {formatPct(dropPct)}
                                   </span>
                                 ) : (
@@ -531,12 +535,12 @@ export function CompetitorTrackingDrawer({
                       {/* Footer Actions */}
                       <div className="mt-3 pt-2.5 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between gap-2 flex-wrap text-xs">
                         {/* Alert sensitivity badge */}
-                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                        <div className="flex items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
                           <span>Alerta si cae &gt;</span>
                           <select
                             value={item.alertThresholdPct}
                             onChange={(e) => updateCompetitorSettings(item.id, { alertThresholdPct: Number(e.target.value) })}
-                            className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-800 dark:text-zinc-200"
+                            className="bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 rounded px-1.5 py-0.5 text-[11px] font-bold text-zinc-800 dark:text-zinc-200"
                           >
                             <option value={3}>3%</option>
                             <option value={5}>5%</option>
@@ -552,7 +556,7 @@ export function CompetitorTrackingDrawer({
                                 onSelectPriceForSimulation(item.currentPrice, item.title);
                                 onClose();
                               }}
-                              className="px-2.5 py-1 bg-black text-white dark:bg-white dark:text-black font-black text-[10px] uppercase rounded hover:opacity-90 transition-opacity flex items-center gap-1 cursor-pointer"
+                              className="px-2.5 py-1 bg-black text-white dark:bg-white dark:text-black font-black text-[11px] uppercase rounded hover:opacity-90 transition-opacity flex items-center gap-1 cursor-pointer"
                               title="Cargar este precio en la calculadora financiera"
                             >
                               <Calculator className="size-2.5" />
@@ -562,7 +566,7 @@ export function CompetitorTrackingDrawer({
 
                           <button
                             onClick={() => updateCompetitorSettings(item.id, { status: item.status === "paused" ? "active" : "paused" })}
-                            className="p-1 rounded text-zinc-400 hover:text-black dark:hover:text-white cursor-pointer"
+                            className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white cursor-pointer"
                             title={item.status === "paused" ? "Reanudar tracking" : "Pausar tracking"}
                           >
                             {item.status === "paused" ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
@@ -570,7 +574,7 @@ export function CompetitorTrackingDrawer({
 
                           <button
                             onClick={() => removeTrackedCompetitor(item.id)}
-                            className="p-1 rounded text-zinc-400 hover:text-red-500 cursor-pointer"
+                            className="p-1 rounded text-zinc-500 dark:text-zinc-400 hover:text-red-500 cursor-pointer"
                             title="Eliminar del radar"
                           >
                             <Trash2 className="size-3.5" />
@@ -588,7 +592,7 @@ export function CompetitorTrackingDrawer({
           {activeTab === "alerts" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Historial de Alertas</span>
+                <span className="text-xs font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">Historial de Alertas</span>
                 <button
                   onClick={markAllAlertsAsRead}
                   className="text-[11px] font-black uppercase text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
@@ -598,7 +602,7 @@ export function CompetitorTrackingDrawer({
               </div>
 
               {items.flatMap((item) => item.triggeredAlerts).length === 0 ? (
-                <div className="p-8 text-center text-zinc-400 text-xs">
+                <div className="p-8 text-center text-zinc-500 dark:text-zinc-400 text-xs">
                   No hay alertas registradas aún. El sistema te notificará cuando se detecten caídas de precios o riesgos de margen.
                 </div>
               ) : (
@@ -612,17 +616,17 @@ export function CompetitorTrackingDrawer({
                         : "border-amber-400 dark:border-amber-600 bg-amber-500/5 text-zinc-900 dark:text-zinc-100 shadow-xs"
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] mb-1">
-                      <span className="font-black uppercase tracking-wider text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                    <div className="flex items-center justify-between text-[11px] mb-1">
+                      <span className="font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-1">
                         <AlertTriangle className="size-3" />
                         {alert.type === "price_drop" ? "Caída de Precio MLU" : "Riesgo de Margen"}
                       </span>
-                      <span className="text-zinc-400 font-medium">
+                      <span className="text-zinc-500 dark:text-zinc-400 font-medium">
                         {new Date(alert.date).toLocaleDateString("es-UY", { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
                     <p className="text-xs font-semibold leading-relaxed">{alert.message}</p>
-                    <div className="mt-2 text-[10px] text-zinc-400 font-medium truncate">
+                    <div className="mt-2 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium truncate">
                       Publicación: {alert.competitorTitle}
                     </div>
                   </div>
@@ -637,13 +641,13 @@ export function CompetitorTrackingDrawer({
               <h3 className="font-black text-sm uppercase text-zinc-900 dark:text-zinc-100 mb-1">
                 Añadir Publicación de Mercado Libre Uruguay
               </h3>
-              <p className="text-xs text-zinc-500 mb-4">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-4">
                 Pega la URL completa de cualquier publicación en mercadolibre.com.uy para comenzar a monitorear sus precios y reputación.
               </p>
 
               <form onSubmit={handleAddManualUrl} className="space-y-3">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-zinc-400 tracking-wider block mb-1">
+                  <label className="text-[11px] font-black uppercase text-zinc-500 dark:text-zinc-400 tracking-wider block mb-1">
                     Enlace de Mercado Libre
                   </label>
                   <input
@@ -652,7 +656,7 @@ export function CompetitorTrackingDrawer({
                     value={newUrl}
                     onChange={(e) => setNewUrl(e.target.value)}
                     required
-                    className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
+                    className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                   />
                 </div>
 
@@ -688,7 +692,7 @@ export function CompetitorTrackingDrawer({
             <span>Exportar Historial (CSV)</span>
           </button>
 
-          <span className="text-[10px] text-zinc-400 font-medium">
+          <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
             UyMargin Engine · Datos en vivo MLU
           </span>
         </div>

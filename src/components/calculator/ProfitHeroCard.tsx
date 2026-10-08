@@ -166,7 +166,7 @@ export function ProfitHeroCard({
                 ) : (
                   <>
                     Te quedan{" "}
-                    <span className={`num whitespace-nowrap align-baseline text-4xl sm:text-5xl leading-none ${isTightMargin ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    <span className={`num whitespace-nowrap align-baseline text-4xl sm:text-5xl leading-none ${isTightMargin ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
                       {formatUyu(winningResult.netProfit)}
                     </span>{" "}
                     en el bolsillo{" "}
@@ -231,7 +231,7 @@ export function ProfitHeroCard({
             <div className="flex items-center gap-2">
               <Trophy className="size-4.5 text-amber-400 dark:text-amber-600 shrink-0" aria-hidden />
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest opacity-80 block">
+                <span className="text-[11px] font-black uppercase tracking-widest opacity-80 block">
                   Canal Ganador
                 </span>
                 <span className="text-xs font-black uppercase tracking-wider">
@@ -241,7 +241,7 @@ export function ProfitHeroCard({
             </div>
 
             <div className="sm:border-t border-zinc-700 dark:border-zinc-300 sm:pt-2 sm:w-full text-right sm:text-left">
-              <span className="text-[10px] opacity-80 block">Diferencia a favor:</span>
+              <span className="text-[11px] opacity-80 block">Diferencia a favor:</span>
               <span className="font-black text-sm text-emerald-400 dark:text-emerald-700">
                 <span className="num">+{formatUyu(profitDiff)}</span> por unidad
               </span>
@@ -256,7 +256,7 @@ export function ProfitHeroCard({
         {/* Key Operational Thresholds */}
         <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
           <div>
-            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Precio Mínimo de Equilibrio</span>
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block font-bold">Precio Mínimo de Equilibrio</span>
             <span className="num font-black text-zinc-900 dark:text-zinc-100 text-sm">
               {winningResult.breakEvenPrice ? formatUyu(winningResult.breakEvenPrice) : "—"}
             </span>
@@ -267,7 +267,7 @@ export function ProfitHeroCard({
               <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
               <div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Retorno s/ Inversión (ROI)</span>
+                <span className="text-[11px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block font-bold">Retorno s/ Inversión (ROI)</span>
                 <span className="num font-black text-zinc-900 dark:text-zinc-100 text-sm">
                   {formatPct(winningResult.roi)}
                 </span>
@@ -278,7 +278,7 @@ export function ProfitHeroCard({
           <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
           <div>
-            <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">Régimen DGI Activo</span>
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block font-bold">Régimen DGI Activo</span>
             <span className="font-bold text-zinc-900 dark:text-zinc-100">
               {inputs.tax.regime === "literal_e" ? "Literal E (Pequeña Empresa)" : `Régimen General (${Math.round((inputs.tax.vatRate ?? 0.22) * 100)}%)`}
             </span>
@@ -288,7 +288,7 @@ export function ProfitHeroCard({
             <>
               <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
               <div>
-                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wider block font-bold">
+                <span className="text-[11px] text-zinc-600 dark:text-zinc-400 uppercase tracking-wider block font-bold">
                   ROI Anualizado ({inputs.stockTurnoverDays} d)
                 </span>
                 <span className="num font-black text-indigo-600 dark:text-indigo-400 text-sm">
@@ -303,7 +303,7 @@ export function ProfitHeroCard({
         <div className="flex flex-wrap items-center gap-1.5">
           {isReady && winningResult.reservesCost && winningResult.reservesCost > 0 ? (
             <span
-              className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase"
+              className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase"
               title="Reserva estimada descontada por posibles mermas y devoluciones"
             >
               📦 Reserva: {formatUyu(-winningResult.reservesCost)}
@@ -312,7 +312,7 @@ export function ProfitHeroCard({
 
           {isLowTicket && (
             <span
-              className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase"
+              className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase"
               title="Ventas menores a $U 1.200 pagan cargo fijo unitario en Mercado Libre"
             >
               ⚠ Ticket &lt; $U 1.200 (Cargo Fijo MLU)
@@ -321,7 +321,7 @@ export function ProfitHeroCard({
 
           {hasNoVatCredit && (
             <span
-              className="inline-flex items-center gap-1 rounded bg-red-500/10 border border-red-500/20 px-2 py-1 text-[10px] font-black text-red-700 dark:text-red-300 uppercase"
+              className="inline-flex items-center gap-1 rounded bg-red-500/10 border border-red-500/20 px-2 py-1 text-[11px] font-black text-red-700 dark:text-red-300 uppercase"
               title="Sin e-factura con RUT no descuentas crédito fiscal de compras"
             >
               ⚠ Proveedor sin e-factura (Sin Crédito)
@@ -330,7 +330,7 @@ export function ProfitHeroCard({
 
           {isCostUsd && (
             <span
-              className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase"
+              className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase"
               title="Comprás en USD y vendés en $U: Expuesto a fluctuación cambiaria"
             >
               💵 Expuesto a Dólar
@@ -346,7 +346,7 @@ export function ProfitHeroCard({
         {/* USD Stress Test Buttons */}
         {isCostUsd && (
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-[10px] text-zinc-600 dark:text-zinc-400 font-bold uppercase">Si sube el dólar:</span>
+            <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-bold uppercase">Si sube el dólar:</span>
             {[5, 10].map((pct) => (
               <button
                 key={pct}
@@ -409,7 +409,7 @@ export function ProfitHeroCard({
 
             {/* Target Margin Selector */}
             <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-1 rounded-lg">
-              <span className="text-[10px] font-bold uppercase text-zinc-500 pl-2">Margen Deseado:</span>
+              <span className="text-[11px] font-bold uppercase text-zinc-600 dark:text-zinc-400 pl-2">Margen Deseado:</span>
               {[15, 20, 25, 30].map((m) => (
                 <button
                   key={m}
@@ -429,14 +429,14 @@ export function ProfitHeroCard({
           {/* Result Card */}
           <div className="mt-3.5 p-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
                 Costo Máximo Admisible de Compra (Landed)
               </span>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 num">
                   {formatUyu(maxLandedCostUyu)}
                 </span>
-                <span className="text-sm font-bold text-zinc-500 num">
+                <span className="text-sm font-bold text-zinc-600 dark:text-zinc-400 num">
                   (≈ USD {maxCostUsd.toFixed(2)})
                 </span>
               </div>
@@ -456,7 +456,7 @@ export function ProfitHeroCard({
       )}
 
       {/* 5. FOOTER: Fiscal Disclaimer */}
-      <div className="mt-3 pt-2 text-[10px] text-zinc-400 font-medium flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
+      <div className="mt-3 pt-2 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
         <span>
           ⚠ Estimación analítica informativa. No reemplaza el asesoramiento de un contador profesional. Literal E y Monotributo son regímenes distintos ante DGI y BPS.
         </span>

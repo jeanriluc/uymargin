@@ -31,7 +31,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
         <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
           Aún no guardaste simulaciones
         </h3>
-        <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">
+        <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
           Podés guardar escenarios haciendo clic en "Guardar Simulación" arriba para comparar productos y exportar tus reportes a Excel / CSV.
         </p>
       </div>
@@ -50,11 +50,11 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
             <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
               Bóveda de Simulaciones Guardadas
             </h3>
-            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider">
+            <p className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
               Historial persistente para auditoría de compras mayoristas
             </p>
           </div>
-          <span className="rounded bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[10px] font-black">
+          <span className="rounded bg-black text-white dark:bg-white dark:text-black px-2 py-0.5 text-[11px] font-black">
             {entries.length}
           </span>
         </div>
@@ -72,7 +72,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs whitespace-nowrap">
-          <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[10px] font-black text-zinc-500 uppercase tracking-wider">
+          <thead className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-[11px] font-black text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
             <tr>
               <th className="px-5 py-3">Fecha</th>
               <th className="px-5 py-3">Producto / Referencia</th>
@@ -98,7 +98,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
                   key={entry.id}
                   className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors"
                 >
-                  <td className="px-5 py-3.5 text-zinc-400 font-medium text-[11px]">{date}</td>
+                  <td className="px-5 py-3.5 text-zinc-500 dark:text-zinc-400 font-medium text-[11px]">{date}</td>
                   <td className="px-5 py-3.5 font-bold text-zinc-900 dark:text-zinc-100 max-w-[200px] truncate" title={entry.inputs.productName || entry.inputs.query}>
                     {entry.inputs.productName || entry.inputs.query || "Sin nombre"}
                   </td>

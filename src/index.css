@@ -63,7 +63,7 @@
   --color-fg: #18181b;
   --color-foreground: #18181b;
   --color-muted: #52525b;
-  --color-faint: #71717a;
+  --color-faint: #52525b;
   --color-border: #e4e4e7;
   --color-border-strong: #a1a1aa;
   --color-surface: #ffffff;
@@ -73,9 +73,9 @@
   --color-brand: #000000;
   --color-brand-strong: #000000;
   --color-brand-soft: #f4f4f5;
-  --color-good: #059669;
+  --color-good: #047857;
   --color-bad: #dc2626;
-  --color-sun: #d97706;
+  --color-sun: #b45309;
 }
 
 /* Same trigger as Tailwind's default `dark:` variant, so both stay in sync. */
@@ -216,4 +216,12 @@
   select {
     font-size: 1rem;
   }
+}
+
+/* Visible keyboard focus on every control that does not draw its own ring. */
+button:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
 }

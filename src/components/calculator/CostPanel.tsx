@@ -217,7 +217,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                   }`}
                 >
                   <span className="block text-xs leading-tight">{label}</span>
-                  <span className="block text-[10px] opacity-75">{sub}</span>
+                  <span className="block text-[11px] opacity-75">{sub}</span>
                 </button>
               ))}
             </div>
@@ -293,7 +293,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                     %
                   </span>
                 </div>
-                <span className="text-[10px] text-faint block mt-1">Típico e-comm: 3% a 6%</span>
+                <span className="text-[11px] text-faint block mt-1">Típico e-comm: 3% a 6%</span>
               </div>
 
               <div>
@@ -318,7 +318,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                     %
                   </span>
                 </div>
-                <span className="text-[10px] text-faint block mt-1">Vidrio/electrónica: 1% a 3%</span>
+                <span className="text-[11px] text-faint block mt-1">Vidrio/electrónica: 1% a 3%</span>
               </div>
 
               <div>
@@ -343,7 +343,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                     días
                   </span>
                 </div>
-                <span className="text-[10px] text-faint block mt-1">Calcula el ROI Anualizado</span>
+                <span className="text-[11px] text-faint block mt-1">Calcula el ROI Anualizado</span>
               </div>
             </div>
 

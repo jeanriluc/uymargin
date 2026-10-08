@@ -13,8 +13,8 @@ interface StickyResultBarProps {
 
 const TONE_STYLES: Record<VerdictTone, { dot: string; amount: string; phrase: string }> = {
   loss: { dot: "bg-red-500", amount: "text-red-600 dark:text-red-400", phrase: "Perdés" },
-  tight: { dot: "bg-amber-500", amount: "text-amber-600 dark:text-amber-400", phrase: "Te quedan" },
-  good: { dot: "bg-emerald-500", amount: "text-emerald-600 dark:text-emerald-400", phrase: "Te quedan" },
+  tight: { dot: "bg-amber-500", amount: "text-amber-700 dark:text-amber-400", phrase: "Te quedan" },
+  good: { dot: "bg-emerald-500", amount: "text-emerald-700 dark:text-emerald-400", phrase: "Te quedan" },
 };
 
 /** Mobile-only verdict that stays in view while the user edits cost and price. */
@@ -54,7 +54,7 @@ export function StickyResultBar({ targetId, result, channelLabel }: StickyResult
           </span>
         </span>
       </span>
-      <ChevronUp aria-hidden className="size-5 shrink-0 text-zinc-500" />
+      <ChevronUp aria-hidden className="size-5 shrink-0 text-zinc-600 dark:text-zinc-400" />
     </button>
   );
 }

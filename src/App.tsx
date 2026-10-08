@@ -317,18 +317,18 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
                     {isReady ? "SIMULACIÓN ACTIVA" : "NUEVA SIMULACIÓN"}
                   </span>
                   <span className="text-zinc-300 dark:text-zinc-700">·</span>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">
+                  <span className="text-[11px] font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">
                     {inputs.tax.regime === "literal_e" ? "LITERAL E / MONOTRIBUTO" : "RÉGIMEN GENERAL (22%)"}
                   </span>
                 </div>
                 <h1 className="heading-grotesk text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase mt-0.5">
                   {inputs.productName || inputs.query || "Producto en Análisis"}
                 </h1>
-                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-500 font-semibold uppercase tracking-wider">
+                <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-zinc-600 dark:text-zinc-400 font-semibold uppercase tracking-wider">
                   <span>Costo puesto: <strong className="text-black dark:text-white num">{formatUyu(analysis.costs.landed)}</strong></span>
                   <span>·</span>
                   <span>Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
@@ -487,7 +487,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         <section id="mercado" aria-labelledby="market-heading" className="scroll-mt-24 flex flex-col gap-4">
           <div>
             <h2 id="market-heading" className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
-              Precio de mercado <span className="font-bold text-zinc-500 dark:text-zinc-400">· opcional</span>
+              Precio de mercado <span className="font-bold text-zinc-600 dark:text-zinc-400">· opcional</span>
             </h2>
             <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
               Buscá a cuánto se vende en Mercado Libre, analizá una publicación por enlace o cargá un catálogo completo.

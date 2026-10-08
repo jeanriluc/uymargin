@@ -43,5 +43,5 @@ export function ViabilityBadge({ viability, compact = false }: ViabilityBadgePro
 export const viabilityTone: Record<Viability, string> = {
   excellent: "text-zinc-900 dark:text-zinc-100 font-black",
   tight: "text-zinc-700 dark:text-zinc-300 font-bold",
-  risky: "text-zinc-500 dark:text-zinc-400 line-through font-bold",
+  risky: "text-zinc-600 dark:text-zinc-400 line-through font-bold",
 };

@@ -29,7 +29,7 @@ export function StepHeader({ step, title, aside, id }: StepHeaderProps) {
         </h2>
       </div>
       {aside && (
-        <span className="shrink-0 text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">
+        <span className="shrink-0 text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-widest">
           {aside}
         </span>
       )}

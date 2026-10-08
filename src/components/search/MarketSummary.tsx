@@ -57,7 +57,7 @@ function StatCard({
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className={`text-[10px] font-black uppercase tracking-wider ${highlight ? "text-zinc-300 dark:text-zinc-700" : "text-zinc-500"}`}>
+        <span className={`text-[11px] font-black uppercase tracking-wider ${highlight ? "text-zinc-300 dark:text-zinc-700" : "text-zinc-600 dark:text-zinc-400"}`}>
           {label}
         </span>
       </div>
@@ -66,7 +66,7 @@ function StatCard({
           {value}
         </p>
         {sublabel && (
-          <p className={`text-[9px] font-semibold uppercase tracking-wider mt-0.5 ${highlight ? "text-zinc-300 dark:text-zinc-700" : "text-zinc-400"}`}>
+          <p className={`text-[11px] font-semibold uppercase tracking-wider mt-0.5 ${highlight ? "text-zinc-300 dark:text-zinc-700" : "text-zinc-500 dark:text-zinc-400"}`}>
             {sublabel}
           </p>
         )}
@@ -97,14 +97,14 @@ export function MarketSummary({
             </h3>
           </div>
           {state.status === "success" && (
-            <p className="text-xs text-zinc-500 mt-0.5">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
               Auditoría activa para: <span className="font-bold text-black dark:text-white">“{state.query}”</span>
             </p>
           )}
         </div>
 
         {stats && stats.outliersRemoved > 0 && (
-          <span className="inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
+          <span className="inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
             {stats.outliersRemoved} OUTLIERS EXCLUIDOS (IQR)
           </span>
         )}
@@ -121,14 +121,14 @@ export function MarketSummary({
             <StatCard
               label="MÍNIMO"
               value={stats ? formatUyu(stats.min) : "—"}
-              sublabel="Click para simular"
+              sublabel="Tocá para simular"
               onClick={stats ? () => onSelectPrice(Math.round(stats.min)) : undefined}
             />
             <StatCard
               label="MEDIANA (FOCAL)"
               highlight
               value={stats ? formatUyu(stats.median) : "—"}
-              sublabel="Recomendado"
+              sublabel="Sugerida"
               onClick={stats ? () => onSelectPrice(Math.round(stats.median)) : undefined}
             />
             <StatCard
@@ -155,18 +155,19 @@ export function MarketSummary({
         <details className="group">
           <summary className="flex cursor-pointer items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white uppercase tracking-wider">
             <span>Editor Manual de Precios de la Competencia</span>
-            <span className="text-[10px] font-black group-open:hidden underline underline-offset-4">+ ABRIR</span>
+            <span className="text-[11px] font-black group-open:hidden underline underline-offset-4">+ ABRIR</span>
           </summary>
           <div className="mt-3">
             <textarea
               id="manual-prices"
+              aria-label="Precios de la competencia, separados por coma o salto de línea"
               rows={2}
               value={manualPrices}
               onChange={(e) => onManualPricesChange(e.target.value)}
               placeholder="Ej: 1290  1450  1350  1890 (separados por espacio o coma)"
               className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-3 text-xs num font-semibold text-zinc-900 dark:text-zinc-100 outline-none focus:border-black dark:focus:border-white"
             />
-            <p className="text-[11px] text-zinc-500 mt-1">
+            <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-1">
               Los precios cargados recalculan al instante el rango de mercado y la mediana en pesos uruguayos.
             </p>
           </div>
@@ -181,7 +182,7 @@ export function MarketSummary({
               <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
                 Publicaciones Reales Verificadas con Stock en Uruguay
               </h4>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
                 <span className="size-1.5 rounded-full bg-emerald-500"></span> 100% Stock Activo
               </span>
             </div>
@@ -190,7 +191,7 @@ export function MarketSummary({
                 href={`https://listado.mercadolibre.com.uy/${encodeURIComponent(state.query.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"))}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline"
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline"
               >
                 <span>Ver listado completo en mercadolibre.com.uy</span>
                 <ExternalLink className="size-3" />
@@ -207,27 +208,27 @@ export function MarketSummary({
                 <div>
                   {/* Top badges: Stock & Store Quality */}
                   <div className="flex items-center justify-between gap-1 mb-2">
-                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
                       <span className="size-1.5 rounded-full bg-emerald-500"></span> En Stock
                     </span>
 
                     <div className="flex items-center gap-1">
                       {item.sellerBadge === "Tienda Oficial" ? (
-                        <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
+                        <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
                           Oficial
                         </span>
                       ) : item.sellerBadge === "MercadoLíder Platinum" ? (
-                        <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[8px] font-black text-emerald-600 dark:text-emerald-400 uppercase">
+                        <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
                           Platinum
                         </span>
                       ) : item.sellerBadge === "MercadoLíder Gold" ? (
-                        <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[8px] font-black text-amber-600 dark:text-amber-400 uppercase">
+                        <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
                           Gold
                         </span>
                       ) : null}
 
                       {item.isTopChoice && (
-                        <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[8px] font-black uppercase">
+                        <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[11px] font-black uppercase">
                           <Sparkles className="size-2" /> Top
                         </span>
                       )}
@@ -240,7 +241,7 @@ export function MarketSummary({
                       {item.thumbnail ? (
                         <img src={item.thumbnail} alt="" className="size-full object-contain" />
                       ) : (
-                        <PackageSearch className="m-auto size-5 text-zinc-400" />
+                        <PackageSearch className="m-auto size-5 text-zinc-500 dark:text-zinc-400" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -257,14 +258,14 @@ export function MarketSummary({
                   </div>
 
                   {/* Pre-click seller reputation, sales & reviews */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[10px]">
-                    <span className="text-zinc-500 font-medium truncate max-w-[130px]">
+                  <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[130px]">
                       {item.seller || "Vendedor Verificado"}
                     </span>
-                    <div className="flex items-center gap-1 font-black text-amber-600 dark:text-amber-400">
+                    <div className="flex items-center gap-1 font-black text-amber-700 dark:text-amber-400">
                       <Star className="size-2.5 fill-amber-500 text-amber-500" />
                       <span>{item.ratingAverage ?? 4.8}</span>
-                      <span className="text-zinc-400 text-[9px] font-normal">
+                      <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-normal">
                         ({item.reviewsCount ?? 32})
                       </span>
                     </div>
@@ -279,12 +280,12 @@ export function MarketSummary({
                     </span>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {item.salesVolume && (
-                        <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                        <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                           {item.salesVolume}
                         </span>
                       )}
                       {item.freeShipping && (
-                        <span className="inline-flex items-center gap-0.5 text-[8px] font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">
+                        <span className="inline-flex items-center gap-0.5 text-[11px] font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">
                           <Truck className="size-2" /> Gratis
                         </span>
                       )}
@@ -295,7 +296,7 @@ export function MarketSummary({
                     <button
                       onClick={() => onSelectPrice(Math.round(item.price))}
                       title="Simular con este precio de venta"
-                      className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[9px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
+                      className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
                     >
                       Simular
                     </button>
@@ -304,7 +305,7 @@ export function MarketSummary({
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Ver en Mercado Libre"
-                      className="p-1 text-zinc-400 hover:text-black dark:hover:text-white"
+                      className="p-1 text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
                     >
                       <ExternalLink className="size-3" />
                     </a>

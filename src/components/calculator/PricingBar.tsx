@@ -76,7 +76,7 @@ export function PricingBar({
 
         {/* Strategy Presets */}
         <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+          <span className="text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
             Atajos de Fijación de Precios:
           </span>
 
@@ -90,7 +90,7 @@ export function PricingBar({
                 className="group flex flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60 p-3 text-left transition-all hover:border-black dark:hover:border-white cursor-pointer disabled:opacity-40 disabled:pointer-events-none"
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 group-hover:text-black dark:group-hover:text-white">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white">
                     {badge}
                   </span>
                 </div>
@@ -119,7 +119,7 @@ export function PricingBar({
       {/* Visual positioning range indicator in monochrome */}
       {stats && (
         <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-zinc-500 mb-1.5">
+          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400 mb-1.5">
             <span>Rango de Mercado MLU</span>
             <span>
               {position !== null
@@ -142,7 +142,7 @@ export function PricingBar({
             )}
           </div>
 
-          <div className="num mt-1.5 flex justify-between text-[10px] font-bold text-zinc-400">
+          <div className="num mt-1.5 flex justify-between text-[11px] font-bold text-zinc-500 dark:text-zinc-400">
             <span>MIN: {formatUyu(stats.min)}</span>
             <span className="text-black dark:text-white font-black">MEDIANA: {formatUyu(stats.median)}</span>
             <span>MAX: {formatUyu(stats.max)}</span>
