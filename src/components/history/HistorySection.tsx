@@ -39,7 +39,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface shadow-sm overflow-hidden">
       {/* Header bar */}
       <div className="flex items-center justify-between p-5 border-b border-zinc-100 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/40">
         <div className="flex items-center gap-3">

@@ -314,19 +314,13 @@ export function BatchAuditor({
   };
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-5 shadow-sm space-y-5 animate-rise">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 shadow-sm space-y-5 animate-rise">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 dark:border-zinc-800 pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-              <FileSpreadsheet className="size-3.5" /> Módulo Business
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400 font-bold uppercase">· Auditoría Mayorista en Lote</span>
-          </div>
-          <h3 className="text-xl font-black text-zinc-900 dark:text-zinc-100 mt-1.5">
-            Evaluador de Listas de Precios y Catálogos
-          </h3>
+          <h2 className="heading-grotesk text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">
+            Evaluador de listas de precios y catálogos
+          </h2>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
             Cargá un catálogo mayorista para cotizar automáticamente en Mercado Libre Uruguay y rankear por margen neto real.
           </p>
@@ -600,18 +594,18 @@ export function BatchAuditor({
                       </td>
                       <td className="py-3 px-3">
                         {r.status === "viable" && (
-                          <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
-                            🟢 Viable
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
+                            <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" /> Viable
                           </span>
                         )}
                         {r.status === "tight" && (
-                          <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
-                            🟡 Ajustado
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
+                            <span aria-hidden className="size-1.5 rounded-full bg-amber-500" /> Ajustado
                           </span>
                         )}
                         {r.status === "loss" && (
-                          <span className="inline-flex rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-black text-red-600 dark:text-red-400 uppercase">
-                            🔴 Pérdida
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-black text-red-600 dark:text-red-400 uppercase">
+                            <span aria-hidden className="size-1.5 rounded-full bg-red-500" /> Pérdida
                           </span>
                         )}
                       </td>

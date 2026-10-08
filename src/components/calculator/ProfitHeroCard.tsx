@@ -3,6 +3,8 @@
 import { useState } from "react";
 import {
   AlertTriangle,
+  DollarSign,
+  Package,
   Trophy,
   Calculator,
   ShieldAlert,
@@ -121,7 +123,7 @@ export function ProfitHeroCard({
     <section
       id={id}
       aria-label="Resultado"
-      className="scroll-mt-24 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-5 shadow-sm transition-all"
+      className="scroll-mt-24 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 shadow-sm transition-all"
     >
       <StepHeader step="03" title="Resultado: lo que te queda limpio" />
 
@@ -306,7 +308,7 @@ export function ProfitHeroCard({
               className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase"
               title="Reserva estimada descontada por posibles mermas y devoluciones"
             >
-              📦 Reserva: {formatUyu(-winningResult.reservesCost)}
+              <Package className="size-3" aria-hidden /> Reserva: {formatUyu(-winningResult.reservesCost)}
             </span>
           ) : null}
 
@@ -315,7 +317,7 @@ export function ProfitHeroCard({
               className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] font-black text-amber-800 dark:text-amber-300 uppercase"
               title="Ventas menores a $U 1.200 pagan cargo fijo unitario en Mercado Libre"
             >
-              ⚠ Ticket &lt; $U 1.200 (Cargo Fijo MLU)
+              <AlertTriangle className="size-3" aria-hidden /> Ticket &lt; $U 1.200 (Cargo Fijo MLU)
             </span>
           )}
 
@@ -324,7 +326,7 @@ export function ProfitHeroCard({
               className="inline-flex items-center gap-1 rounded bg-red-500/10 border border-red-500/20 px-2 py-1 text-[11px] font-black text-red-700 dark:text-red-300 uppercase"
               title="Sin e-factura con RUT no descuentas crédito fiscal de compras"
             >
-              ⚠ Proveedor sin e-factura (Sin Crédito)
+              <AlertTriangle className="size-3" aria-hidden /> Proveedor sin e-factura (Sin Crédito)
             </span>
           )}
 
@@ -333,7 +335,7 @@ export function ProfitHeroCard({
               className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-1 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase"
               title="Comprás en USD y vendés en $U: Expuesto a fluctuación cambiaria"
             >
-              💵 Expuesto a Dólar
+              <DollarSign className="size-3" aria-hidden /> Expuesto a Dólar
             </span>
           )}
         </div>
@@ -458,7 +460,7 @@ export function ProfitHeroCard({
       {/* 5. FOOTER: Fiscal Disclaimer */}
       <div className="mt-3 pt-2 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800/60">
         <span>
-          ⚠ Estimación analítica informativa. No reemplaza el asesoramiento de un contador profesional. Literal E y Monotributo son regímenes distintos ante DGI y BPS.
+          Estimación analítica informativa. No reemplaza el asesoramiento de un contador profesional. Literal E y Monotributo son regímenes distintos ante DGI y BPS.
         </span>
       </div>
     </section>

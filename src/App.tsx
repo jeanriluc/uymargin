@@ -308,7 +308,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
 
       <main className={`mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pt-8 sm:px-6 lg:pb-8 ${isReady ? "pb-28" : "pb-8"}`}>
         {/* Architectural Executive Ribbon (inspired by reference layout) */}
-        <section aria-label="Resumen Ejecutivo" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+        <section aria-label="Resumen Ejecutivo" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             {/* Left: Product & Sourcing */}
             <div className="flex items-start gap-4">
@@ -495,7 +495,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           </div>
 
           {/* Search Mode Tab Switcher */}
-          <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-1.5 shadow-sm lg:max-w-xl">
+          <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-surface p-1.5 shadow-sm lg:max-w-xl">
             <button
               type="button"
               onClick={() => setSearchTab("keyword")}

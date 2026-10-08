@@ -54,7 +54,7 @@ export function PricingBar({
   ];
 
   return (
-    <section aria-label="Precio de venta" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-5 sm:p-6 shadow-sm">
+    <section aria-label="Precio de venta" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
       <StepHeader step="02" title="Precio de venta al público" aside="Lo que cobrás" />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] items-end">

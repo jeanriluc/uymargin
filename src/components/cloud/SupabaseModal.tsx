@@ -71,7 +71,7 @@ export function SupabaseModal({ isOpen, onClose, onConnected }: SupabaseModalPro
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Conexión con Supabase" className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-2xl">
+      <div className="relative w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-surface p-6 shadow-2xl">
         {/* Close Button */}
         <button
           type="button"

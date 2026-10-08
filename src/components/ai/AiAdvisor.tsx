@@ -160,7 +160,7 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Copiloto de inteligencia artificial" className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="flex flex-col w-full max-w-2xl h-[85vh] max-h-[780px] rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-[#121214] shadow-2xl overflow-hidden">
+      <div className="flex flex-col w-full max-w-2xl h-[85vh] max-h-[780px] rounded-xl border border-zinc-300 dark:border-zinc-700 bg-surface shadow-2xl overflow-hidden">
         {/* Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/60">
           <div className="flex items-center gap-3">

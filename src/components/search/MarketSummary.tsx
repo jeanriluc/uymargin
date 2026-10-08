@@ -88,7 +88,7 @@ export function MarketSummary({
   const total = state.status === "success" ? state.total : stats?.sampleSize ?? 0;
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
         <div>
           <div className="flex items-center gap-2">

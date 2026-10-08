@@ -25,7 +25,7 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
       <StepHeader title="Radar de competencia en Mercado Libre Uruguay" aside="Opcional" />
 
       <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">

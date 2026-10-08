@@ -40,7 +40,7 @@ export function StickyResultBar({ targetId, result, channelLabel }: StickyResult
       type="button"
       onClick={() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
       aria-label={`Ver resultado completo. ${tone.phrase} ${formatUyu(Math.abs(result.netProfit))} por unidad en ${channelLabel}`}
-      className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] text-left shadow-[0_-4px_16px_rgba(0,0,0,0.12)] cursor-pointer print:hidden"
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-zinc-200 dark:border-zinc-800 bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] text-left shadow-[0_-4px_16px_rgba(0,0,0,0.12)] cursor-pointer print:hidden"
     >
       <span className="flex min-w-0 items-center gap-3">
         <span aria-hidden className={`size-3 shrink-0 rounded-full ${tone.dot}`} />

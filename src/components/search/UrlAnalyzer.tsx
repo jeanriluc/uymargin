@@ -23,6 +23,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { formatMoney, formatUyu } from "@/lib/format";
+import { StepHeader } from "@/components/ui/StepHeader";
 import { saveAuditToCloud, getSupabaseClient, CloudAuditRecord } from "@/lib/supabase";
 
 export interface AnalyzedProductData {
@@ -258,20 +259,8 @@ export function UrlAnalyzer({
   return (
     <div className="space-y-6">
       {/* Input Section */}
-      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-6 items-center justify-center bg-black text-white dark:bg-white dark:text-black text-xs font-black">
-              01
-            </span>
-            <h2 className="heading-grotesk text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">
-              Auditor de Publicación por Enlace (MLU)
-            </h2>
-          </div>
-          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-            FILTRO DE STOCK Y CALIDAD ACTIVA
-          </span>
-        </div>
+      <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
+        <StepHeader title="Auditor de publicación por enlace (MLU)" aside="Solo con stock activo" />
 
         <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
           Pegá el link de cualquier publicación de Mercado Libre Uruguay. UyMargin audita al instante si tiene stock activo, quién más vende el mismo producto en Uruguay, la reputación de cada tienda (ventas, calificaciones y opiniones positivas) y las mejores alternativas disponibles.
@@ -344,7 +333,7 @@ export function UrlAnalyzer({
       {result && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           {/* Target Product Summary Card */}
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -579,7 +568,7 @@ export function UrlAnalyzer({
           </div>
 
           {/* Section 1: Same Product Sold by Other Sellers */}
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Users className="size-4 text-zinc-600 dark:text-zinc-400" />
@@ -619,7 +608,7 @@ export function UrlAnalyzer({
                         : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
                     }`}
                   >
-                    ⭐ Tiendas Oficiales & MercadoLíder
+                    <Star className="size-3" aria-hidden /> Tiendas Oficiales & MercadoLíder
                   </button>
                   <button
                     type="button"
@@ -630,7 +619,7 @@ export function UrlAnalyzer({
                         : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700"
                     }`}
                   >
-                    🚚 Envío Gratis
+                    <Truck className="size-3" aria-hidden /> Envío Gratis
                   </button>
                 </div>
 
@@ -826,7 +815,7 @@ export function UrlAnalyzer({
 
           {/* Section 2: Similar Competing Products in the Market (Verified In-Stock) */}
           {result.similarProducts.length > 0 && (
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
+            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center gap-2">
                   <PackageSearch className="size-4 text-zinc-600 dark:text-zinc-400" />

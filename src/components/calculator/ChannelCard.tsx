@@ -70,7 +70,7 @@ export function ChannelCard({
 
   return (
     <article
-      className={`flex flex-col rounded-xl border transition-all duration-200 shadow-sm overflow-hidden bg-white dark:bg-[#121214] ${
+      className={`flex flex-col rounded-xl border transition-all duration-200 shadow-sm overflow-hidden bg-surface ${
         isWinner && hasPrice
           ? "border-black dark:border-white ring-1 ring-black dark:ring-white"
           : "border-zinc-200 dark:border-zinc-800"

@@ -53,7 +53,7 @@ export function SavedAuditsDrawer({ isOpen, onClose, onLoadAudit, onOpenSettings
 
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Auditorías guardadas en la nube" className="fixed inset-0 z-50 flex justify-end bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative flex h-full w-full max-w-md flex-col border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-2xl">
+      <div className="relative flex h-full w-full max-w-md flex-col border-l border-zinc-200 dark:border-zinc-800 bg-surface p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-4 mb-3">
           <div className="flex items-center gap-2.5">
