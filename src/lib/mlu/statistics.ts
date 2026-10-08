@@ -23,11 +23,17 @@ export function filterOutliers(sorted: number[]): number[] {
   return sorted.filter((v) => v >= lo && v <= hi);
 }
 
-/** Computes min / average / median / max (UYU) after IQR outlier filtering. */
-export function computeMarketStats(prices: number[]): MarketStats | null {
+/**
+ * Computes min / average / median / max (UYU). By default it removes outliers with the IQR filter;
+ * `excludeOutliers: false` keeps every price (the radar uses it: its products were already filtered by relevance).
+ */
+export function computeMarketStats(
+  prices: number[],
+  { excludeOutliers = true }: { excludeOutliers?: boolean } = {}
+): MarketStats | null {
   const clean = prices.filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
   if (clean.length === 0) return null;
-  const filtered = filterOutliers(clean);
+  const filtered = excludeOutliers ? filterOutliers(clean) : clean;
   const sum = filtered.reduce((acc, v) => acc + v, 0);
   return {
     sampleSize: filtered.length,

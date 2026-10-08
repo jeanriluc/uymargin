@@ -304,12 +304,14 @@ export default function App() {
           query,
           total: data.total,
           items: data.items,
+          relevance: data.relevance ?? null,
         });
 
         setUnsupportedListings(Array.isArray(data.unsupported) ? data.unsupported : []);
         setExactBlock(data.exact ?? null);
+        // Sin productos que coincidan no hay estadística: no se arrastra la de una búsqueda anterior.
+        setStats(data.stats ?? null);
         if (data.stats) {
-          setStats(data.stats);
           if (inputs.salePrice <= 0) {
             updateInputs({ salePrice: Math.round(data.stats.median) });
           }
@@ -354,12 +356,17 @@ export default function App() {
   };
 
   // Estadísticas del radar recalculadas con la cotización vigente: si cambia el dólar, cambian.
-  // Si hay publicaciones en dólares y no hay cotización, no se calcula nada.
+  // Solo entran los productos que coinciden con la búsqueda, sin excluir ninguno.
+  // Si alguno de ellos está en dólares y no hay cotización, no se calcula nada.
   const liveStats = useMemo<MarketStats | null>(() => {
     if (marketSource !== "mlu" || marketState.status !== "success") return stats;
-    const conversions = marketState.items.map((item) => convertToUyu(item.price, item.currency, currentRate));
+    const matching = marketState.items.filter((item) => item.match?.matches);
+    const conversions = matching.map((item) => convertToUyu(item.price, item.currency, currentRate));
     if (conversions.some((c) => c.status === "no_rate")) return null;
-    return computeMarketStats(conversions.flatMap((c) => (c.status === "ok" ? [c.amountUyu] : [])));
+    return computeMarketStats(
+      conversions.flatMap((c) => (c.status === "ok" ? [c.amountUyu] : [])),
+      { excludeOutliers: false }
+    );
   }, [marketSource, marketState, stats, currentRate]);
 
   const analysis = analyzeAll(inputs);

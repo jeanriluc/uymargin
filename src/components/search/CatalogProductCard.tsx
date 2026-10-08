@@ -10,13 +10,15 @@ interface CatalogProductCardProps {
   rate: ExchangeRate | null;
   /** Recibe el precio en pesos con la cotización vigente. */
   onSimulate: (priceUyu: number) => void;
+  /** Aclaración corta bajo el nombre (por ejemplo, qué le falta para coincidir con la búsqueda). */
+  note?: string;
 }
 
 /**
  * Tarjeta de un producto de catálogo del radar o de "Similares". Muestra solo lo que informa
- * Mercado Libre: precio de una de sus ofertas, cantidad de ofertas activas y datos de ese vendedor.
+ * Mercado Libre: precio de su oferta activa más barata, cantidad de ofertas activas y datos de ese vendedor.
  */
-export function CatalogProductCard({ item, rate, onSimulate }: CatalogProductCardProps) {
+export function CatalogProductCard({ item, rate, onSimulate, note }: CatalogProductCardProps) {
   const conversion = convertToUyu(item.price, item.currency, rate);
   const canSimulate = conversion.status === "ok";
   const seller = item.seller ?? null;
@@ -63,6 +65,9 @@ export function CatalogProductCard({ item, rate, onSimulate }: CatalogProductCar
             >
               {item.title}
             </a>
+            {note && (
+              <p className="mt-1 text-[11px] font-semibold leading-snug text-amber-800 dark:text-amber-300">{note}</p>
+            )}
           </div>
         </div>
 
@@ -98,6 +103,9 @@ export function CatalogProductCard({ item, rate, onSimulate }: CatalogProductCar
 
       <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
         <div className="min-w-0">
+          <span className="block text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+            Oferta más barata
+          </span>
           <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5 text-[11px] text-zinc-600 dark:text-zinc-400">
             {item.freeShipping && (

@@ -12,7 +12,10 @@ import type {
   ExactOfferSeller,
   ExactProductBlock,
   MluItem,
+  RadarRelevance,
+  SimilarCriteria,
 } from "../src/lib/mlu/types.js";
+import { nameHasTypeWords, productTexts, productTypeWords, queryTerms, relevanceOf } from "../src/lib/mlu/relevance.js";
 import path from "path";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 
@@ -157,16 +160,6 @@ function quantile(sorted: number[], q: number): number {
   return next !== undefined ? sorted[base] + rest * (next - sorted[base]) : sorted[base];
 }
 
-function filterOutliers(sorted: number[]): number[] {
-  if (sorted.length < 5) return sorted;
-  const q1 = quantile(sorted, 0.25);
-  const q3 = quantile(sorted, 0.75);
-  const iqr = q3 - q1;
-  const lo = q1 - 1.5 * iqr;
-  const hi = q3 + 1.5 * iqr;
-  return sorted.filter((v) => v >= lo && v <= hi);
-}
-
 let cachedAppToken: { token: string; expiresAt: number } | null = null;
 
 async function getAppToken(): Promise<string | null> {
@@ -214,184 +207,265 @@ export interface UnsupportedListing {
   permalink: string;
 }
 
+/** Resultados de la búsqueda por palabras en el catálogo: una sola llamada, trae nombre, ficha y dominio. */
+const RADAR_SEARCH_LIMIT = 50;
+/** Tope de productos de la búsqueda a los que se les consultan las ofertas (una llamada cada uno, en paralelo). */
+const RADAR_MAX_SEARCH_PICKS = 24;
+/** Tope de productos más vendidos de la categoría que se consultan (dos llamadas cada uno, en paralelo). */
+const RADAR_MAX_HIGHLIGHTS = 16;
+
+interface CatalogCandidates {
+  /** domain_id que Mercado Libre asigna al texto buscado. null = no informado. */
+  discoveredDomain: string | null;
+  /** Productos de catálogo que devuelve la búsqueda por palabras, en el orden de Mercado Libre. */
+  search: any[];
+  /** Ids de los productos más vendidos de la categoría que Mercado Libre asigna al texto. */
+  highlightIds: string[];
+}
+
 /**
- * Productos de catálogo con ofertas activas para una búsqueda. Cada uno lleva el precio de una de sus
- * ofertas y los datos reales de ese vendedor. `rate` solo se usa para comparar precios al ordenar.
+ * Candidatos para el radar y para "Similares". Dos fuentes en paralelo:
+ *  - la búsqueda por palabras en el catálogo (muchos de sus productos no tienen ofertas en Uruguay), y
+ *  - los más vendidos de la categoría del texto (tienen ofertas, pero son de la categoría, no de lo buscado).
+ */
+async function gatherCandidates(query: string, token: string): Promise<CatalogCandidates> {
+  const q = encodeURIComponent(query.trim());
+  const [searchData, discovery] = await Promise.all([
+    mlGet(`/products/search?status=active&site_id=MLU&q=${q}&limit=${RADAR_SEARCH_LIMIT}`, token, 5000),
+    (async () => {
+      const domains = await mlGet(`/sites/MLU/domain_discovery/search?limit=3&q=${q}`, token, 4000);
+      const first = Array.isArray(domains) ? domains[0] : null;
+      const categoryId = typeof first?.category_id === "string" ? first.category_id : null;
+      const highlights = categoryId ? await mlGet(`/highlights/MLU/category/${categoryId}`, token, 4000) : null;
+      return {
+        domain: typeof first?.domain_id === "string" ? (first.domain_id as string) : null,
+        ids: (Array.isArray(highlights?.content) ? highlights.content : [])
+          .filter((c: any) => c?.type === "PRODUCT" && typeof c.id === "string")
+          .map((c: any) => c.id as string),
+      };
+    })(),
+  ]);
+  return {
+    discoveredDomain: discovery.domain,
+    search: Array.isArray(searchData?.results) ? searchData.results.filter((p: any) => typeof p?.id === "string") : [],
+    highlightIds: Array.from(new Set<string>(discovery.ids)),
+  };
+}
+
+interface LoadedCatalogProduct {
+  item: MluItem;
+  /** Producto de catálogo tal como lo informa Mercado Libre (nombre, ficha, domain_id). */
+  product: any;
+}
+
+/**
+ * Ofertas activas de cada producto pedido. Cada producto queda con el precio de su oferta más barata
+ * (en la moneda de esa oferta) y el vendedor de esa oferta. `product: null` = hay que pedir también la ficha.
+ * `withoutOffers` recibe los ids para los que Mercado Libre informó cero ofertas activas.
+ */
+async function loadCatalogProducts(
+  picks: { id: string; product: any | null }[],
+  token: string,
+  rate: number | null,
+  unsupported: UnsupportedListing[],
+  withoutOffers: Set<string> = new Set()
+): Promise<LoadedCatalogProduct[]> {
+  const fetched = await Promise.all(
+    picks.map(async (pick) => {
+      const [product, rawItems] = await Promise.all([
+        pick.product ?? mlGet(`/products/${pick.id}`, token, 4500),
+        fetchRawOffers(pick.id, token),
+      ]);
+      if (!product || !rawItems) return null;
+      if (rawItems.length === 0) {
+        withoutOffers.add(pick.id);
+        return null;
+      }
+
+      const title = product.name || product.family_name || pick.id;
+      const priced = rawItems.filter((it) => typeof it?.price === "number" && it.price > 0);
+      const supported = priced.flatMap((it) => {
+        const currency = normalizeCurrency(it.currency_id);
+        return currency ? [{ it, currency, comparable: currency === "USD" && rate ? it.price * rate : it.price }] : [];
+      });
+      if (supported.length === 0) {
+        // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
+        const first = priced[0];
+        if (first) {
+          unsupported.push({
+            id: pick.id,
+            title,
+            price: first.price,
+            currency: String(first.currency_id ?? ""),
+            permalink: productPermalink(pick.id),
+          });
+        }
+        return null;
+      }
+
+      // La oferta activa más barata, igual que el precio de referencia de "Productos exactos".
+      supported.sort((x, y) => x.comparable - y.comparable || String(x.it.item_id).localeCompare(String(y.it.item_id)));
+      const { it: cheapest, currency } = supported[0];
+      const city = cheapest.seller_address?.city?.name || "";
+      const state = cheapest.seller_address?.state?.name || "";
+      const item: MluItem = {
+        id: pick.id,
+        title,
+        price: cheapest.price,
+        currency,
+        condition:
+          cheapest.condition === "new" || cheapest.condition === "used"
+            ? cheapest.condition
+            : cheapest.condition
+              ? "other"
+              : null,
+        thumbnail: pictureUrl(product),
+        permalink: productPermalink(pick.id),
+        freeShipping: cheapest.shipping?.free_shipping === true,
+        isOfficialStore: !!cheapest.official_store_id,
+        activeSellersCount: rawItems.length,
+        sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
+        seller: null,
+      };
+      return { item, product, sellerId: typeof cheapest.seller_id === "number" ? (cheapest.seller_id as number) : null };
+    })
+  );
+
+  const valid = fetched.flatMap((v) => (v ? [v] : []));
+
+  // Datos reales de los vendedores: una sola consulta a /users para todos (con caché).
+  // Si Mercado Libre no responde, `seller` queda en null y la interfaz muestra "no disponible".
+  const sellers = await lookupSellers(
+    valid.flatMap((v) => (v.sellerId !== null ? [v.sellerId] : [])),
+    token
+  );
+  for (const v of valid) v.item.seller = v.sellerId !== null ? sellers.get(v.sellerId) ?? null : null;
+
+  // Orden: más ofertas activas del producto primero; a igual cantidad, el más barato.
+  const comparablePrice = (i: MluItem) => (i.currency === "USD" && rate ? i.price * rate : i.price);
+  valid.sort(
+    (a, b) =>
+      (b.item.activeSellersCount ?? 0) - (a.item.activeSellersCount ?? 0) ||
+      comparablePrice(a.item) - comparablePrice(b.item)
+  );
+  return valid.map(({ item, product }) => ({ item, product }));
+}
+
+/** Productos de la búsqueda (ya traen ficha) más los destacados que no estén entre ellos, sin repetir. */
+function buildPicks(searchPicks: any[], highlightIds: string[]): { id: string; product: any | null }[] {
+  const seen = new Set<string>(searchPicks.map((p) => p.id));
+  const picks: { id: string; product: any | null }[] = searchPicks.map((p) => ({ id: p.id, product: p }));
+  for (const id of highlightIds) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    picks.push({ id, product: null });
+  }
+  return picks;
+}
+
+/**
+ * Radar por nombre: productos de catálogo con ofertas activas, separados entre los que mencionan todo lo
+ * que se buscó (`match.matches`) y los relacionados. Primero van los que coinciden.
  */
 async function searchRealMlu(
   query: string,
   token: string | null,
   unsupported: UnsupportedListing[] = [],
   rate: number | null = null
-): Promise<MluItem[]> {
-  const cleanQ = query.trim();
-  const listings: MluItem[] = [];
-  const seenIds = new Set<string>();
-
-  const addListing = (item: MluItem) => {
-    if (!item.title || !item.price || item.price <= 0 || seenIds.has(item.id)) return;
-    seenIds.add(item.id);
-    listings.push(item);
+): Promise<{ items: MluItem[]; relevance: RadarRelevance }> {
+  const terms = queryTerms(query);
+  const relevance: RadarRelevance = {
+    terms,
+    matched: 0,
+    related: 0,
+    matchedOffers: 0,
+    matchedWithoutOffers: 0,
+    matchedNotChecked: 0,
+    searchCheckLimit: RADAR_MAX_SEARCH_PICKS,
+    missingCounts: [],
   };
+  if (!token) return { items: [], relevance };
 
   try {
-    const candidateProductIds: string[] = [];
+    const candidates = await gatherCandidates(query, token);
 
-    // 1. Domain discovery & category highlights (highest sales volume in Uruguay)
-    if (token) {
-      try {
-        const discRes = await fetch(
-          `https://api.mercadolibre.com/sites/MLU/domain_discovery/search?limit=3&q=${encodeURIComponent(cleanQ)}`,
-          { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(4000) }
-        );
-        if (discRes.ok) {
-          const domains = await discRes.json();
-          const categoryId = Array.isArray(domains) && domains[0]?.category_id ? domains[0].category_id : null;
-          if (categoryId) {
-            const hRes = await fetch(`https://api.mercadolibre.com/highlights/MLU/category/${categoryId}`, {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(4000),
-            });
-            if (hRes.ok) {
-              const hData = await hRes.json();
-              for (const c of hData.content || []) {
-                if (c.type === "PRODUCT" && c.id) candidateProductIds.push(c.id);
-              }
-            }
-          }
-        }
-      } catch (e) {}
-    }
+    // La búsqueda ya trae nombre y ficha: la relevancia se calcula antes de gastar llamadas en ofertas,
+    // y se consultan primero los productos que coinciden.
+    const ranked = candidates.search.map((product) => ({ product, rel: relevanceOf(query, productTexts(product)) }));
+    const matching = ranked.filter((r) => r.rel.matches);
+    const searchPicks = [...matching, ...ranked.filter((r) => !r.rel.matches)]
+      .slice(0, RADAR_MAX_SEARCH_PICKS)
+      .map((r) => r.product);
+    const pickedIds = new Set<string>(searchPicks.map((p) => p.id));
+    relevance.matchedNotChecked = matching.filter((r) => !pickedIds.has(r.product.id)).length;
 
-    // 2. Keyword catalog product search
-    if (token) {
-      try {
-        const pRes = await fetch(
-          `https://api.mercadolibre.com/products/search?status=active&site_id=MLU&q=${encodeURIComponent(cleanQ)}&limit=15`,
-          { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) }
-        );
-        if (pRes.ok) {
-          const pData = await pRes.json();
-          if (Array.isArray(pData.results)) {
-            for (const p of pData.results) {
-              if (p.id) candidateProductIds.push(p.id);
-            }
-          }
-        }
-      } catch (e) {}
-    }
+    const withoutOffers = new Set<string>();
+    const loaded = await loadCatalogProducts(
+      buildPicks(searchPicks, candidates.highlightIds.slice(0, RADAR_MAX_HIGHLIGHTS)),
+      token,
+      rate,
+      unsupported,
+      withoutOffers
+    );
+    relevance.matchedWithoutOffers = matching.filter((r) => withoutOffers.has(r.product.id)).length;
 
-    const uniqueProductIds = Array.from(new Set(candidateProductIds)).slice(0, 16);
+    for (const l of loaded) l.item.match = relevanceOf(query, productTexts(l.product));
+    const items = loaded.map((l) => l.item);
+    const matched = items.filter((i) => i.match?.matches);
+    const related = items.filter((i) => !i.match?.matches);
 
-    // 3. Parallel fetch of product details & item availability
-    if (token && uniqueProductIds.length > 0) {
-      const fetchedResults = await Promise.allSettled(
-        uniqueProductIds.map(async (pid) => {
-          const [prodRes, itemsRes] = await Promise.all([
-            fetch(`https://api.mercadolibre.com/products/${pid}`, {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(4500),
-            }),
-            fetch(`https://api.mercadolibre.com/products/${pid}/items`, {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(4500),
-            }),
-          ]);
+    relevance.matched = matched.length;
+    relevance.related = related.length;
+    relevance.matchedOffers = matched.reduce((acc, i) => acc + (i.activeSellersCount ?? 0), 0);
+    relevance.missingCounts = terms
+      .map((term) => ({ term, count: related.filter((i) => i.match?.missing.includes(term)).length }))
+      .filter((m) => m.count > 0);
 
-          if (!prodRes.ok || !itemsRes.ok) return null;
-          const prod = await prodRes.json();
-          const itemsData = await itemsRes.json();
-          const items = Array.isArray(itemsData?.results) ? itemsData.results : [];
-
-          // STRICT AVAILABILITY CHECK: If 0 items in Uruguay, product is out of stock! Discard!
-          if (items.length === 0) return null;
-
-          // Pick top seller: prioritize official stores, then gold_special, then lowest price
-          const sortedItems = [...items].sort((a, b) => {
-            const aOff = a.official_store_id ? 100 : 0;
-            const bOff = b.official_store_id ? 100 : 0;
-            if (aOff !== bOff) return bOff - aOff;
-            const aGold = a.listing_type_id === "gold_special" ? 50 : 0;
-            const bGold = b.listing_type_id === "gold_special" ? 50 : 0;
-            if (aGold !== bGold) return bGold - aGold;
-            return (a.price || 0) - (b.price || 0);
-          });
-
-          const bestItem = sortedItems[0];
-
-          const title = prod.name || prod.family_name || cleanQ;
-          const rawPrice = typeof bestItem.price === "number" && bestItem.price > 0 ? bestItem.price : null;
-          if (!rawPrice) return null;
-          const currency = normalizeCurrency(bestItem.currency_id);
-          if (!currency) {
-            // Moneda que no manejamos: se informa tal cual, sin convertir ni entrar a las estadísticas.
-            unsupported.push({
-              id: pid,
-              title: prod.name || prod.family_name || cleanQ,
-              price: rawPrice,
-              currency: String(bestItem.currency_id ?? ""),
-              permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
-            });
-            return null;
-          }
-
-          const city = bestItem.seller_address?.city?.name || "";
-          const state = bestItem.seller_address?.state?.name || "";
-          const item: MluItem = {
-            id: pid,
-            title,
-            price: rawPrice,
-            currency,
-            condition:
-              bestItem.condition === "new" || bestItem.condition === "used"
-                ? bestItem.condition
-                : bestItem.condition
-                  ? "other"
-                  : null,
-            thumbnail: prod.pictures?.[0]?.url ? String(prod.pictures[0].url).replace(/^http:\/\//, "https://") : null,
-            permalink: `https://www.mercadolibre.com.uy/p/${pid}`,
-            freeShipping: bestItem.shipping?.free_shipping === true,
-            isOfficialStore: !!bestItem.official_store_id,
-            activeSellersCount: items.length,
-            sellerCity: city && state && state !== city ? `${city}, ${state}` : city || state || null,
-            seller: null,
-          };
-          return { item, sellerId: typeof bestItem.seller_id === "number" ? (bestItem.seller_id as number) : null };
-        })
-      );
-
-      // Collect only valid, in-stock items
-      const validItems = fetchedResults.flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []));
-
-      // Datos reales de los vendedores: una sola consulta a /users para toda la búsqueda (con caché).
-      // Si Mercado Libre no responde, `seller` queda en null y la interfaz muestra "no disponible".
-      const sellers = await lookupSellers(
-        validItems.flatMap((v) => (v.sellerId !== null ? [v.sellerId] : [])),
-        token
-      );
-      for (const v of validItems) {
-        v.item.seller = v.sellerId !== null ? sellers.get(v.sellerId) ?? null : null;
-      }
-
-      // Orden: más ofertas activas del producto primero; a igual cantidad, el más barato.
-      const comparablePrice = (i: MluItem) => (i.currency === "USD" && rate ? i.price * rate : i.price);
-      validItems.sort(
-        (a, b) =>
-          (b.item.activeSellersCount ?? 0) - (a.item.activeSellersCount ?? 0) ||
-          comparablePrice(a.item) - comparablePrice(b.item)
-      );
-
-      for (const v of validItems) {
-        addListing(v.item);
-      }
-    }
+    return { items: [...matched, ...related], relevance };
   } catch (err) {
     console.error("[searchRealMlu] error:", err);
+    // Sin resultados: quien llama informa "sin resultados"; nunca se calcula una mediana con otra cosa.
+    return { items: [], relevance };
   }
+}
 
-  // No sample listings when nothing matched: the caller reports "sin resultados"
-  // so a market median is never computed from products the user did not search for.
-  return listings;
+/**
+ * "Similares" de un producto de catálogo: otros productos del mismo tipo con ofertas activas.
+ * Mismo tipo = está en el domain_id del producto (o en el que Mercado Libre asigna a su nombre) y su
+ * nombre menciona las palabras de tipo del producto. Si no hay, la lista queda vacía: no se rellena.
+ */
+async function findSimilarProducts(
+  target: any | null,
+  targetId: string,
+  query: string,
+  token: string,
+  rate: number,
+  unsupported: UnsupportedListing[]
+): Promise<{ items: MluItem[]; criteria: SimilarCriteria }> {
+  const typeWords = target ? productTypeWords(target) : [];
+  const criteria: SimilarCriteria = { typeWords, domains: [], discarded: 0 };
+  // Sin ficha del producto o sin palabras de tipo no hay forma de afirmar "mismo tipo".
+  if (!target || typeWords.length === 0) return { items: [], criteria };
+
+  const candidates = await gatherCandidates(query, token);
+  const domains = new Set<string>(
+    [target.domain_id, candidates.discoveredDomain].filter((d): d is string => typeof d === "string" && d.length > 0)
+  );
+  criteria.domains = Array.from(domains);
+
+  const sameType = (product: any) =>
+    typeof product?.domain_id === "string" &&
+    domains.has(product.domain_id) &&
+    nameHasTypeWords(typeof product?.name === "string" ? product.name : "", typeWords);
+
+  // Los de la búsqueda ya traen dominio y nombre: se filtran antes de consultar ofertas.
+  const searchPicks = candidates.search.filter((p) => p.id !== targetId && sameType(p)).slice(0, RADAR_MAX_SEARCH_PICKS);
+  const highlightIds = candidates.highlightIds.filter((id) => id !== targetId).slice(0, RADAR_MAX_HIGHLIGHTS);
+  const loaded = await loadCatalogProducts(buildPicks(searchPicks, highlightIds), token, rate, unsupported);
+
+  const similar = loaded.filter((l) => sameType(l.product));
+  criteria.discarded = loaded.length - similar.length;
+  return { items: similar.slice(0, 8).map((l) => l.item), criteria };
 }
 
 app.get("/api/search-mlu", async (req, res) => {
@@ -410,7 +484,7 @@ app.get("/api/search-mlu", async (req, res) => {
     const token = await getAppToken();
     const unsupported: UnsupportedListing[] = [];
     // "Productos exactos" va en paralelo con el radar; si falla, el radar responde igual sin esa sección.
-    const [items, exact] = await Promise.all([
+    const [radar, exact] = await Promise.all([
       searchRealMlu(query, token, unsupported, rate),
       token
         ? resolveExactByName(query, token, rate).catch((err) => {
@@ -419,6 +493,7 @@ app.get("/api/search-mlu", async (req, res) => {
           })
         : Promise.resolve(null),
     ]);
+    const { items, relevance } = radar;
 
     if (items.length === 0 && unsupported.length > 0) {
       const currencies = Array.from(new Set(unsupported.map((u) => u.currency || "sin indicar"))).join(", ");
@@ -440,32 +515,33 @@ app.get("/api/search-mlu", async (req, res) => {
       });
     }
 
-    // Compute prices in UYU
+    // Estadísticas en pesos, solo con los productos que coinciden con la búsqueda y sin excluir ninguno:
+    // la relevancia ya dejó afuera lo que no es lo buscado. Si no coincide ninguno no hay estadística.
     const uyuPrices = items
+      .filter((i) => i.match?.matches)
       .map((i) => (i.currency === "USD" ? i.price * rate : i.price))
       .filter((p) => Number.isFinite(p) && p > 0)
       .sort((a, b) => a - b);
 
-    let stats = null;
-    if (uyuPrices.length > 0) {
-      const filtered = filterOutliers(uyuPrices);
-      const sum = filtered.reduce((acc, v) => acc + v, 0);
-      stats = {
-        sampleSize: filtered.length,
-        outliersRemoved: uyuPrices.length - filtered.length,
-        min: filtered[0],
-        max: filtered[filtered.length - 1],
-        average: Math.round(sum / filtered.length),
-        median: Math.round(quantile(filtered, 0.5)),
-      };
-    }
+    const stats =
+      uyuPrices.length > 0
+        ? {
+            sampleSize: uyuPrices.length,
+            outliersRemoved: 0,
+            min: uyuPrices[0],
+            max: uyuPrices[uyuPrices.length - 1],
+            average: Math.round(uyuPrices.reduce((acc, v) => acc + v, 0) / uyuPrices.length),
+            median: Math.round(quantile(uyuPrices, 0.5)),
+          }
+        : null;
 
     return res.json({
       ok: true,
       query,
-      total: items.length,
+      total: relevance.matched,
       items,
       stats,
+      relevance,
       rateUsed: rate,
       unsupported,
       exact,
@@ -833,11 +909,14 @@ app.all("/api/analyze-url", async (req, res) => {
     let match: ExactMatch | null = null;
     let candidates: CatalogCandidate[] = [];
     let rawItems: any[] | null = null;
+    /** Ficha del producto exacto: de ahí salen el dominio y las palabras de tipo para "Similares". */
+    let targetPayload: any | null = null;
 
     // 1. El enlace trae el product_id de catálogo: es el producto exacto.
     if (pid && token) {
       const [prod, items] = await Promise.all([mlGet(`/products/${pid}`, token, 5000), fetchRawOffers(pid, token)]);
       if (prod) {
+        targetPayload = prod;
         rawItems = items ?? [];
         match = {
           productId: pid,
@@ -917,39 +996,28 @@ app.all("/api/analyze-url", async (req, res) => {
       activeSellersCount: built.offers.length,
     };
 
-    // 4. Productos similares: otros productos de catálogo con ofertas activas para la misma búsqueda
+    // 4. Similares: otros productos de catálogo del mismo tipo con ofertas activas (ver findSimilarProducts).
     const searchQuery = slugQuery || match.title;
     let similarProducts: MluItem[] = [];
+    let similarCriteria: SimilarCriteria | null = null;
     if (!exactOnly && searchQuery) {
-      const allFound = await searchRealMlu(searchQuery, token, unsupported, rate);
-      similarProducts = allFound.filter((item) => item.id !== match.productId).slice(0, 8);
+      // Si el producto se eligió por búsqueda, la ficha completa todavía no se pidió.
+      targetPayload ??= await mlGet(`/products/${match.productId}`, token, 5000);
+      const similar = await findSimilarProducts(targetPayload, match.productId, searchQuery, token, rate, unsupported);
+      similarProducts = similar.items;
+      similarCriteria = similar.criteria;
     }
 
-    // 5. Compute market benchmark stats across all competitor offers with valid prices
-    const allPricesUyu: number[] = [
-      ...built.offers.map((o) => o.priceUyu),
-      ...similarProducts.map((p) => (p.currency === "USD" ? p.price * rate : p.price)),
-    ].filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
-
-    let marketStats = {
-      min: targetProduct.priceUyu,
-      median: targetProduct.priceUyu,
-      average: targetProduct.priceUyu,
-      max: targetProduct.priceUyu,
-      sampleSize: targetProduct.priceUyu > 0 ? 1 : 0,
+    // 5. Rango de mercado: una sola fuente, las ofertas del producto exacto, sin excluir ninguna.
+    //    Son los mismos números que `exact.stats` (más el promedio); los similares no entran.
+    const exactPrices = built.offers.map((o) => o.priceUyu);
+    const marketStats = {
+      sampleSize: built.stats?.count ?? 0,
+      min: built.stats?.min ?? 0,
+      median: built.stats?.median ?? 0,
+      max: built.stats?.max ?? 0,
+      average: exactPrices.length > 0 ? Math.round(exactPrices.reduce((acc, v) => acc + v, 0) / exactPrices.length) : 0,
     };
-
-    if (allPricesUyu.length > 0) {
-      const filtered = filterOutliers(allPricesUyu);
-      const sum = filtered.reduce((acc, v) => acc + v, 0);
-      marketStats = {
-        sampleSize: filtered.length,
-        min: filtered[0],
-        max: filtered[filtered.length - 1],
-        average: Math.round(sum / filtered.length),
-        median: Math.round(quantile(filtered, 0.5)),
-      };
-    }
 
     return res.json({
       ok: true,
@@ -957,6 +1025,7 @@ app.all("/api/analyze-url", async (req, res) => {
       targetProduct,
       exact,
       similarProducts,
+      similarCriteria,
       marketStats,
       rateUsed: rate,
       unsupported,
