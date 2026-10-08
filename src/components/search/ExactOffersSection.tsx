@@ -4,6 +4,7 @@ import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
 import { formatUyu } from "@/lib/format";
 import type { CatalogCandidate, ExactOffer, ExactProductBlock } from "@/lib/mlu/types";
+import { CONDITION, POWER_SELLER, REPUTATION } from "@/lib/mlu/sellerLabels";
 
 interface ExactOffersSectionProps {
   /** null = no disponible (sin coincidencia en el catálogo o Mercado Libre no respondió). */
@@ -17,22 +18,6 @@ interface ExactOffersSectionProps {
 
 type SortKey = "price_asc" | "price_desc" | "transactions";
 type CurrencyFilter = "all" | "UYU" | "USD";
-
-const REPUTATION: Record<string, { label: string; dot: string }> = {
-  "5_green": { label: "Verde", dot: "bg-emerald-500" },
-  "4_light_green": { label: "Verde claro", dot: "bg-lime-500" },
-  "3_yellow": { label: "Amarilla", dot: "bg-yellow-500" },
-  "2_orange": { label: "Naranja", dot: "bg-orange-500" },
-  "1_red": { label: "Roja", dot: "bg-red-500" },
-};
-
-const POWER_SELLER: Record<string, string> = {
-  platinum: "MercadoLíder Platinum",
-  gold: "MercadoLíder Gold",
-  silver: "MercadoLíder",
-};
-
-const CONDITION: Record<string, string> = { new: "Nuevo", used: "Usado", other: "Otra condición" };
 
 function median(sorted: number[]): number {
   const mid = (sorted.length - 1) / 2;

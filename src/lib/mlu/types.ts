@@ -1,26 +1,58 @@
 import type { Currency } from "@/lib/finance/types";
 
+/**
+ * Producto de catálogo del radar (y de "Similares"). Lleva el precio de su oferta activa más barata
+ * y los datos de ese vendedor. Solo datos que informa Mercado Libre; lo que falta va en null.
+ */
 export interface MluItem {
   id: string;
   title: string;
+  /** Precio de la oferta activa más barata del producto. */
   price: number;
   currency: Currency;
-  condition: "new" | "used" | "other";
+  condition?: "new" | "used" | "other" | null;
   thumbnail: string | null;
   permalink: string;
   freeShipping: boolean;
-  seller: string | null;
-  isAvailable?: boolean;
-  stockStatus?: string;
-  salesVolume?: string;
-  sellerBadge?: "Tienda Oficial" | "MercadoLíder Platinum" | "MercadoLíder Gold" | "Vendedor Destacado";
-  sellerReputation?: string;
-  positivePercentage?: number;
-  ratingAverage?: number;
-  reviewsCount?: number;
+  /** La oferta mostrada es de una tienda oficial (official_store_id). */
+  isOfficialStore?: boolean;
+  /** Cantidad de ofertas activas del producto de catálogo. */
   activeSellersCount?: number;
-  sellerCity?: string;
-  isTopChoice?: boolean;
+  sellerCity?: string | null;
+  /** Vendedor de la oferta mostrada, según /users. null = no disponible. */
+  seller?: ExactOfferSeller | null;
+  /** Solo en el radar por nombre: si el producto menciona todo lo que se buscó y, si no, qué le falta. */
+  match?: { matches: boolean; missing: string[] };
+}
+
+/** Cómo se separó el radar entre "Coinciden con tu búsqueda" y "Relacionados". */
+export interface RadarRelevance {
+  /** Palabras y números de la búsqueda que se compararon. */
+  terms: string[];
+  /** Productos con ofertas activas que mencionan todos los términos: con ellos se calculan las estadísticas. */
+  matched: number;
+  /** Productos con ofertas activas a los que les falta algún término: no entran a las estadísticas. */
+  related: number;
+  /** Suma de las ofertas activas de los productos que coinciden. */
+  matchedOffers: number;
+  /** Coinciden por nombre pero Mercado Libre no informa ofertas activas en Uruguay: no se muestran. */
+  matchedWithoutOffers: number;
+  /** Coinciden por nombre pero no se consultaron sus ofertas por el tope de consultas por búsqueda. */
+  matchedNotChecked: number;
+  /** Tope de productos de la búsqueda a los que se les consultan las ofertas. */
+  searchCheckLimit: number;
+  /** Por cada término, cuántos de los relacionados no lo mencionan. */
+  missingCounts: { term: string; count: number }[];
+}
+
+/** Criterio real con el que se eligieron los "Similares" de un enlace. */
+export interface SimilarCriteria {
+  /** Palabras de tipo de producto que debe mencionar el nombre ("olla", "presion"). */
+  typeWords: string[];
+  /** domain_id de Mercado Libre admitidos (el del producto y el que Mercado Libre asigna a su nombre). */
+  domains: string[];
+  /** Productos con ofertas activas que se descartaron por ser de otro tipo. */
+  discarded: number;
 }
 
 export interface MarketStats {
@@ -50,11 +82,13 @@ export type MluErrorCode =
 export interface MluSearchSuccess {
   ok: true;
   query: string;
-  /** Total active listings reported by Mercado Libre. */
+  /** Productos de catálogo con ofertas activas que coinciden con la búsqueda (los que entran a `stats`). */
   total: number;
+  /** Primero los que coinciden, después los relacionados (`match.matches`). */
   items: MluItem[];
-  /** Stats in UYU, computed with the exchange rate supplied in the request. */
+  /** En pesos, con la cotización del pedido y solo con los productos que coinciden. null = no coincide ninguno. */
   stats: MarketStats | null;
+  relevance?: RadarRelevance;
   /** Cotización con la que el servidor calculó `stats`. */
   rateUsed?: number;
   /** Publicaciones en una moneda que no convertimos: se informan, no se calculan. */

@@ -1,29 +1,14 @@
-import {
-  AlertTriangle,
-  ArrowDownToLine,
-  ArrowUpToLine,
-  BarChart3,
-  ExternalLink,
-  PackageSearch,
-  Sigma,
-  Truck,
-  Users,
-  Star,
-  Sparkles,
-  Store,
-  Award,
-  ShieldCheck,
-} from "lucide-react";
+import { AlertTriangle, ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 import { formatRate, formatUyu } from "@/lib/format";
-import type { MarketStats, MluItem, MluSearchError, UnsupportedListing } from "@/lib/mlu/types";
-import { convertToUyu, describeRate, type ExchangeRate } from "@/lib/currency";
-import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
+import type { MarketStats, MluItem, MluSearchError, RadarRelevance, UnsupportedListing } from "@/lib/mlu/types";
+import { describeRate, type ExchangeRate } from "@/lib/currency";
+import { CatalogProductCard } from "@/components/search/CatalogProductCard";
 
 export type MarketState =
   | { status: "idle" }
   | { status: "loading"; query: string }
-  | { status: "success"; query: string; total: number; items: MluItem[] }
+  | { status: "success"; query: string; total: number; items: MluItem[]; relevance: RadarRelevance | null }
   | { status: "error"; query: string; error: MluSearchError };
 
 interface MarketSummaryProps {
@@ -33,6 +18,7 @@ interface MarketSummaryProps {
   rate: ExchangeRate | null;
   /** Publicaciones en una moneda no soportada: se muestran, no se calculan. */
   unsupported?: UnsupportedListing[];
+  /** De dónde salen las estadísticas: el radar de Mercado Libre o los precios cargados a mano. */
   source: "mlu" | "manual" | null;
   manualPrices: string;
   onManualPricesChange: (text: string) => void;
@@ -83,6 +69,13 @@ function StatCard({
   );
 }
 
+/** Con menos productos que esto, mínimo, mediana y máximo se muestran como referencia, no como rango. */
+const SMALL_SAMPLE = 3;
+
+function plural(count: number, one: string, many: string): string {
+  return `${count.toLocaleString("es-UY")} ${count === 1 ? one : many}`;
+}
+
 export function MarketSummary({
   state,
   stats,
@@ -95,8 +88,18 @@ export function MarketSummary({
 }: MarketSummaryProps) {
   const loading = state.status === "loading";
   const items = state.status === "success" ? state.items : [];
-  const usdCount = items.filter((i) => i.currency === "USD").length;
   const total = state.status === "success" ? state.total : stats?.sampleSize ?? 0;
+
+  // Radar por nombre: solo los productos que coinciden con la búsqueda alimentan las estadísticas.
+  const fromRadar = state.status === "success" && source === "mlu";
+  const relevance = state.status === "success" ? state.relevance : null;
+  const matching = items.filter((i) => i.match?.matches);
+  const related = items.filter((i) => !i.match?.matches);
+  const matchingOffers = matching.reduce((acc, i) => acc + (i.activeSellersCount ?? 0), 0);
+  const smallSample = fromRadar && matching.length > 0 && matching.length < SMALL_SAMPLE;
+  // Solo los que coinciden entran al rango: son los que importan para la conversión a pesos.
+  const usdCount = matching.filter((i) => i.currency === "USD").length;
+  const quoted = (terms: string[]) => terms.map((t) => `«${t}»`).join(", ");
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-surface p-5 sm:p-6 shadow-sm">
@@ -141,15 +144,16 @@ export function MarketSummary({
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <div>
-            <strong className="font-bold">Falta la cotización del dólar.</strong> {usdCount} de {items.length}{" "}
-            publicaciones están en dólares. No se calculó el rango de mercado: ingresá la cotización en el encabezado.
+            <strong className="font-bold">Falta la cotización del dólar.</strong> {usdCount} de {matching.length}{" "}
+            productos que coinciden tienen su oferta más barata en dólares. No se calculó el rango de mercado: ingresá la cotización en el encabezado.
           </div>
         </div>
       )}
 
       {usdCount > 0 && rate && (
         <p className="mb-3 text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
-          {usdCount} de {items.length} publicaciones están en dólares. Para comparar se pasaron a pesos con:{" "}
+          {usdCount} de {matching.length} productos que coinciden tienen su oferta más barata en dólares. Para comparar
+          se pasaron a pesos con:{" "}
           <span className={rate.stale ? "font-bold text-amber-700 dark:text-amber-400" : ""}>
             {describeRate(rate)} (<span className="num">{formatRate(rate.rate)}</span>)
           </span>
@@ -180,6 +184,82 @@ export function MarketSummary({
         </div>
       )}
 
+      {fromRadar && (
+        <div className="mb-4 space-y-2.5">
+          <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <strong className="font-bold text-zinc-800 dark:text-zinc-200">Cómo se arma este rango:</strong> un producto
+            coincide cuando su nombre o su ficha en Mercado Libre mencionan todo lo que buscaste
+            {relevance && relevance.terms.length > 0 && <> ({quoted(relevance.terms)})</>}. El mínimo, la mediana, el
+            promedio y el máximo usan solo esos productos, cada uno con el precio de su oferta activa más barata.
+          </p>
+
+          {matching.length === 0 && (
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <div>
+                <strong className="font-bold">Ningún producto con ofertas activas coincide con “{state.query}”.</strong>{" "}
+                No se calculó mínimo, mediana ni máximo.
+                {related.length > 0 &&
+                  ` Abajo ${related.length === 1 ? "queda 1 producto relacionado" : `quedan ${related.length} productos relacionados`}, solo como referencia.`}{" "}
+                Probá con menos palabras o cargá los precios a mano.
+              </div>
+            </div>
+          )}
+
+          {smallSample && (
+            <div
+              role="status"
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <div>
+                <strong className="font-bold">
+                  Muestra chica: {matching.length === 1 ? "coincide 1 solo producto" : `coinciden solo ${matching.length} productos`}.
+                </strong>{" "}
+                Tomá estos números como referencia, no como el rango del mercado.
+              </div>
+            </div>
+          )}
+
+          {relevance && (related.length > 0 || relevance.matchedWithoutOffers > 0 || relevance.matchedNotChecked > 0) && (
+            <ul className="space-y-0.5 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+              {related.length > 0 && (
+                <li>
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
+                    {plural(related.length, "relacionado quedó", "relacionados quedaron")} fuera de las estadísticas
+                  </span>
+                  {relevance.missingCounts.length > 0 && (
+                    <>
+                      :{" "}
+                      {relevance.missingCounts
+                        .map((m) => `${m.count} no ${m.count === 1 ? "menciona" : "mencionan"} «${m.term}»`)
+                        .join("; ")}
+                    </>
+                  )}
+                  .
+                </li>
+              )}
+              {relevance.matchedWithoutOffers > 0 && (
+                <li>
+                  {plural(relevance.matchedWithoutOffers, "producto de catálogo coincide", "productos de catálogo coinciden")}{" "}
+                  por nombre pero Mercado Libre no informa ofertas activas en Uruguay: no se muestran.
+                </li>
+              )}
+              {relevance.matchedNotChecked > 0 && (
+                <li>
+                  {plural(relevance.matchedNotChecked, "producto más coincide", "productos más coinciden")} por nombre
+                  y no se {relevance.matchedNotChecked === 1 ? "consultó" : "consultaron"}: se revisan las ofertas de
+                  hasta {relevance.searchCheckLimit} por búsqueda. Si buscás algo más específico (marca, modelo, medida) entran todos.
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
+
       {/* 5 Architectural Stat Cards */}
       <div className="flex flex-wrap gap-2.5">
         {loading ? (
@@ -198,7 +278,7 @@ export function MarketSummary({
               label="MEDIANA (FOCAL)"
               highlight
               value={stats ? formatUyu(stats.median) : "—"}
-              sublabel="Sugerida"
+              sublabel={smallSample ? "Muestra chica" : "Sugerida"}
               onClick={stats ? () => onSelectPrice(Math.round(stats.median)) : undefined}
             />
             <StatCard
@@ -212,17 +292,25 @@ export function MarketSummary({
               value={stats ? formatUyu(stats.max) : "—"}
               onClick={stats ? () => onSelectPrice(Math.round(stats.max)) : undefined}
             />
-            <StatCard
-              label="OFERTAS"
-              value={
-                stats?.fromCloud && state.status !== "success" && total === 0
-                  ? "No disponible"
-                  : stats || state.status === "success"
-                    ? total.toLocaleString("es-UY")
-                    : "—"
-              }
-              sublabel={stats?.fromCloud && state.status !== "success" ? "Guardado en la nube" : "Muestra real con stock"}
-            />
+            {fromRadar ? (
+              <StatCard
+                label="PRODUCTOS DE CATÁLOGO"
+                value={matching.length.toLocaleString("es-UY")}
+                sublabel={
+                  matching.length > 0
+                    ? `Coinciden · ${plural(matchingOffers, "oferta activa", "ofertas activas")} en total`
+                    : "Ninguno coincide"
+                }
+              />
+            ) : (
+              <StatCard
+                label={stats?.fromCloud ? "OFERTAS" : "PRECIOS"}
+                value={
+                  stats?.fromCloud && total === 0 ? "No disponible" : stats ? total.toLocaleString("es-UY") : "—"
+                }
+                sublabel={stats?.fromCloud ? "Guardado en la nube" : stats ? "Cargados a mano" : undefined}
+              />
+            )}
           </>
         )}
       </div>
@@ -251,17 +339,19 @@ export function MarketSummary({
         </details>
       </div>
 
-      {/* Live item thumbnails & links with pre-click quality & reviews info */}
+      {/* Productos de catálogo encontrados: solo datos que informa Mercado Libre */}
       {items.length > 0 && (
         <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+            <div className="min-w-0">
               <h4 className="text-[11px] font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100">
-                Publicaciones Reales Verificadas con Stock en Uruguay
+                Coinciden con tu búsqueda ({matching.length})
               </h4>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase whitespace-nowrap">
-                <span className="size-1.5 rounded-full bg-emerald-500"></span> 100% Stock Activo
-              </span>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                Productos de catálogo con ofertas activas en Uruguay, ordenados por cantidad de ofertas; a igual
+                cantidad, primero el más barato. El precio de cada tarjeta es el de la oferta activa más barata de ese
+                producto y el vendedor es el de esa oferta.
+              </p>
             </div>
             {state.status === "success" && state.query && (
               <a
@@ -276,130 +366,45 @@ export function MarketSummary({
             )}
           </div>
 
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
-            {items.slice(0, 9).map((item) => (
-              <div
-                key={item.id}
-                className="group flex min-w-0 flex-col justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-[#fafafa] dark:bg-zinc-900/40 p-3 transition-all hover:border-black dark:hover:border-white hover:shadow-sm"
-              >
-                <div>
-                  {/* Top badges: Stock & Store Quality */}
-                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-2">
-                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-black uppercase text-emerald-700 dark:text-emerald-400">
-                      <span className="size-1.5 rounded-full bg-emerald-500"></span> En Stock
-                    </span>
+          {matching.length > 0 ? (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
+              {matching.map((item) => (
+                <CatalogProductCard key={item.id} item={item} rate={rate} onSimulate={onSelectPrice} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-3 text-xs text-zinc-600 dark:text-zinc-400">
+              Ningún producto con ofertas activas menciona todo lo que buscaste.
+            </p>
+          )}
 
-                    <div className="flex items-center gap-1">
-                      {item.sellerBadge === "Tienda Oficial" ? (
-                        <span className="rounded bg-indigo-500/10 border border-indigo-500/20 px-1.5 py-0.2 text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase">
-                          Oficial
-                        </span>
-                      ) : item.sellerBadge === "MercadoLíder Platinum" ? (
-                        <span className="rounded bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
-                          Platinum
-                        </span>
-                      ) : item.sellerBadge === "MercadoLíder Gold" ? (
-                        <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.2 text-[11px] font-black text-amber-700 dark:text-amber-400 uppercase">
-                          Gold
-                        </span>
-                      ) : null}
-
-                      {item.isTopChoice && (
-                        <span className="inline-flex items-center gap-0.5 rounded bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.2 text-[11px] font-black uppercase">
-                          <Sparkles className="size-2" /> Top
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Thumbnail & Title */}
-                  <div className="flex items-start gap-2.5">
-                    <div className="relative size-12 shrink-0 rounded bg-white overflow-hidden p-0.5 border border-zinc-200 dark:border-zinc-700 shadow-2xs">
-                      {item.thumbnail ? (
-                        <img loading="lazy" decoding="async" src={item.thumbnail} alt="" className="size-full object-contain" />
-                      ) : (
-                        <PackageSearch className="m-auto size-5 text-zinc-500 dark:text-zinc-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <a
-                        href={item.permalink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="line-clamp-2 text-xs font-bold leading-snug text-zinc-800 dark:text-zinc-200 hover:underline"
-                        title={item.title}
-                      >
-                        {item.title}
-                      </a>
-                    </div>
-                  </div>
-
-                  {/* Pre-click seller reputation, sales & reviews */}
-                  <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between gap-2 text-[11px]">
-                    <span className="min-w-0 flex-1 truncate text-zinc-600 dark:text-zinc-400 font-medium" title={item.seller || undefined}>
-                      {item.seller || "Vendedor sin identificar"}
-                    </span>
-                    {item.ratingAverage != null && (
-                      <div className="flex shrink-0 items-center gap-1 font-black text-amber-700 dark:text-amber-400">
-                      <Star className="size-2.5 fill-amber-500 text-amber-500" />
-                      <span>{item.ratingAverage}</span>
-                      {item.reviewsCount != null && <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-normal">({item.reviewsCount})</span>}
-                    </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Price, Shipping & Actions */}
-                <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-zinc-200/60 dark:border-zinc-800/60 pt-2">
-                  <div className="min-w-0">
-                    <PriceWithEquivalent amount={item.price} currency={item.currency} rate={rate} />
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-0.5">
-                      {item.salesVolume && (
-                        <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                          {item.salesVolume}
-                        </span>
-                      )}
-                      {item.freeShipping && (
-                        <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-[11px] font-black uppercase text-zinc-600 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700 px-1 rounded">
-                          <Truck className="size-2" aria-hidden /> Envío gratis
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={convertToUyu(item.price, item.currency, rate).status !== "ok"}
-                      onClick={() => {
-                        // El simulador trabaja en pesos: una publicación en dólares entra convertida.
-                        const c = convertToUyu(item.price, item.currency, rate);
-                        if (c.status === "ok") onSelectPrice(Math.round(c.amountUyu));
-                      }}
-                      title={
-                        convertToUyu(item.price, item.currency, rate).status === "ok"
-                          ? "Simular con este precio de venta (en pesos)"
-                          : "No se puede simular: falta la cotización o la moneda no es reconocida"
-                      }
-                      className="rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2 py-1 text-[11px] font-black uppercase text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:pointer-events-none hover:border-black hover:text-black dark:hover:border-white dark:hover:text-white cursor-pointer"
-                    >
-                      Simular
-                    </button>
-                    <a
-                      href={item.permalink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Ver en Mercado Libre"
-                      aria-label={`Ver ${item.title} en Mercado Libre`}
-                      className="tap-target inline-flex size-8 items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                    >
-                      <ExternalLink className="size-3" />
-                    </a>
-                  </div>
-                </div>
+          {related.length > 0 && (
+            <details className="group mt-4 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+              <summary className="flex cursor-pointer items-center justify-between gap-3 text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white uppercase tracking-wider">
+                <span>Relacionados ({related.length}) · no entran a las estadísticas</span>
+                <span className="shrink-0 text-[11px] font-black group-open:hidden underline underline-offset-4">+ VER</span>
+              </summary>
+              <p className="mt-2 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+                Son los más vendidos de la misma categoría de Mercado Libre y resultados a los que les falta algo de lo
+                que escribiste; cada tarjeta dice qué le falta. Mismo criterio de precio: la oferta activa más barata.
+              </p>
+              <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-3">
+                {related.map((item) => (
+                  <CatalogProductCard
+                    key={item.id}
+                    item={item}
+                    rate={rate}
+                    onSimulate={onSelectPrice}
+                    note={
+                      item.match && item.match.missing.length > 0
+                        ? `No menciona: ${item.match.missing.join(", ")}`
+                        : undefined
+                    }
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </details>
+          )}
         </div>
       )}
     </div>
