@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* La variante `dark:` de Tailwind sigue al atributo data-theme de <html>, no al sistema.
+   Quién decide el tema (claro, oscuro o automático) es src/lib/theme.ts. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @layer base {
   :root {
     --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -32,7 +36,6 @@
   background-image: radial-gradient(circle, rgba(0, 0, 0, 0.08) 1px, transparent 1px);
 }
 
-.dark .bg-editorial-dots,
 [data-theme="dark"] .bg-editorial-dots {
   background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
 }
@@ -80,27 +83,36 @@
   --color-sun: #b45309;
 }
 
-/* Same trigger as Tailwind's default `dark:` variant, so both stay in sync. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-page: #0c0c0e;
-    --color-fg: #f4f4f5;
-    --color-foreground: #f4f4f5;
-    --color-muted: #a1a1aa;
-    --color-faint: #8b8b94;
-    --color-border: #27272a;
-    --color-border-strong: #52525b;
-    --color-surface: #121214;
-    --color-surface-1: #18181b;
-    --color-surface-2: #18181b;
-    --color-surface-3: #3f3f46;
-    --color-brand: #ffffff;
-    --color-brand-strong: #ffffff;
-    --color-brand-soft: #27272a;
-    --color-good: #34d399;
-    --color-bad: #f87171;
-    --color-sun: #fbbf24;
-  }
+/* Tema claro: valores por defecto (arriba, en @theme). Tema oscuro: mismos tokens redefinidos. */
+:root {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-page: #0c0c0e;
+  --color-fg: #f4f4f5;
+  --color-foreground: #f4f4f5;
+  --color-muted: #a1a1aa;
+  --color-faint: #8b8b94;
+  --color-border: #27272a;
+  --color-border-strong: #52525b;
+  --color-surface: #121214;
+  --color-surface-1: #18181b;
+  --color-surface-2: #18181b;
+  --color-surface-3: #3f3f46;
+  --color-brand: #ffffff;
+  --color-brand-strong: #ffffff;
+  --color-brand-soft: #27272a;
+  --color-good: #34d399;
+  --color-bad: #f87171;
+  --color-sun: #fbbf24;
+}
+
+/* La selección de texto usa la paleta, no el azul del navegador. */
+::selection {
+  background-color: var(--color-brand);
+  color: var(--color-surface);
 }
 
 @layer components {

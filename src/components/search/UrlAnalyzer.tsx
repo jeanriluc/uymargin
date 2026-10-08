@@ -304,7 +304,7 @@ export function UrlAnalyzer({
               placeholder="https://www.mercadolibre.com.uy/... o https://articulo.mercadolibre.com.uy/MLU-..."
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="h-12 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
+              className="h-12 w-full rounded-md border border-zinc-400 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3.5 pl-10 text-xs font-medium text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 dark:placeholder:text-zinc-400 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
             />
           </div>
 

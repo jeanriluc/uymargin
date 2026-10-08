@@ -223,7 +223,7 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
                   }`}
                 >
                   <span className="block text-xs leading-tight">{label}</span>
-                  <span className="block text-[11px] opacity-75">{sub}</span>
+                  <span className="block text-[11px]">{sub}</span>
                 </button>
               ))}
             </div>
