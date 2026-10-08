@@ -1,0 +1,7 @@
+{
+  "name": "UyMargin - Analizador de Rentabilidad Mayorista",
+  "description": "Dashboard financiero SaaS y simulador de márgenes para e-commerce y mayoristas en Uruguay (Mercado Libre, Tienda Propia, DGI e impuestos).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
