@@ -84,13 +84,15 @@ export function Header({
                 <ArrowLeftRight className="size-2.5 text-zinc-800 dark:text-zinc-200" />
                 <span>USD/UYU</span>
               </div>
-              <div className="w-20">
+              <div className="w-16">
+                <label htmlFor="header-rate" className="visually-hidden">
+                  Cotización del dólar en pesos uruguayos
+                </label>
                 <NumberField
                   id="header-rate"
                   value={exchangeRate}
                   onChange={(v) => onExchangeRateChange(v > 0 ? v : 40)}
-                  prefix="$U"
-                  inputClassName="h-6 text-xs font-black border-0 bg-transparent px-0 pl-5 focus:ring-0 text-zinc-900 dark:text-zinc-100"
+                  inputClassName="h-6 text-xs font-black border-0 bg-transparent px-0! focus:ring-0 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
             </div>

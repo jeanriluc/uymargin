@@ -99,7 +99,7 @@ export function NumberField({
           }}
           className={`h-11 w-full rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 text-sm font-semibold text-zinc-900 dark:text-zinc-100 num transition-all outline-none placeholder:text-zinc-400 hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white disabled:opacity-50 ${
             prefix ? "pl-11" : ""
-          } ${suffix ? "pr-16" : ""} ${invalid ? "border-red-600 focus:border-red-600 focus:ring-red-600" : ""} ${inputClassName}`}
+          } ${suffix ? "pr-24" : ""} ${invalid ? "border-red-600 focus:border-red-600 focus:ring-red-600" : ""} ${inputClassName}`}
         />
         {suffix && <div className="absolute right-2 flex items-center">{suffix}</div>}
       </div>

@@ -182,3 +182,38 @@
     animation: none;
   }
 }
+
+/* Touch ergonomics: the app is used standing in a warehouse, one-handed. */
+@media (pointer: coarse) {
+  button,
+  summary,
+  [role="button"] {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+
+  /* Controls that live inside a 44px input keep the input's height. */
+  button.tap-compact {
+    min-height: 2.25rem;
+    min-width: 2.5rem;
+  }
+
+  /* Inline icon buttons keep their size in the text flow; the hit area grows around them. */
+  button.tap-inline {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+  }
+  button.tap-inline::after {
+    content: "";
+    position: absolute;
+    inset: -0.8rem;
+  }
+
+  /* iOS zooms the page when a focused field is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]):not([class*="text-3xl"]),
+  textarea,
+  select {
+    font-size: 1rem;
+  }
+}

@@ -17,7 +17,7 @@ export function InfoTip({ label, children }: InfoTipProps) {
         onClick={() => setOpen(!open)}
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
-        className="inline-flex size-4.5 cursor-help items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-black dark:hover:text-white"
+        className="tap-inline inline-flex size-4.5 cursor-help items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-black dark:hover:text-white"
       >
         <Info className="size-3.5" aria-hidden />
       </button>

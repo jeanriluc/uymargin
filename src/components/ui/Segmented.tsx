@@ -42,6 +42,7 @@ export function Segmented<T extends string>({
               key={opt.value}
               type="button"
               onClick={() => onChange(opt.value)}
+              aria-pressed={isSelected}
               className={`flex flex-1 items-center justify-center gap-1.5 rounded font-bold uppercase transition-all cursor-pointer ${
                 size === "sm" ? "py-1 px-2 text-[11px]" : "py-1.5 px-3 text-xs"
               } ${
@@ -67,13 +68,15 @@ interface CurrencyToggleProps {
   label?: string;
 }
 
-export function CurrencyToggle({ value, onChange }: CurrencyToggleProps) {
+export function CurrencyToggle({ value, onChange, label }: CurrencyToggleProps) {
   return (
-    <div className="flex rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
+    <div role="group" aria-label={label} className="flex rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 p-0.5">
       <button
         type="button"
         onClick={() => onChange("UYU")}
-        className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
+        aria-pressed={value === "UYU"}
+        aria-label="Pesos uruguayos"
+        className={`tap-compact px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
           value === "UYU"
             ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
             : "text-zinc-500 hover:text-black dark:hover:text-white"
@@ -84,7 +87,9 @@ export function CurrencyToggle({ value, onChange }: CurrencyToggleProps) {
       <button
         type="button"
         onClick={() => onChange("USD")}
-        className={`px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
+        aria-pressed={value === "USD"}
+        aria-label="Dólares"
+        className={`tap-compact px-2 py-0.5 text-[11px] font-bold rounded cursor-pointer transition-all ${
           value === "USD"
             ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
             : "text-zinc-500 hover:text-black dark:hover:text-white"
