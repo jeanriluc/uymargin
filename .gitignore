@@ -18,3 +18,6 @@ docs/**/*.jpeg
 
 # Registro de auditoría interno: queda en disco, no se publica
 AUDIT_LOG.md
+
+# Reportes y mediciones de auditoría: quedan en disco, no se publican
+docs/audit/
