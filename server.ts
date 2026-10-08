@@ -464,12 +464,8 @@ async function searchRealMlu(query: string, token: string | null, rate: number):
     console.error("[searchRealMlu] error:", err);
   }
 
-  // Fallback if no items matched
-  if (listings.length === 0) {
-    const fallbackList = getVerifiedFallback(cleanQ, rate);
-    fallbackList.forEach(addListing);
-  }
-
+  // No sample listings when nothing matched: the caller reports "sin resultados"
+  // so a market median is never computed from products the user did not search for.
   return listings;
 }
 
@@ -484,6 +480,16 @@ app.get("/api/search-mlu", async (req, res) => {
   try {
     const token = await getAppToken();
     const items = await searchRealMlu(query, token, rate);
+
+    if (items.length === 0) {
+      return res.status(404).json({
+        ok: false,
+        code: token ? "NO_RESULTS" : "UPSTREAM_ERROR",
+        message: token
+          ? `No encontramos publicaciones activas en Mercado Libre Uruguay para "${query}". Probá con otro nombre o cargá los precios a mano.`
+          : "No se pudo conectar con Mercado Libre. Cargá los precios de la competencia a mano.",
+      });
+    }
 
     // Compute prices in UYU
     const uyuPrices = items
@@ -779,30 +785,13 @@ app.all("/api/analyze-url", async (req, res) => {
       }
     }
 
-    // 3. Fallback target product if still not found
+    // 3. Without a real listing there is nothing to audit: report it instead of inventing a price.
     if (!targetProduct) {
-      targetProduct = {
-        id: pid || "MLU_CUSTOM",
-        title: slugQuery || "Publicación de Mercado Libre",
-        price: 1490,
-        priceUyu: 1490,
-        currency: "UYU",
-        thumbnail: null,
-        permalink: rawUrl,
-        seller: "Vendedor en Mercado Libre",
-        sellerCity: "Uruguay",
-        condition: "new",
-        freeShipping: false,
-        isAvailable: true,
-        stockStatus: "En stock verificado",
-        salesVolume: "+100 vendidos",
-        sellerBadge: "Vendedor Destacado",
-        sellerReputation: "Reputación Positiva Verificada",
-        positivePercentage: 96,
-        ratingAverage: 4.7,
-        reviewsCount: 38,
-        activeSellersCount: 1,
-      };
+      return res.status(404).json({
+        ok: false,
+        message:
+          "No pudimos leer esa publicación de Mercado Libre. Revisá que el enlace sea de mercadolibre.com.uy y que la publicación siga activa.",
+      });
     }
 
     // Calculate percentage differences relative to target product price

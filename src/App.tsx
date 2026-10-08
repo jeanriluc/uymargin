@@ -57,6 +57,8 @@ export default function App() {
 
   const [rateInfo, setRateInfo] = useState<ExchangeRateResponse | null>(null);
   const [rateLoading, setRateLoading] = useState(false);
+  const [rateFailed, setRateFailed] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const [aiAdvisorOpen, setAiAdvisorOpen] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
@@ -111,8 +113,10 @@ export default function App() {
   // Fetch exchange rate on mount
   const fetchRate = useCallback(async () => {
     setRateLoading(true);
+    setRateFailed(false);
     try {
       const res = await fetch("/api/exchange-rate");
+      if (!res.ok) setRateFailed(true);
       if (res.ok) {
         const data: ExchangeRateResponse = await res.json();
         setRateInfo(data);
@@ -122,6 +126,7 @@ export default function App() {
       }
     } catch (e) {
       console.error("Failed to fetch exchange rate", e);
+      setRateFailed(true);
     } finally {
       setRateLoading(false);
     }
@@ -262,9 +267,17 @@ export default function App() {
 - Canal más rentable: ${bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"} (${winningChannelResult.viability.toUpperCase()})
 - Régimen DGI: ${inputs.tax.regime === "literal_e" ? "Literal E" : "Régimen General"}`;
 
-    navigator.clipboard.writeText(summary);
-    setCopiedSummary(true);
-    setTimeout(() => setCopiedSummary(false), 2000);
+    navigator.clipboard.writeText(summary).then(
+      () => {
+        setCopyFailed(false);
+        setCopiedSummary(true);
+        setTimeout(() => setCopiedSummary(false), 2000);
+      },
+      () => {
+        setCopyFailed(true);
+        setTimeout(() => setCopyFailed(false), 4000);
+      }
+    );
   };
 
   const handleShareWhatsApp = () => {
@@ -287,6 +300,18 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
   const handlePrint = () => {
     window.print();
   };
+
+  // The exchange rate drives every USD cost: say where it comes from and when it is not live.
+  const rateUpdatedAt = rateInfo?.updatedAt ? new Date(rateInfo.updatedAt) : null;
+  const rateAgeDays = rateUpdatedAt ? (Date.now() - rateUpdatedAt.getTime()) / 86_400_000 : 0;
+  const rateIsUnreliable = rateFailed || rateInfo?.source === "fallback" || rateAgeDays > 3;
+  const rateNote = rateLoading
+    ? "actualizando…"
+    : rateFailed || rateInfo?.source === "fallback"
+      ? "sin cotización en línea: revisá el valor"
+      : rateUpdatedAt
+        ? `cotización del ${rateUpdatedAt.toLocaleDateString("es-UY", { day: "numeric", month: "numeric" })}`
+        : null;
 
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -333,7 +358,16 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                   <span>·</span>
                   <span>Venta: <strong className="text-black dark:text-white num">{formatUyu(inputs.salePrice)}</strong></span>
                   <span>·</span>
-                  <span>USD/UYU: <strong className="text-black dark:text-white num">{formatRate(inputs.exchangeRate)}</strong></span>
+                  <span>USD/UYU: <strong className="text-black dark:text-white num">{formatRate(inputs.exchangeRate)}</strong>
+                    {rateNote && (
+                      <span
+                        role="status"
+                        className={`ml-1.5 normal-case tracking-normal ${rateIsUnreliable ? "font-bold text-amber-700 dark:text-amber-400" : "font-medium"}`}
+                      >
+                        ({rateNote})
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </div>
@@ -367,7 +401,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 title="Copiar resumen al portapapeles"
               >
                 {copiedSummary ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                <span className="hidden sm:inline">{copiedSummary ? "Copiado" : "Copiar"}</span>
+                <span className="hidden sm:inline">{copiedSummary ? "Copiado" : copyFailed ? "No se pudo copiar" : "Copiar"}</span>
               </button>
 
               <button

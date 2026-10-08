@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
+  Package,
   PackageSearch,
   Star,
   Award,
@@ -467,24 +468,30 @@ export function UrlAnalyzer({
                   )}
 
                   {/* Rating with stars */}
+                  {result.targetProduct.ratingAverage != null && (
                   <span className="inline-flex items-center gap-1 rounded bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-2 py-0.5 text-[11px] font-black text-amber-800 dark:text-amber-300">
                     <Star className="size-3 fill-amber-500 text-amber-500" />
-                    <span>{result.targetProduct.ratingAverage ?? 4.8}</span>
-                    <span className="text-[11px] font-normal text-amber-700 dark:text-amber-400">
-                      ({result.targetProduct.reviewsCount ?? 64} opiniones)
-                    </span>
+                    <span>{result.targetProduct.ratingAverage}</span>
+                    {result.targetProduct.reviewsCount != null && (
+                      <span className="text-[11px] font-normal text-amber-700 dark:text-amber-400">({result.targetProduct.reviewsCount} opiniones)</span>
+                    )}
                   </span>
+                  )}
 
                   {/* Sales Volume badge */}
+                  {result.targetProduct.salesVolume && (
                   <span className="inline-flex items-center gap-1 rounded bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-700 dark:text-zinc-300">
-                    📦 {result.targetProduct.salesVolume ?? "+500 vendidos"}
+                    <Package className="size-3" aria-hidden /> {result.targetProduct.salesVolume}
                   </span>
+                  )}
 
                   {/* Positive reputation % */}
+                  {result.targetProduct.positivePercentage != null && (
                   <span className="inline-flex items-center gap-1 rounded bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
                     <Check className="size-3 text-emerald-500" />
-                    {result.targetProduct.positivePercentage ?? 98}% opiniones positivas
+                    {result.targetProduct.positivePercentage}% opiniones positivas
                   </span>
+                  )}
                 </div>
 
                 <div className="mt-3.5 flex flex-wrap items-center gap-4 border-t border-zinc-100 dark:border-zinc-800/80 pt-3">
@@ -701,20 +708,27 @@ export function UrlAnalyzer({
                         {/* Calidad & Reviews (Pre-click insight) */}
                         <td className="py-3">
                           <div>
-                            <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 dark:text-amber-400">
-                              <Star className="size-3 fill-amber-500 text-amber-500" />
-                              <span>{seller.ratingAverage ?? 4.8}</span>
-                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold">
-                                ({seller.reviewsCount ?? 45})
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
-                              <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                                {seller.salesVolume ?? "+500 vendidos"}
-                              </span>
-                              <span>·</span>
-                              <span>{seller.positivePercentage ?? 98}% pos.</span>
-                            </div>
+                            {seller.ratingAverage != null ? (
+                              <div className="flex items-center gap-1 text-[11px] font-black text-amber-700 dark:text-amber-400">
+                                <Star className="size-3 fill-amber-500 text-amber-500" />
+                                <span>{seller.ratingAverage}</span>
+                                {seller.reviewsCount != null && (
+                                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold">
+                                    ({seller.reviewsCount})
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Sin datos</span>
+                            )}
+                            {(seller.salesVolume || seller.positivePercentage != null) && (
+                              <div className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                                {seller.salesVolume && (
+                                  <span className="font-bold text-emerald-700 dark:text-emerald-400">{seller.salesVolume}</span>
+                                )}
+                                {seller.positivePercentage != null && <span>{seller.positivePercentage}% pos.</span>}
+                              </div>
+                            )}
                           </div>
                         </td>
 
@@ -876,15 +890,15 @@ export function UrlAnalyzer({
                       {/* Seller & Reviews Pre-click summary */}
                       <div className="mt-2.5 pt-2 border-t border-zinc-200/50 dark:border-zinc-800/50 flex flex-wrap items-center justify-between gap-1">
                         <span className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[120px]">
-                          {item.seller || "Vendedor Verificado"}
+                          {item.seller || "Vendedor sin identificar"}
                         </span>
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                        {item.ratingAverage != null && (
+                          <div className="flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-400">
                           <Star className="size-2.5 fill-amber-500 text-amber-500" />
-                          <span>{item.ratingAverage ?? 4.8}</span>
-                          <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">
-                            ({item.reviewsCount ?? 35})
-                          </span>
+                          <span>{item.ratingAverage}</span>
+                          {item.reviewsCount != null && <span className="text-zinc-500 dark:text-zinc-400 text-[11px]">({item.reviewsCount})</span>}
                         </div>
+                        )}
                       </div>
                     </div>
 

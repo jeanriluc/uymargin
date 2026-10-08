@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowDownToLine,
   ArrowUpToLine,
   BarChart3,
@@ -110,6 +111,19 @@ export function MarketSummary({
         )}
       </div>
 
+      {state.status === "error" && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <div>
+            <strong className="font-bold">No hay precios de mercado para “{state.query}”.</strong>{" "}
+            {state.error.message}
+          </div>
+        </div>
+      )}
+
       {/* 5 Architectural Stat Cards */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
         {loading ? (
@@ -142,7 +156,7 @@ export function MarketSummary({
               onClick={stats ? () => onSelectPrice(Math.round(stats.max)) : undefined}
             />
             <StatCard
-              label="PUBLICACIONES"
+              label="OFERTAS"
               value={stats || state.status === "success" ? total.toLocaleString("es-UY") : "—"}
               sublabel="Muestra real con stock"
             />
@@ -152,7 +166,7 @@ export function MarketSummary({
 
       {/* Manual Prices fallback section */}
       <div className="mt-5 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-        <details className="group">
+        <details className="group" open={state.status === "error" || undefined}>
           <summary className="flex cursor-pointer items-center justify-between text-xs font-bold text-zinc-700 dark:text-zinc-300 hover:text-black dark:hover:text-white uppercase tracking-wider">
             <span>Editor Manual de Precios de la Competencia</span>
             <span className="text-[11px] font-black group-open:hidden underline underline-offset-4">+ ABRIR</span>
@@ -260,15 +274,15 @@ export function MarketSummary({
                   {/* Pre-click seller reputation, sales & reviews */}
                   <div className="mt-2.5 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 flex items-center justify-between text-[11px]">
                     <span className="text-zinc-600 dark:text-zinc-400 font-medium truncate max-w-[130px]">
-                      {item.seller || "Vendedor Verificado"}
+                      {item.seller || "Vendedor sin identificar"}
                     </span>
-                    <div className="flex items-center gap-1 font-black text-amber-700 dark:text-amber-400">
+                    {item.ratingAverage != null && (
+                      <div className="flex items-center gap-1 font-black text-amber-700 dark:text-amber-400">
                       <Star className="size-2.5 fill-amber-500 text-amber-500" />
-                      <span>{item.ratingAverage ?? 4.8}</span>
-                      <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-normal">
-                        ({item.reviewsCount ?? 32})
-                      </span>
+                      <span>{item.ratingAverage}</span>
+                      {item.reviewsCount != null && <span className="text-zinc-500 dark:text-zinc-400 text-[11px] font-normal">({item.reviewsCount})</span>}
                     </div>
+                    )}
                   </div>
                 </div>
 

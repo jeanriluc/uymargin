@@ -43,7 +43,8 @@ export interface BatchItemResult {
   directProfit: number;
   directMargin: number;
   roi: number;
-  status: "viable" | "tight" | "loss";
+  /** "unpriced": Mercado Libre returned no market price, so the row cannot be ranked. */
+  status: "viable" | "tight" | "loss" | "unpriced";
   analysisInputs: AnalysisInputs;
 }
 
@@ -161,8 +162,9 @@ export function BatchAuditor({
       setProgress({ current: i + 1, total: items.length, currentName: item.name });
 
       const costUyu = item.currency === "USD" ? item.cost * exchangeRate : item.cost;
-      let marketPriceUyu = Math.round(costUyu * 1.5); // Fallback margin
-      let sampleSize = 1;
+      // Placeholder so the row can be opened in the simulator; sampleSize 0 marks it as not a market price.
+      let marketPriceUyu = Math.round(costUyu * 1.5);
+      let sampleSize = 0;
 
       try {
         const res = await fetch(
@@ -197,8 +199,10 @@ export function BatchAuditor({
       const bestChannel = directProfit >= mlProfit ? "direct" : "ml";
       const winningResult = bestChannel === "direct" ? analysis.direct : analysis.ml;
 
-      let status: "viable" | "tight" | "loss" = "viable";
-      if (winningResult.netProfit <= 0) {
+      let status: BatchItemResult["status"] = "viable";
+      if (sampleSize === 0) {
+        status = "unpriced";
+      } else if (winningResult.netProfit <= 0) {
         status = "loss";
       } else if (winningResult.netMargin < 12) {
         status = "tight";
@@ -257,7 +261,7 @@ export function BatchAuditor({
       String(r.cost).replace(".", ","),
       r.currency,
       Math.round(r.costUyu),
-      r.marketPriceUyu,
+      r.status === "unpriced" ? "" : r.marketPriceUyu,
       r.sampleSize,
       r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia",
       r.mlMargin.toFixed(1).replace(".", ","),
@@ -265,7 +269,7 @@ export function BatchAuditor({
       r.directMargin.toFixed(1).replace(".", ","),
       Math.round(r.directProfit),
       r.roi.toFixed(1).replace(".", ","),
-      r.status.toUpperCase(),
+      r.status === "unpriced" ? "SIN PRECIO DE MERCADO" : r.status.toUpperCase(),
     ]);
 
     const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row) => row.join(";"))].join("\n");
@@ -285,6 +289,8 @@ export function BatchAuditor({
     let count = 0;
 
     for (const r of results) {
+      // Rows without a real market price are not saved: there is no audit to store.
+      if (r.status === "unpriced") continue;
       try {
         const res = await saveAuditToCloud({
           title: r.name,
@@ -398,8 +404,9 @@ export function BatchAuditor({
 
       {/* Results Section */}
       {results.length > 0 && (() => {
-        const totalInvestmentUyu = results.reduce((acc, r) => acc + r.costUyu, 0);
-        const totalProfitUyu = results.reduce(
+        const pricedResults = results.filter((r) => r.status !== "unpriced");
+        const totalInvestmentUyu = pricedResults.reduce((acc, r) => acc + r.costUyu, 0);
+        const totalProfitUyu = pricedResults.reduce(
           (acc, r) => acc + (r.bestChannel === "ml" ? r.mlProfit : r.directProfit),
           0
         );
@@ -566,33 +573,62 @@ export function BatchAuditor({
                         )}
                       </td>
                       <td className="py-3 px-3">
-                        <span className="font-bold text-zinc-900 dark:text-zinc-100 num">
-                          {formatUyu(r.marketPriceUyu)}
-                        </span>
-                        <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} ventas/ofertas</span>
+                        {r.status === "unpriced" ? (
+                          <span className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
+                            Sin precio de mercado
+                          </span>
+                        ) : (
+                          <>
+                            <span className="font-bold text-zinc-900 dark:text-zinc-100 num">
+                              {formatUyu(r.marketPriceUyu)}
+                            </span>
+                            <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} publicaciones</span>
+                          </>
+                        )}
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`font-bold ${r.mlProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}>
-                          {formatUyu(r.mlProfit)}
-                        </span>
-                        <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.mlMargin)}</span>
+                        {r.status === "unpriced" ? (
+                          <span className="text-zinc-500 dark:text-zinc-400">—</span>
+                        ) : (
+                          <>
+                            <span className={`num font-bold ${r.mlProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                              {formatUyu(r.mlProfit)}
+                            </span>
+                            <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.mlMargin)}</span>
+                          </>
+                        )}
                       </td>
                       <td className="py-3 px-3">
-                        <span className={`font-bold ${r.directProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-500"}`}>
-                          {formatUyu(r.directProfit)}
-                        </span>
-                        <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.directMargin)}</span>
+                        {r.status === "unpriced" ? (
+                          <span className="text-zinc-500 dark:text-zinc-400">—</span>
+                        ) : (
+                          <>
+                            <span className={`num font-bold ${r.directProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                              {formatUyu(r.directProfit)}
+                            </span>
+                            <span className="block text-[11px] text-zinc-600 dark:text-zinc-400 font-bold">{formatPct(r.directMargin)}</span>
+                          </>
+                        )}
                       </td>
                       <td className="py-3 px-3">
-                        <div className="flex items-center gap-1 font-bold text-zinc-900 dark:text-zinc-100">
-                          <Trophy className="size-3 text-amber-500 shrink-0" />
-                          <span>{r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"}</span>
-                        </div>
+                        {r.status === "unpriced" ? (
+                          <span className="text-zinc-500 dark:text-zinc-400">—</span>
+                        ) : (
+                          <div className="flex items-center gap-1 font-bold text-zinc-900 dark:text-zinc-100">
+                            <Trophy className="size-3 text-amber-500 shrink-0" />
+                            <span>{r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"}</span>
+                          </div>
+                        )}
                         <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
                           +{formatUyu(winningProfit)} ({formatPct(winningMargin)})
                         </span>
                       </td>
                       <td className="py-3 px-3">
+                        {r.status === "unpriced" && (
+                          <span className="inline-flex rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-black text-zinc-700 dark:text-zinc-300 uppercase">
+                            Sin datos
+                          </span>
+                        )}
                         {r.status === "viable" && (
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-black text-emerald-700 dark:text-emerald-400 uppercase">
                             <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" /> Viable

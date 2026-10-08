@@ -32,7 +32,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
           Aún no guardaste simulaciones
         </h3>
         <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1 max-w-sm mx-auto">
-          Podés guardar escenarios haciendo clic en "Guardar Simulación" arriba para comparar productos y exportar tus reportes a Excel / CSV.
+          Podés guardar escenarios con el botón "Guardar" de arriba para comparar productos y exportar tus reportes a Excel / CSV.
         </p>
       </div>
     );

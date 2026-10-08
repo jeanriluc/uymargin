@@ -37,6 +37,7 @@ export interface MarketStats {
 export type MluErrorCode =
   | "BAD_REQUEST"
   | "AUTH_REQUIRED"
+  | "NO_RESULTS"
   | "RATE_LIMITED"
   | "UPSTREAM_ERROR"
   | "NETWORK";
