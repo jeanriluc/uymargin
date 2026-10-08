@@ -56,7 +56,7 @@ export function WaterfallChart({ steps, id }: WaterfallChartProps) {
           const negativeNet = step.key === "net" && step.amount < 0;
           const isZero = Math.abs(step.amount) < 0.5 && !isTotal;
           return (
-            <li key={step.key} className="grid grid-cols-[6.5rem_1fr_5.5rem] items-center gap-2 text-xs sm:grid-cols-[8rem_1fr_6rem]">
+            <li key={step.key} className="grid grid-cols-[7.5rem_1fr_5.5rem] items-center gap-2 text-xs sm:grid-cols-[8rem_1fr_6rem]">
               <span className={`truncate ${isTotal ? "font-semibold text-fg" : "text-muted"}`}>
                 {step.label}
               </span>

@@ -55,7 +55,8 @@ function StatCard({
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col justify-between rounded-lg border p-3.5 transition-all ${
+      // Cada tarjeta crece para completar su fila: con cinco indicadores no queda un hueco al final.
+      className={`flex min-w-0 flex-[1_1_7.5rem] flex-col justify-between rounded-lg border p-3.5 transition-all ${
         onClick ? "cursor-pointer hover:border-black dark:hover:border-white" : ""
       } ${
         highlight
@@ -180,10 +181,10 @@ export function MarketSummary({
       )}
 
       {/* 5 Architectural Stat Cards */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7.5rem),1fr))] gap-2.5">
+      <div className="flex flex-wrap gap-2.5">
         {loading ? (
           Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-24 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+            <div key={i} className="h-24 flex-[1_1_7.5rem] rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
           ))
         ) : (
           <>
