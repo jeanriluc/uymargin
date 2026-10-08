@@ -20,6 +20,7 @@ import type { UnitCosts } from "@/lib/finance/engine";
 import { NumberField } from "@/components/ui/NumberField";
 import { CurrencyToggle } from "@/components/ui/Segmented";
 import { InfoTip } from "@/components/ui/InfoTip";
+import { StepHeader } from "@/components/ui/StepHeader";
 
 interface CostPanelProps {
   inputs: AnalysisInputs;
@@ -54,7 +55,7 @@ function Toggle({
       />
       <span
         aria-hidden
-        className="relative mt-0.5 h-5 w-9 shrink-0 rounded-full bg-surface-3 transition-colors peer-checked:bg-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4"
+        className="relative mt-0.5 h-5 w-9 shrink-0 rounded-full bg-surface-3 transition-colors peer-checked:bg-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white dark:after:bg-zinc-900 after:shadow after:transition-transform peer-checked:after:translate-x-4"
       />
       <span className="text-sm">
         <span className="font-medium">{label}</span>
@@ -74,30 +75,10 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
   const turnoverDays = inputs.stockTurnoverDays || 0;
 
   return (
-    <section aria-labelledby="cost-heading" className="card card-pad animate-rise [animation-delay:60ms]">
-      <p className="eyebrow">Paso 2</p>
-      <h2 id="cost-heading" className="mt-1 text-lg font-semibold tracking-tight">
-        Costo mayorista y régimen DGI
-      </h2>
+    <section aria-labelledby="cost-heading" className="card card-pad">
+      <StepHeader step="01" id="cost-heading" title="Costo mayorista y régimen DGI" aside="Lo que pagás" />
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <label htmlFor="product-name" className="field-label">
-            Nombre interno del producto <span className="text-xs font-normal text-faint">(opcional)</span>
-          </label>
-          <input
-            id="product-name"
-            name="product-name"
-            type="text"
-            autoComplete="off"
-            maxLength={120}
-            placeholder="Ej: Auriculares F9 · Proveedor Montevideo"
-            value={inputs.productName}
-            onChange={(e) => onChange({ productName: e.target.value })}
-            className="input"
-          />
-        </div>
-
+      <div className="grid gap-4 sm:grid-cols-2">
         <NumberField
           id="wholesale-cost"
           label="Costo mayorista por unidad"
@@ -139,6 +120,23 @@ export function CostPanel({ inputs, costs, onChange, onTaxChange }: CostPanelPro
           }
           hint={`Costo puesto: ${formatUyu(costs.landed)}`}
         />
+
+        <div className="sm:col-span-2">
+          <label htmlFor="product-name" className="field-label">
+            Nombre interno del producto <span className="text-xs font-normal text-faint">(opcional)</span>
+          </label>
+          <input
+            id="product-name"
+            name="product-name"
+            type="text"
+            autoComplete="off"
+            maxLength={120}
+            placeholder="Ej: Auriculares F9 · Proveedor Montevideo"
+            value={inputs.productName}
+            onChange={(e) => onChange({ productName: e.target.value })}
+            className="input"
+          />
+        </div>
       </div>
 
       <fieldset className="mt-6">

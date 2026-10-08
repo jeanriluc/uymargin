@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   Store,
   TrendingUp,
-  Trophy,
 } from "lucide-react";
 
 import { Header, type ConnectionStatus } from "@/components/layout/Header";
@@ -24,6 +23,7 @@ import { CostPanel } from "@/components/calculator/CostPanel";
 import { ProfitHeroCard } from "@/components/calculator/ProfitHeroCard";
 import { BundleOptimizer } from "@/components/calculator/BundleOptimizer";
 import { PricingBar } from "@/components/calculator/PricingBar";
+import { StickyResultBar } from "@/components/calculator/StickyResultBar";
 import { ChannelCard } from "@/components/calculator/ChannelCard";
 import { MlSettings, DirectSettings } from "@/components/calculator/ChannelSettings";
 import { HistorySection } from "@/components/history/HistorySection";
@@ -156,7 +156,7 @@ export default function App() {
 
         if (data.stats) {
           setStats(data.stats);
-          if (inputs.salePrice <= 0 || inputs.salePrice === 1290) {
+          if (inputs.salePrice <= 0) {
             updateInputs({ salePrice: Math.round(data.stats.median) });
           }
         }
@@ -201,6 +201,8 @@ export default function App() {
   const analysis = analyzeAll(inputs);
   const bestChannel = analysis.ml.netProfit >= analysis.direct.netProfit ? "ml" : "direct";
   const winningChannelResult = bestChannel === "ml" ? analysis.ml : analysis.direct;
+  const bestChannelLabel = bestChannel === "ml" ? "Mercado Libre UY" : "Tienda Propia / POS";
+  const isReady = inputs.salePrice > 0 && analysis.costs.landed > 0;
   const suggestedPrice = analysis.ml.targetMarginPrice ?? analysis.direct.targetMarginPrice;
   const minBreakEven = Math.min(
     analysis.ml.breakEvenPrice ?? Infinity,
@@ -286,6 +288,10 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     window.print();
   };
 
+  const scrollToSection = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   return (
     <div className="min-h-screen bg-[#f5f5f6] dark:bg-[#0c0c0e] text-[#121212] dark:text-[#f2f2f3] flex flex-col font-sans transition-colors bg-editorial-dots">
       <Header
@@ -300,7 +306,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
         onOpenSavedAudits={() => setSavedAuditsOpen(true)}
       />
 
-      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
+      <main className={`mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pt-8 sm:px-6 lg:pb-8 ${isReady ? "pb-28" : "pb-8"}`}>
         {/* Architectural Executive Ribbon (inspired by reference layout) */}
         <section aria-label="Resumen Ejecutivo" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -312,7 +318,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">
-                    SIMULACIÓN ACTIVA
+                    {isReady ? "SIMULACIÓN ACTIVA" : "NUEVA SIMULACIÓN"}
                   </span>
                   <span className="text-zinc-300 dark:text-zinc-700">·</span>
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-800 dark:text-zinc-200">
@@ -332,36 +338,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               </div>
             </div>
 
-            {/* Center: Winning channel verdict callout */}
-            {inputs.salePrice > 0 && (
-              <div className="flex items-center gap-4 rounded-lg border border-black dark:border-white bg-black text-white dark:bg-white dark:text-black px-5 py-3 shadow-sm">
-                <div className="flex items-center gap-2.5">
-                  <Trophy className="size-5 shrink-0" />
-                  <div>
-                    <span className="text-[9px] font-black uppercase tracking-widest block opacity-75">
-                      CANAL RECOMENDADO
-                    </span>
-                    <span className="text-xs font-black uppercase tracking-wider">
-                      {bestChannel === "ml" ? "MERCADO LIBRE UY" : "TIENDA PROPIA / POS"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="h-8 w-px bg-white/30 dark:bg-black/30" />
-
-                <div>
-                  <span className="text-[9px] font-black uppercase tracking-widest block opacity-75">
-                    UTILIDAD LÍQUIDA
-                  </span>
-                  <span className="num text-sm font-black">
-                    {formatUyu(winningChannelResult.netProfit)} ({formatPct(winningChannelResult.netMargin)})
-                  </span>
-                </div>
-              </div>
-            )}
-
             {/* Right: Quick Action Buttons */}
-            <div className="flex items-center gap-2 self-start lg:self-center">
+            <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
               <button
                 type="button"
                 onClick={handleExportCsv}
@@ -414,7 +392,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={inputs.salePrice <= 0}
+                disabled={!isReady}
                 className="flex items-center gap-1.5 rounded-md bg-black hover:bg-zinc-800 text-white dark:bg-white dark:text-black dark:hover:bg-zinc-200 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:pointer-events-none active:scale-95"
               >
                 {savedSuccess ? <Check className="size-3.5" /> : <Save className="size-3.5" />}
@@ -424,11 +402,33 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           </div>
         </section>
 
-        {/* Level 1: 5-Second Executive Profit Hero & Reverse Calculator */}
+        {/* Steps 1 and 2: what you pay, what you charge */}
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+          <CostPanel
+            inputs={inputs}
+            costs={analysis.costs}
+            onChange={updateInputs}
+            onTaxChange={updateTax}
+          />
+
+          <PricingBar
+            salePrice={inputs.salePrice}
+            exchangeRate={inputs.exchangeRate}
+            stats={stats}
+            suggestedPrice={suggestedPrice}
+            breakEvenPrice={Number.isFinite(minBreakEven) ? minBreakEven : null}
+            onChange={(p) => updateInputs({ salePrice: p })}
+            onFindMarketPrice={() => scrollToSection("mercado")}
+          />
+        </div>
+
+        {/* Step 3: the verdict */}
         <ProfitHeroCard
+          id="resultado"
           inputs={inputs}
           analysis={analysis}
-          suggestedMarketPrice={suggestedPrice}
+          bestChannel={bestChannel}
+          targetMarginPrice={suggestedPrice}
           onSelectSalePrice={(p) => updateInputs({ salePrice: p })}
           onUpdateCostAmount={(newCost) => {
             updateInputs({ cost: { ...inputs.cost, amount: newCost } });
@@ -437,6 +437,38 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             updateInputs({ exchangeRate: newRate });
           }}
         />
+
+        {/* Channel battle */}
+        <section aria-labelledby="channels-heading" className="flex flex-col gap-4">
+          <div>
+            <h2 id="channels-heading" className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
+              Comparación por canal
+            </h2>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
+              ¿Dónde te conviene publicar considerando envíos, comisiones y pasarelas?
+            </p>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <ChannelCard
+              result={analysis.ml}
+              icon={<ShoppingBag className="size-5" />}
+              subtitle="Mercado Libre Uruguay (Comisión + Mercado Envíos + Cargo Fijo)"
+              regime={inputs.tax.regime}
+              isWinner={bestChannel === "ml" && isReady}
+              settings={<MlSettings value={inputs.ml} onChange={updateMl} />}
+            />
+
+            <ChannelCard
+              result={analysis.direct}
+              icon={<Store className="size-5" />}
+              subtitle="Tienda Propia / POS / Redes Sociales (Pasarela + Flete Local)"
+              regime={inputs.tax.regime}
+              isWinner={bestChannel === "direct" && isReady}
+              settings={<DirectSettings value={inputs.direct} onChange={updateDirect} />}
+            />
+          </div>
+        </section>
 
         {/* Strategic Bundle Optimizer (Anti-Cargo Fijo MLU & Multiplicador) */}
         <BundleOptimizer
@@ -447,151 +479,115 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               salePrice: bundlePrice,
               productName: bundleTitle,
             });
-            window.scrollTo({ top: 350, behavior: "smooth" });
+            scrollToSection("resultado");
           }}
         />
 
-        {/* Bento Grid: Step 1, Step 2, Step 3 */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left Column: Sourcing & Market Intelligence */}
-          <div className="flex flex-col gap-6">
-            {/* Search Mode Tab Switcher */}
-            <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-1.5 shadow-sm">
-              <button
-                type="button"
-                onClick={() => setSearchTab("keyword")}
-                className={`flex-1 rounded-md py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
-                  searchTab === "keyword"
-                    ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                }`}
-              >
-                Radar MLU
-              </button>
-              <button
-                type="button"
-                onClick={() => setSearchTab("url")}
-                className={`flex-1 rounded-md py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  searchTab === "url"
-                    ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                }`}
-              >
-                <span>Auditor Enlace</span>
-                <span className="rounded bg-amber-500/20 px-1 py-0.2 text-[9px] font-black text-amber-500">NUEVO</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSearchTab("batch")}
-                className={`flex-1 rounded-md py-2 text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                  searchTab === "batch"
-                    ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
-                    : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
-                }`}
-              >
-                <span>Lote CSV</span>
-                <span className="rounded bg-indigo-500/20 px-1 py-0.2 text-[9px] font-black text-indigo-500">PRO</span>
-              </button>
-            </div>
-
-            {searchTab === "keyword" ? (
-              <>
-                <SearchPanel
-                  query={inputs.query}
-                  onQueryChange={(q) => updateInputs({ query: q })}
-                  onSearch={handleSearch}
-                  loading={searchLoading}
-                />
-
-                <MarketSummary
-                  state={marketState}
-                  stats={stats}
-                  source={marketSource}
-                  manualPrices={manualPrices}
-                  onManualPricesChange={handleManualPricesChange}
-                  onSelectPrice={(p) => updateInputs({ salePrice: p })}
-                />
-              </>
-            ) : searchTab === "url" ? (
-              <UrlAnalyzer
-                exchangeRate={inputs.exchangeRate}
-                onSimulatePrice={(p, name) => {
-                  updateInputs({ salePrice: p, productName: name, query: name });
-                  window.scrollTo({ top: 300, behavior: "smooth" });
-                }}
-                onOpenCloudSettings={() => setSupabaseModalOpen(true)}
-              />
-            ) : (
-              <BatchAuditor
-                baseInputs={inputs}
-                exchangeRate={inputs.exchangeRate}
-                onSimulateProduct={(simInputs) => {
-                  updateInputs(simInputs);
-                  setSearchTab("keyword");
-                  window.scrollTo({ top: 250, behavior: "smooth" });
-                }}
-                onOpenCloudSettings={() => setSupabaseModalOpen(true)}
-              />
-            )}
-
-            <CostPanel
-              inputs={inputs}
-              costs={analysis.costs}
-              onChange={updateInputs}
-              onTaxChange={updateTax}
-            />
+        {/* Optional: market intelligence to pick a sale price */}
+        <section id="mercado" aria-labelledby="market-heading" className="scroll-mt-24 flex flex-col gap-4">
+          <div>
+            <h2 id="market-heading" className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100">
+              Precio de mercado <span className="font-bold text-zinc-500 dark:text-zinc-400">· opcional</span>
+            </h2>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
+              Buscá a cuánto se vende en Mercado Libre, analizá una publicación por enlace o cargá un catálogo completo.
+            </p>
           </div>
 
-          {/* Right Column: Pricing Engine & Channel Battle */}
-          <div className="flex flex-col gap-6">
-            <PricingBar
-              salePrice={inputs.salePrice}
+          {/* Search Mode Tab Switcher */}
+          <div className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-1.5 shadow-sm lg:max-w-xl">
+            <button
+              type="button"
+              onClick={() => setSearchTab("keyword")}
+              aria-pressed={searchTab === "keyword"}
+              className={`flex-1 rounded-md px-2 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                searchTab === "keyword"
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+              }`}
+            >
+              Radar MLU
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchTab("url")}
+              aria-pressed={searchTab === "url"}
+              className={`flex-1 rounded-md px-2 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                searchTab === "url"
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+              }`}
+            >
+              Por enlace
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchTab("batch")}
+              aria-pressed={searchTab === "batch"}
+              className={`flex-1 rounded-md px-2 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                searchTab === "batch"
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+              }`}
+            >
+              Lote CSV
+            </button>
+          </div>
+
+          {searchTab === "keyword" ? (
+            <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+              <SearchPanel
+                query={inputs.query}
+                onQueryChange={(q) => updateInputs({ query: q })}
+                onSearch={handleSearch}
+                loading={searchLoading}
+              />
+
+              <MarketSummary
+                state={marketState}
+                stats={stats}
+                source={marketSource}
+                manualPrices={manualPrices}
+                onManualPricesChange={handleManualPricesChange}
+                onSelectPrice={(p) => updateInputs({ salePrice: p })}
+              />
+            </div>
+          ) : searchTab === "url" ? (
+            <UrlAnalyzer
               exchangeRate={inputs.exchangeRate}
-              stats={stats}
-              suggestedPrice={suggestedPrice}
-              breakEvenPrice={Number.isFinite(minBreakEven) ? minBreakEven : null}
-              onChange={(p) => updateInputs({ salePrice: p })}
+              onSimulatePrice={(p, name) => {
+                updateInputs({ salePrice: p, productName: name, query: name });
+                scrollToSection("resultado");
+              }}
+              onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
-
-            {/* Channels Comparative Header Banner */}
-            <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-4 flex items-center justify-between">
-              <div>
-                <h3 className="heading-grotesk text-sm font-black uppercase tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                  <span>Simulación Multicanal Comparada</span>
-                </h3>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  ¿Dónde te conviene publicar considerando envíos, comisiones y pasarelas?
-                </p>
-              </div>
-            </div>
-
-            {/* Mercado Libre Card */}
-            <ChannelCard
-              result={analysis.ml}
-              icon={<ShoppingBag className="size-5" />}
-              subtitle="Mercado Libre Uruguay (Comisión + Mercado Envíos + Cargo Fijo)"
-              regime={inputs.tax.regime}
-              isWinner={bestChannel === "ml" && inputs.salePrice > 0}
-              settings={<MlSettings value={inputs.ml} onChange={updateMl} />}
+          ) : (
+            <BatchAuditor
+              baseInputs={inputs}
+              exchangeRate={inputs.exchangeRate}
+              onSimulateProduct={(simInputs) => {
+                updateInputs(simInputs);
+                setSearchTab("keyword");
+                scrollToSection("resultado");
+              }}
+              onOpenCloudSettings={() => setSupabaseModalOpen(true)}
             />
-
-            {/* Direct Web / POS Card */}
-            <ChannelCard
-              result={analysis.direct}
-              icon={<Store className="size-5" />}
-              subtitle="Tienda Propia / POS / Redes Sociales (Pasarela + Flete Local)"
-              regime={inputs.tax.regime}
-              isWinner={bestChannel === "direct" && inputs.salePrice > 0}
-              settings={<DirectSettings value={inputs.direct} onChange={updateDirect} />}
-            />
-          </div>
-        </div>
+          )}
+        </section>
 
         {/* History Vault Section */}
         <section aria-label="Historial de Simulaciones" className="mt-2">
           <HistorySection onLoadEntry={handleLoadEntry} />
         </section>
       </main>
+
+      {isReady && (
+        <StickyResultBar
+          targetId="resultado"
+          result={winningChannelResult}
+          channelLabel={bestChannelLabel}
+        />
+      )}
 
       {/* AI Financial Advisor Drawer / Modal */}
       <AiAdvisor

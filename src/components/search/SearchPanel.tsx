@@ -1,5 +1,6 @@
 import { Loader2, Search } from "lucide-react";
 import type { FormEvent } from "react";
+import { StepHeader } from "@/components/ui/StepHeader";
 
 interface SearchPanelProps {
   query: string;
@@ -25,19 +26,7 @@ export function SearchPanel({ query, onQueryChange, onSearch, loading }: SearchP
 
   return (
     <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-6 items-center justify-center bg-black text-white dark:bg-white dark:text-black text-xs font-black">
-            01
-          </span>
-          <h2 className="heading-grotesk text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">
-            Radar de Competencia en Mercado Libre Uruguay
-          </h2>
-        </div>
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-          ETAPA INICIAL
-        </span>
-      </div>
+      <StepHeader title="Radar de competencia en Mercado Libre Uruguay" aside="Opcional" />
 
       <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
         Buscá por producto o modelo para auditar precios en vivo en MLU y calcular mediana real sin publicaciones atípicas.

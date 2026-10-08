@@ -2,6 +2,7 @@ import { BarChart3, Target, Zap } from "lucide-react";
 import { formatUsd, formatUyu } from "@/lib/format";
 import type { MarketStats } from "@/lib/mlu/types";
 import { NumberField } from "@/components/ui/NumberField";
+import { StepHeader } from "@/components/ui/StepHeader";
 
 interface PricingBarProps {
   salePrice: number;
@@ -10,6 +11,8 @@ interface PricingBarProps {
   suggestedPrice: number | null;
   breakEvenPrice: number | null;
   onChange: (price: number) => void;
+  /** Jumps to the optional market research block. */
+  onFindMarketPrice?: () => void;
 }
 
 export function PricingBar({
@@ -19,6 +22,7 @@ export function PricingBar({
   suggestedPrice,
   breakEvenPrice,
   onChange,
+  onFindMarketPrice,
 }: PricingBarProps) {
   const position =
     stats && salePrice > 0 && stats.max > stats.min
@@ -50,20 +54,8 @@ export function PricingBar({
   ];
 
   return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-4 border-b border-zinc-100 dark:border-zinc-800 pb-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-6 items-center justify-center bg-black text-white dark:bg-white dark:text-black text-xs font-black">
-            03
-          </span>
-          <h2 className="heading-grotesk text-sm font-black tracking-tight uppercase text-zinc-900 dark:text-zinc-100">
-            Simulador de Precio de Venta al Consumidor
-          </h2>
-        </div>
-        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-          ESTRATEGIA FINAL
-        </span>
-      </div>
+    <section aria-label="Precio de venta" className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] p-5 sm:p-6 shadow-sm">
+      <StepHeader step="02" title="Precio de venta al público" aside="Lo que cobrás" />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] items-end">
         <div>
@@ -77,7 +69,7 @@ export function PricingBar({
             hint={
               exchangeRate > 0 && salePrice > 0
                 ? `Equivale a ${formatUsd(salePrice / exchangeRate)} al cambio actual de ${exchangeRate}`
-                : "Definí un precio o utilizá las estrategias sugeridas al lado"
+                : "Escribí un precio o tocá uno de los atajos"
             }
           />
         </div>
@@ -111,6 +103,16 @@ export function PricingBar({
               </button>
             ))}
           </div>
+
+          {!stats && onFindMarketPrice && (
+            <button
+              type="button"
+              onClick={onFindMarketPrice}
+              className="self-start text-xs font-bold text-zinc-700 dark:text-zinc-300 underline underline-offset-2 hover:text-black dark:hover:text-white cursor-pointer"
+            >
+              ¿No sabés a cuánto vender? Buscá el precio de mercado
+            </button>
+          )}
         </div>
       </div>
 
@@ -147,6 +149,6 @@ export function PricingBar({
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

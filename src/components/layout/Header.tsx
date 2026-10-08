@@ -45,15 +45,15 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 dark:border-zinc-800 bg-[#fbfbfb]/90 dark:bg-[#0c0c0e]/90 backdrop-blur-md transition-colors">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-2 gap-y-2 px-4 py-3 sm:gap-x-4 sm:px-6">
         {/* Brand with editorial black block logo inspired by reference image */}
-        <div className="flex items-center gap-3.5">
-          <div className="flex size-10 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-base tracking-tighter shadow-sm">
+        <div className="flex items-center gap-2 sm:gap-3.5">
+          <div role="img" aria-label="UyMargin" className="flex size-10 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-base tracking-tighter shadow-sm">
             UY
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="heading-grotesk text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
+              <span className="hidden min-[420px]:inline heading-grotesk text-base sm:text-lg font-black tracking-tight text-zinc-900 dark:text-zinc-100 uppercase">
                 UyMargin
               </span>
               <span className="hidden bg-black text-white dark:bg-white dark:text-black px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest sm:inline-block">
@@ -132,7 +132,7 @@ export function Header({
           <button
             type="button"
             onClick={onOpenAiAdvisor}
-            className="flex items-center gap-1.5 bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer shadow-sm active:scale-95"
+            className="hidden sm:flex items-center gap-1.5 bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black px-3.5 py-2 text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer shadow-sm active:scale-95"
           >
             <Bot className="size-3.5" />
             <span className="hidden md:inline">Copilot IA</span>

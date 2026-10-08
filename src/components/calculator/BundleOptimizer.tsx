@@ -13,7 +13,8 @@ interface BundleOptimizerProps {
 }
 
 export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOptimizerProps) {
-  const [expanded, setExpanded] = useState(true);
+  // Open by default only when a pack actually removes the MLU fixed fee.
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
 
   const bundleData = useMemo(() => {
     return calculateBundleOptions(inputs);
@@ -24,6 +25,7 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
   }
 
   const { isEligibleForBundleBoost, options, baseFixedFee } = bundleData;
+  const expanded = userExpanded ?? isEligibleForBundleBoost;
 
   return (
     <div
@@ -70,7 +72,8 @@ export function BundleOptimizer({ inputs, baseResult, onApplyBundle }: BundleOpt
 
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setUserExpanded(!expanded)}
+          aria-expanded={expanded}
           className="rounded-md border border-border bg-surface-2 p-1.5 text-muted hover:text-foreground transition-colors cursor-pointer"
           aria-label={expanded ? "Minimizar opciones de packs" : "Expandir opciones de packs"}
         >
