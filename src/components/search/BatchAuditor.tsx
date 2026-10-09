@@ -196,8 +196,10 @@ export function BatchAuditor({
           marketPriceUyu = Math.round(data.stats.median);
           sampleSize = data.stats.sampleSize;
           // Mismos precios con los que el servidor armó la mediana: los productos que coinciden, en pesos.
+          const matching = (data.items ?? []).filter((it) => it.match?.matches);
           reliability = assessMarketData(
-            (data.items ?? []).filter((it) => it.match?.matches).map((it) => priceToUyu(it.price, it.currency, exchangeRate))
+            matching.map((it) => priceToUyu(it.price, it.currency, exchangeRate)),
+            matching.filter((it) => it.condition === "used").length
           );
         } else if (data && !data.ok && "message" in data && data.message) {
           marketError = data.message;

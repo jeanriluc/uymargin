@@ -34,6 +34,8 @@ export interface MarketReliability {
   spread: number;
   /** Precios a más de 3 veces la mediana o a menos de un tercio. Siguen contando en las estadísticas. */
   farCount: number;
+  /** Precios que corresponden a productos usados. */
+  usedCount: number;
   /** Por qué no es sólido, en palabras. Vacío si lo es. */
   reasons: string[];
 }
@@ -45,8 +47,12 @@ function quantile(sorted: number[], q: number): number {
   return next !== undefined ? sorted[base] + (pos - base) * (next - sorted[base]) : sorted[base];
 }
 
-/** null cuando no hay ningún precio válido. Los precios van en pesos. */
-export function assessMarketData(pricesUyu: number[]): MarketReliability | null {
+/**
+ * null cuando no hay ningún precio válido. Los precios van en pesos.
+ * `usedCount`: cuántos de esos precios son de productos usados (la oferta más barata es usada).
+ * Si hay usados mezclados con nuevos, la mediana compara cosas distintas y el dato no es sólido.
+ */
+export function assessMarketData(pricesUyu: number[], usedCount = 0): MarketReliability | null {
   const sorted = pricesUyu.filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
   if (sorted.length === 0) return null;
 
@@ -66,6 +72,9 @@ export function assessMarketData(pricesUyu: number[]): MarketReliability | null 
   if (spread > RELIABILITY_RULES.solidSpread) reasons.push("los precios están muy dispersos");
   if (farCount > 0) reasons.push(farCount === 1 ? "hay 1 precio muy fuera de rango" : `hay ${farCount} precios muy fuera de rango`);
 
+  const used = Math.max(0, Math.min(sorted.length, Math.floor(usedCount) || 0));
+  if (used > 0 && used < sorted.length) reasons.push(used === 1 ? "hay 1 usado mezclado con nuevos" : `hay ${used} usados mezclados con nuevos`);
+
   const level: ReliabilityLevel = few ? "few" : reasons.length === 0 ? "solid" : "weak";
-  return { level, label: RELIABILITY_LABELS[level], sampleSize: sorted.length, median, p25, p75, spread, farCount, reasons };
+  return { level, label: RELIABILITY_LABELS[level], sampleSize: sorted.length, median, p25, p75, spread, farCount, usedCount: used, reasons };
 }

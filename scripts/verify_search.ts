@@ -42,6 +42,11 @@ assert(outlier.level === "weak" && outlier.farCount === 1 && outlier.reasons.inc
 const twoOutliers = assessMarketData([150, 2000, 2100, 2200, 2290, 2400, 2500, 9500])!;
 assert(twoOutliers.farCount === 2 && twoOutliers.reasons.includes("hay 2 precios muy fuera de rango"), "Dos precios fuera de rango: «hay 2 precios muy fuera de rango»");
 
+const mixed = assessMarketData([2000, 2100, 2200, 2290, 2400, 2500], 2)!;
+assert(mixed.level === "weak" && mixed.usedCount === 2 && mixed.reasons.join() === "hay 2 usados mezclados con nuevos", "Nuevos y usados mezclados: Dato flojo, con el motivo");
+assert(assessMarketData([2000, 2100, 2200, 2290, 2400, 2500], 6)!.level === "solid", "Todos usados (no hay mezcla): no baja la confiabilidad");
+assert(solid.usedCount === 0 && assessMarketData([2000, 2100], 9)!.usedCount === 2, "Sin usados no cambia nada; la cantidad de usados nunca supera a la de precios");
+
 // No excluye nada ni cambia la mediana que usa la app.
 const prices = [150, 2000, 2100, 2200, 2290, 2400, 2500, 9500];
 const appStats = computeMarketStats(prices, { excludeOutliers: false })!;

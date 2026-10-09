@@ -110,7 +110,10 @@ export function MarketSummary({
   const farCount = matching.filter(isFar).length;
   // Confiabilidad del dato: describe los precios que coinciden, no cambia ninguna estadística.
   const reliability = fromRadar && stats
-    ? assessMarketData(matching.flatMap((i) => { const c = convertToUyu(i.price, i.currency, rate); return c.status === "ok" ? [c.amountUyu] : []; }))
+    ? assessMarketData(
+        matching.flatMap((i) => { const c = convertToUyu(i.price, i.currency, rate); return c.status === "ok" ? [c.amountUyu] : []; }),
+        matching.filter((i) => i.condition === "used").length
+      )
     : null;
   const quoted = (terms: string[]) => terms.map((t) => `«${t}»`).join(", ");
 
