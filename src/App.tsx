@@ -447,14 +447,13 @@ export default function App() {
 
   const handleLoadEntry = (entry: HistoryEntry) => {
     setInputs(entry.inputs);
+    // El Radar no queda con la búsqueda anterior; después se cargan las estadísticas que guardó la entrada.
+    clearRadar();
     if (entry.market) {
       const { total, source, ...restStats } = entry.market;
       setStats(restStats);
       setMarketSource(source);
       setStatus("manual");
-    } else {
-      setStats(null);
-      setMarketSource(null);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

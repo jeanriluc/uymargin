@@ -78,6 +78,12 @@ for (const setter of ["setMarketState", "setStats(null)", "setMarketSource(null)
 const tabButtons = app.match(/onClick=\{\(\) => setSearchTab\("(keyword|url|batch)"\)\}/g) ?? [];
 assert(tabButtons.length === 3 && !/setSearchTab\([^)]*\);?\s*clearRadar/.test(app), "Cambiar de pestaña solo cambia la pestaña: no vacía nada");
 
+const loadEntry = app.slice(app.indexOf("const handleLoadEntry = "), app.indexOf("window.scrollTo", app.indexOf("const handleLoadEntry = ")));
+assert(
+  loadEntry.includes("clearRadar()") && loadEntry.indexOf("clearRadar()") < loadEntry.indexOf("setStats(restStats)"),
+  "Cargar una simulación guardada vacía el Radar y después carga las estadísticas de la entrada"
+);
+
 console.log("--- Lote: filas sin dato de mercado y signo de la ganancia ---");
 const inputs = createDefaultInputs();
 const priced: BatchItemResult = {
