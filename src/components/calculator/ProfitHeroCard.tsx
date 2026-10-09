@@ -14,8 +14,8 @@ import {
   ChevronUp,
   Sparkles,
 } from "lucide-react";
-import { formatUyu, formatPct, formatDecimal } from "@/lib/format";
-import type { MultichannelAnalysis } from "@/lib/finance/engine";
+import { formatUyu, formatUsd, formatMoney, formatPct, formatDecimal } from "@/lib/format";
+import { solveMaxMerchandiseCostAll, type MultichannelAnalysis } from "@/lib/finance/engine";
 import type { ChannelResult, AnalysisInputs } from "@/lib/finance/types";
 import { StepHeader } from "@/components/ui/StepHeader";
 
@@ -87,18 +87,14 @@ export function ProfitHeroCard({
   const isLosingMoney = isReady && tone === "loss";
   const hasNoVatCredit = inputs.tax.regime === "general" && !inputs.tax.costIncludesVat;
 
-  // Reverse Negotiation Calculator: Max acquisition cost to achieve targetMarginGoal
-  // Formula: Max Cost Landed = Price - Channel Fees - Shipping - Taxes - (TargetMargin * Price)
-  const channelFeeEst = bestChannel === "ml"
-    ? price * (inputs.ml.listingType === "premium" ? inputs.ml.premiumRate : inputs.ml.classicRate) + (price < inputs.ml.fixedFeeThreshold ? inputs.ml.fixedFee : 0)
-    : price * 0.04;
-  const shippingEst = bestChannel === "ml"
-    ? (inputs.ml.shippingMode === "seller" ? inputs.ml.sellerShippingCost : 0)
-    : (inputs.direct.shippingMode === "seller" ? inputs.direct.shippingCost : 0);
-  
-  const targetProfitAmount = (targetMarginGoal / 100) * price;
-  const maxLandedCostUyu = Math.max(0, price - channelFeeEst - shippingEst - targetProfitAmount);
-  const maxCostUsd = inputs.exchangeRate > 0 ? (maxLandedCostUyu / inputs.exchangeRate) : 0;
+  // Reverse negotiation calculator: the engine solves the max merchandise cost per channel
+  // with the same logic as the analysis (fees, shipping, reserves, IVA, IRAE).
+  const maxCosts = isReady && showReverseCalc ? solveMaxMerchandiseCostAll(inputs, targetMarginGoal) : null;
+  const otherChannel = bestChannel === "ml" ? "direct" : "ml";
+  const winningMaxCost = maxCosts?.[bestChannel] ?? null;
+  const otherMaxCost = maxCosts?.[otherChannel] ?? null;
+  const applyCost = winningMaxCost?.applyCost && winningMaxCost.applyCost.amount > 0 ? winningMaxCost.applyCost : null;
+  const hasFreight = analysis.costs.freight > 0;
 
   // Currency stress testing, always computed from the pre-stress rate.
   const handleStressRate = (pct: number) => {
@@ -412,7 +408,7 @@ export function ProfitHeroCard({
                 <span>Negociación con Mayorista / Importador</span>
               </h4>
               <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-0.5">
-                Para vender al precio de mercado ({formatUyu(price)}) y asegurar tu objetivo de ganancia:
+                Para vender a {formatUyu(price)} y que te quede el margen neto que elegís, con comisiones, envío, impuestos, mermas y devoluciones ya descontados:
               </p>
             </div>
 
@@ -422,6 +418,8 @@ export function ProfitHeroCard({
               {[15, 20, 25, 30].map((m) => (
                 <button
                   key={m}
+                  type="button"
+                  aria-pressed={targetMarginGoal === m}
                   onClick={() => setTargetMarginGoal(m)}
                   className={`px-2 py-1 text-xs font-black rounded cursor-pointer transition-all ${
                     targetMarginGoal === m
@@ -435,32 +433,84 @@ export function ProfitHeroCard({
             </div>
           </div>
 
-          {/* Result Card */}
+          {/* Result Card: winning channel */}
           <div className="mt-3.5 p-3 rounded-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
-                Costo Máximo Admisible de Compra (Landed)
+                Costo máximo de mercadería · {winningResult.label} (canal ganador)
               </span>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 num">
-                  {formatUyu(maxLandedCostUyu)}
-                </span>
-                <span className="text-sm font-bold text-zinc-600 dark:text-zinc-400 num">
-                  (≈ USD {maxCostUsd.toFixed(2)})
-                </span>
-              </div>
+              {winningMaxCost ? (
+                <>
+                  <div className="flex flex-wrap items-baseline gap-x-2 mt-0.5">
+                    <span className="text-xl font-black text-zinc-900 dark:text-zinc-100 num">
+                      {formatUyu(Math.floor(winningMaxCost.maxMerchandiseCost))}
+                    </span>
+                    {winningMaxCost.maxMerchandiseCostUsd !== null && (
+                      <span className="text-sm font-bold text-zinc-600 dark:text-zinc-400 num">
+                        (≈ {formatUsd(Math.floor(winningMaxCost.maxMerchandiseCostUsd * 100) / 100)})
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                    Es lo que te factura el proveedor, sin flete.
+                    {hasFreight && (
+                      <>
+                        {" "}Sumando tu flete, el costo puesto máximo es{" "}
+                        <span className="num font-bold">{formatUyu(Math.floor(winningMaxCost.maxLandedCost))}</span>.
+                      </>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-0.5 text-sm font-bold text-red-700 dark:text-red-400">
+                  Con este precio no llegás a ese margen ni con costo cero.
+                </p>
+              )}
             </div>
 
-            <button
-              onClick={() => {
-                const targetUnitCost = isCostUsd ? Number(maxCostUsd.toFixed(2)) : Math.round(maxLandedCostUyu);
-                onUpdateCostAmount(targetUnitCost);
-              }}
-              className="px-3.5 py-2 bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer shadow-xs"
-            >
-              Aplicar este costo a la simulación
-            </button>
+            <div className="flex flex-col items-stretch sm:items-end gap-1">
+              <button
+                type="button"
+                disabled={!applyCost}
+                onClick={() => {
+                  if (applyCost) onUpdateCostAmount(applyCost.amount);
+                }}
+                className="px-3.5 py-2 bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-xs font-black uppercase tracking-wider rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-black dark:disabled:hover:bg-white"
+              >
+                Aplicar este costo a la simulación
+              </button>
+              {applyCost && (
+                <span className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                  Carga <span className="num font-bold">{formatMoney(applyCost.amount, applyCost.currency)}</span> como costo de mercadería.
+                </span>
+              )}
+            </div>
           </div>
+
+          {/* Reference: the other channel */}
+          <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <span className="font-bold">Referencia · {losingResult.label}:</span>{" "}
+            {otherMaxCost ? (
+              <>
+                costo máximo de mercadería{" "}
+                <span className="num font-bold text-zinc-900 dark:text-zinc-100">
+                  {formatUyu(Math.floor(otherMaxCost.maxMerchandiseCost))}
+                </span>
+                {otherMaxCost.maxMerchandiseCostUsd !== null && (
+                  <span className="num"> (≈ {formatUsd(Math.floor(otherMaxCost.maxMerchandiseCostUsd * 100) / 100)})</span>
+                )}
+                {hasFreight && (
+                  <>
+                    {" "}· puesto con flete{" "}
+                    <span className="num">{formatUyu(Math.floor(otherMaxCost.maxLandedCost))}</span>
+                  </>
+                )}
+                .
+              </>
+            ) : (
+              "con este precio no llegás a ese margen ni con costo cero."
+            )}
+          </p>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { TARGET_NET_MARGIN, VIABILITY_THRESHOLDS } from "./constants";
 import { computeTaxes } from "./dgi-taxes";
 import type {
   AnalysisInputs,
+  ChannelId,
   ChannelResult,
   Money,
   TaxBreakdown,
@@ -94,6 +95,28 @@ function solveMonotonic(f: (price: number) => number): number | null {
   return hi;
 }
 
+/**
+ * Finds the largest `x >= 0` where `f(x) >= 0` via bisection.
+ * `f` must be non-increasing in `x`. Returns null when not even `x = 0` satisfies it.
+ * The returned value is always on the side where `f >= 0`.
+ */
+function solveMaxDecreasing(f: (x: number) => number, initialHi: number): number | null {
+  if (f(0) < 0) return null;
+  let lo = 0;
+  let hi = Math.max(1, initialHi);
+  while (f(hi) >= 0) {
+    lo = hi;
+    hi *= 2;
+    if (hi > SOLVER_MAX_PRICE) return lo;
+  }
+  for (let i = 0; i < 80; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) >= 0) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
 export function classifyViability(netMargin: number, roi: number): Viability {
   const t = VIABILITY_THRESHOLDS;
   if (netMargin >= t.excellentMargin && roi >= t.excellentRoi) return "excellent";
@@ -164,6 +187,96 @@ export function analyzeChannel(model: ChannelModel, inputs: AnalysisInputs): Cha
     targetMarginPrice,
     viability: price > 0 ? classifyViability(netMargin, roi) : "risky",
     waterfall,
+  };
+}
+
+export interface MaxCostResult {
+  channel: ChannelId;
+  label: string;
+  /** Target net margin, 0–100. */
+  targetMarginPct: number;
+  /** Maximum merchandise cost in UYU (as invoiced by the wholesaler, without freight). */
+  maxMerchandiseCost: number;
+  /** Maximum landed cost in UYU = merchandise + acquisition freight. */
+  maxLandedCost: number;
+  /** USD equivalents (null without a valid exchange rate). */
+  maxMerchandiseCostUsd: number | null;
+  maxLandedCostUsd: number | null;
+  /**
+   * Merchandise cost to load in the simulation, in the currency of `inputs.cost`,
+   * rounded DOWN (cents in USD, whole pesos in UYU) so the resulting net margin
+   * never falls below the target. Null when it cannot be expressed in that currency.
+   */
+  applyCost: Money | null;
+}
+
+/**
+ * Inverse calculator: the maximum merchandise cost that still reaches
+ * `targetMarginPct` net margin at the given sale price, on one channel.
+ *
+ * Uses the same `evaluate()` as `analyzeChannel` (fees, shipping, reserves, IVA, IRAE),
+ * so applying the result to the simulation yields a net margin >= the target.
+ * Net profit is strictly decreasing in the merchandise cost, so bisection applies.
+ *
+ * Returns null when the target is unreachable even with a merchandise cost of zero.
+ */
+export function solveMaxMerchandiseCost(
+  model: ChannelModel,
+  inputs: AnalysisInputs,
+  targetMarginPct: number,
+): MaxCostResult | null {
+  const price = Math.max(0, inputs.salePrice || 0);
+  if (price <= 0 || !Number.isFinite(targetMarginPct)) return null;
+
+  const freight = toUyu(inputs.freight, inputs.exchangeRate);
+  const risks = {
+    returnRatePct: inputs.returnRatePct,
+    shrinkageRatePct: inputs.shrinkageRatePct,
+  };
+  const targetProfit = (targetMarginPct / 100) * price;
+  const slack = (merchandise: number) =>
+    evaluate(model, price, { merchandise, freight, landed: merchandise + freight }, inputs.tax, risks)
+      .netProfit - targetProfit;
+
+  const maxMerchandiseCost = solveMaxDecreasing(slack, price);
+  if (maxMerchandiseCost === null) return null;
+
+  const rate = inputs.exchangeRate;
+  const hasRate = Number.isFinite(rate) && rate > 0;
+  const currency = inputs.cost.currency;
+
+  let applyCost: Money | null = null;
+  if (currency === "UYU" || hasRate) {
+    // Work in integer units (pesos or cents) to round down without float drift.
+    const unitsPerAmount = currency === "USD" ? 100 : 1;
+    const inCurrency = currency === "USD" ? maxMerchandiseCost / rate : maxMerchandiseCost;
+    let units = Math.floor(inCurrency * unitsPerAmount);
+    // Guard against the last-bit error of the currency conversion.
+    while (units > 0 && slack(toUyu({ amount: units / unitsPerAmount, currency }, rate)) < 0) units--;
+    applyCost = { amount: units / unitsPerAmount, currency };
+  }
+
+  const maxLandedCost = maxMerchandiseCost + freight;
+  return {
+    channel: model.id,
+    label: model.label,
+    targetMarginPct,
+    maxMerchandiseCost,
+    maxLandedCost,
+    maxMerchandiseCostUsd: hasRate ? maxMerchandiseCost / rate : null,
+    maxLandedCostUsd: hasRate ? maxLandedCost / rate : null,
+    applyCost,
+  };
+}
+
+/** Inverse calculator for both channels (null per channel when the target is unreachable). */
+export function solveMaxMerchandiseCostAll(
+  inputs: AnalysisInputs,
+  targetMarginPct: number,
+): Record<ChannelId, MaxCostResult | null> {
+  return {
+    ml: solveMaxMerchandiseCost(createMlModel(inputs.ml), inputs, targetMarginPct),
+    direct: solveMaxMerchandiseCost(createDirectModel(inputs.direct), inputs, targetMarginPct),
   };
 }
 
