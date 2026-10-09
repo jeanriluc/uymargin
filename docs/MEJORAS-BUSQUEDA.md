@@ -259,3 +259,95 @@ El contador de fotos es propio (`foto`): no gasta el de las búsquedas de Mercad
 2. Confirmar en la vista previa de Vercel que la subida de la imagen llega bien.
 3. Decidir si 5 por minuto y 40 por día son los topes que querés.
 4. Decidir si la función nueva lleva `maxDuration` en `vercel.json` como las demás.
+
+---
+
+# Ronda 12: en la web (Uruguay)
+
+Rama `ronda-12-web-uruguay`, desde `ronda-11-por-foto` (`858d39b`; el PR #10 seguía abierto). Dentro de la pestaña "Por foto", una vez identificado el producto, hay dos vistas: "Mercado Libre" (lo de la ronda 11) y "En la web (Uruguay)", que muestra qué sitios web venden el producto según una búsqueda de Google hecha por Gemini. No toca el motor financiero, ni la búsqueda de Mercado Libre, ni ningún número existente. **No muestra precios.**
+
+## Etapa 0: qué confirmé en la documentación y qué no
+
+Leí la documentación oficial vigente el 9/10/2026 (`ai.google.dev/gemini-api/docs/google-search`, `/pricing`, `/structured-output`, `/tool-combination`, `/interactions-overview` y la referencia `ai.google.dev/api/generate-content`) y los tipos del SDK instalado (`@google/genai` 2.27.0).
+
+**Confirmado:**
+
+- **Hay dos APIs.** La documentación actual muestra la búsqueda con la API de Interactions (`client.interactions.create`, `tools: [{ type: "google_search" }]`), que es la recomendada para proyectos nuevos desde junio de 2026. `generateContent` figura como "legacy" pero "fully supported". La app (copiloto e identificación por foto) usa `generateContent`.
+- **En `generateContent` la herramienta es `tools: [{ googleSearch: {} }]`.** Está en los tipos del SDK instalado (`Tool.googleSearch`).
+- **Forma de `groundingMetadata`** (referencia de `generateContent` y tipos del SDK): `groundingChunks[]` con `web.uri` y `web.title`; `groundingSupports[]` con `segment` (`startIndex` y `endIndex` en bytes) y `groundingChunkIndices`; `webSearchQueries[]`; `searchEntryPoint` con `renderedContent` (HTML). El campo `web.domain` existe en el SDK pero "is not supported in Gemini API".
+- **Modelos.** Los dos que usa la app (`gemini-3.8-flash` y `gemini-3.5-flash-lite`) figuran como compatibles con la búsqueda.
+- **Precio.** En Gemini 3 y posteriores, plan gratuito: "Not available". Plan pago: 5.000 búsquedas gratis por mes, compartidas entre todos los modelos Gemini 3 y posteriores, y después US$ 14 cada 1.000. Se cobra **por cada búsqueda que ejecuta el modelo**, no por pedido: una sola consulta nuestra puede ser varias búsquedas.
+- **JSON estructurado junto con la búsqueda.** Documentado solo para la API de Interactions (`response_format`), en vista previa y para modelos Gemini 3.
+- **Interactions guarda por defecto.** `store=true` salvo que se pida lo contrario; retención de 55 días en el plan pago y 1 día en el gratuito.
+
+**Confirmado con una prueba real** (dos llamadas con la clave local, que no tiene facturación):
+
+- Con la herramienta de búsqueda, Gemini responde **HTTP 429 `RESOURCE_EXHAUSTED`** con el mensaje "You exceeded your current quota, please check your plan and billing details". El mismo modelo, sin la herramienta y con la misma clave, respondió bien. O sea: así se ve hoy "la búsqueda no está disponible para esta clave". El código lo reconoce y muestra "La búsqueda web necesita activar la facturación de la clave de Gemini."; el mensaje exacto quedó como caso de test.
+
+**No pude confirmar:**
+
+- **La forma real de una respuesta con resultados.** La clave local no tiene facturación, así que nunca vi `groundingChunks` de verdad. En particular no confirmé: si `web.uri` viene como enlace de redirección (`vertexaisearch.cloud.google.com/grounding-api-redirect/…`) o directo; si `web.title` trae el dominio (el ejemplo de la documentación de Interactions muestra dominios, como "aljazeera.com") o el título de la página; y si esos enlaces vencen. El código funciona en los dos casos: un enlace directo se valida y se usa sin pedir nada; uno de redirección se resuelve.
+- **Si `responseMimeType: "application/json"` se puede combinar con `googleSearch` en `generateContent`.** No está documentado, así que no se usa: el JSON se pide en el prompt y se lee aunque venga con texto alrededor.
+- **Si un 429 por cuota agotada de verdad (con facturación activa) trae el mismo mensaje.** Es probable. En ese caso la app diría "necesita activar la facturación" cuando en realidad se acabó la cuota.
+- **Las condiciones de uso sobre mostrar las "sugerencias de búsqueda".** La documentación remite a los Términos del Servicio. La app muestra las búsquedas que hizo Google como enlaces, pero no el HTML de `searchEntryPoint`. Hay que leer los términos antes de usar esto con público.
+
+**Decisión:** se usa `generateContent`, como el resto de la app, sin `responseMimeType`. La IA está inyectada (`WebSearchModel`), así que pasar a Interactions más adelante es cambiar una función. Si se hace, hay que mandar `store: false`.
+
+## Cómo funciona
+
+1. `POST /api/web-sellers` con `{ query }` (2 a 120 caracteres). Mismo control de acceso que el resto.
+2. Si la consulta está en la memoria del servidor (30 minutos), se responde desde ahí, sin gastar un uso ni una búsqueda.
+3. Límite de uso propio y después una sola llamada a Gemini con la búsqueda de Google. Sin reintentos: cada llamada cuesta búsquedas.
+4. Cada fuente real (`groundingChunks`) se resuelve. El servidor solo le hace pedidos al host de redirección de Google, con `redirect: "manual"`: lee a dónde apunta y nunca visita el destino. El destino se valida (https, dominio público, sin IP, sin usuario, sin puerto raro).
+5. Lo que nombró la IA se cruza con las fuentes por dominio. **Un sitio que la IA nombra y no está en las fuentes se descarta.** Un resultado por dominio, hasta 10.
+6. Clasificación por dominio, en una función pura:
+   - `.uy` (incluye `mercadolibre.com.uy`) con el enlace verificado: **confirmado**.
+   - AliExpress, Temu, Amazon, Shein, eBay, Alibaba y similares: **internacional**, sin confirmar, digan lo que digan.
+   - Dominios que llevan adentro la terminación de otro (`mercadolibre.com.uy.evil.com`): **no confirmado**.
+   - El resto: **probable** si la fuente dice que vende en Uruguay; si no, **no confirmado**. Nunca "confirmado".
+7. La pantalla muestra confirmados y probables en la lista principal; internacionales y sin confirmar en un bloque cerrado.
+
+Los botones "Buscar en Google Uruguay" y "Google Shopping Uruguay" son enlaces armados en el navegador: no usan la IA, no cuestan nada y funcionan aunque la búsqueda web falle.
+
+## Límites de uso
+
+| Qué | Valor | Dónde se cambia |
+|---|---|---|
+| Búsquedas web por usuario | 5 por minuto, 20 por día | `RATE_RULES.web` en `server/rateLimit.ts` |
+| Memoria de respuestas | 30 minutos, 100 consultas | `WEB_CACHE` en `server/webSellers.ts` |
+| Resultados, fuentes y largo de la consulta | 10, 20 y 2 a 120 | `WEB_LIMITS` en `src/lib/web/sellers.ts` |
+| Resolución de enlaces | 3 s por pedido, 3 saltos | `REDIRECT_LIMITS` en `server/webSellers.ts` |
+| Espera por llamada a la IA | 25 s | `WEB_SEARCH_TIMEOUT_MS` en `server/webSellers.ts` |
+
+## Evidencia
+
+- `scripts/verify_web.ts`: 219 casos, con la IA y la red simuladas. Consulta, clasificación de dominios (incluye `.uy`, subdominios, tiendas globales y dominios falsos), cruce con las fuentes, un resultado por dominio, tope de 10, resolución de enlaces con defensa contra SSRF, límite de uso, memoria, error de herramienta no disponible, y que los logs no llevan la consulta, los sitios ni el texto de las páginas.
+- `scripts/e2e_web.mjs`: 57 casos en Chrome con `/api/web-sellers` simulado. Botón explícito, estados, enlaces con `target` y `rel`, bloque cerrado, mensaje de facturación, botones de Google, teclado, estado conservado, 1280 y 390 px sin desborde, sin errores de consola.
+- Los cuatro tests de navegador anteriores pasan sin cambios.
+
+## Qué puede salir mal
+
+- **Resultados irrelevantes o de un producto parecido.** La búsqueda devuelve páginas, no certezas. La pantalla lo avisa y cada tarjeta dice si parece el mismo producto, uno parecido o una coincidencia dudosa, pero eso lo dice la IA.
+- **Alucinaciones.** Un sitio inventado no pasa, porque tiene que estar en las fuentes. Lo que sí puede estar inventado es el título y la frase de un sitio real: la IA puede decir que vende algo que no vende.
+- **Costo.** Con facturación activa, cada consulta nuestra son una o más búsquedas de Google pagas. Los topes son por usuario: con N usuarios permitidos, el máximo diario es N × 20 consultas, y no sé cuántas búsquedas hace el modelo por consulta. La memoria es por instancia: en Vercel ayuda poco entre instancias distintas.
+- **Redirecciones.** Si Google cambia el host de redirección, los enlaces dejan de resolverse y los resultados salen sin enlace y sin pasar de "probable". Se arregla agregando el host a `GOOGLE_REDIRECT_HOSTS`. Resolver hasta 20 enlaces suma tiempo a cada búsqueda.
+- **Sitios que no envían a Uruguay.** "Probable" significa que la fuente lo dice, no que sea cierto. Un `.uy` tampoco garantiza que el comercio exista o tenga stock.
+- **Enlaces maliciosos.** Solo se muestran enlaces https a dominios públicos, que salen de la búsqueda de Google, con `rel="noopener noreferrer"`. Eso no impide que un sitio real sea una estafa: la app no verifica reputación. Los dominios que imitan a otro quedan en el bloque cerrado, con su nombre completo a la vista.
+- **Texto de las páginas que intenta dar órdenes.** El prompt lo trata como dato, y la salida solo puede ser los campos del contrato, acotados y sin precios.
+- **El aviso de facturación puede ser inexacto** si en realidad se agotó la cuota (ver arriba).
+- **Los resultados de Mercado Libre siguen debajo** cuando se está en la vista web: son el Radar compartido de la ronda 11. Puede confundir.
+
+**Impacto en números existentes.** Ninguno. No se tocó `src/lib/finance` ni la búsqueda de Mercado Libre.
+
+**Valor 4 · Confianza 2 · Riesgo 3.** La confianza es 2 porque nunca vi una respuesta real con resultados. El riesgo es 3 por el costo por búsqueda y porque la app pasa a mostrar enlaces a sitios de terceros.
+
+## Etapa futura (sin implementar)
+
+**Precios de esos sitios, marcados como orientativos.** Habría que visitar páginas de terceros desde el servidor, y ahí la defensa contra SSRF de esta ronda no alcanza (hoy el servidor no visita ningún destino). Los precios no serían comparables con los de Mercado Libre y no deberían entrar en la mediana ni en el precio sugerido.
+
+## Qué revisar primero (ronda 12)
+
+1. Activar la facturación de la clave de Gemini (o usar una que la tenga) y hacer una búsqueda real: es lo único que confirma la forma de las fuentes y de los enlaces.
+2. Mirar cuántas búsquedas de Google cobra una consulta típica antes de abrirlo a más usuarios.
+3. Leer los Términos del Servicio sobre las sugerencias de búsqueda.
+4. Decidir si los resultados de Mercado Libre se ocultan mientras se mira la vista web.
