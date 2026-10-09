@@ -32,6 +32,7 @@ import { createAuthMiddleware, isAuthDisabled, requestUser } from "./auth.js";
 import { createMemoryRateStore, createRateLimiter, RATE_RULES } from "./rateLimit.js";
 import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabaseToken } from "./cloud.js";
 import { createGeminiIdentifier, createIdentifyRoute, type IdentifyModel } from "./identify.js";
+import { createGeminiWebSearcher, createLinkResolver, createWebSellersRoute, type WebSearchModel } from "./webSellers.js";
 
 dotenv.config();
 
@@ -1281,6 +1282,24 @@ app.post(
       if (!apiKey) return null;
       if (photoIdentifier?.key !== apiKey) photoIdentifier = { key: apiKey, model: createGeminiIdentifier(apiKey) };
       return photoIdentifier.model;
+    },
+  })
+);
+
+// ------------------------------------------------------------------
+// 3c. Sitios web de Uruguay que venden un producto (server/webSellers.ts). Límite de uso propio.
+// ------------------------------------------------------------------
+let webSearcher: { key: string; model: WebSearchModel } | null = null;
+app.post(
+  "/api/web-sellers",
+  ...createWebSellersRoute({
+    limiter: rateLimit(RATE_RULES.web),
+    resolveLink: createLinkResolver({ fetch: (url, init) => fetch(url, init) }),
+    model: () => {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return null;
+      if (webSearcher?.key !== apiKey) webSearcher = { key: apiKey, model: createGeminiWebSearcher(apiKey) };
+      return webSearcher.model;
     },
   })
 );
