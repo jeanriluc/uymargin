@@ -51,6 +51,187 @@ function assert(condition: boolean, message: string) {
   }
 }
 
+// Casos armados a mano con la forma del actor: entradas rotas, enlaces inseguros, sitios que no son tiendas
+// y dominios inventados para probar la clasificación. La respuesta real está en scripts/fixtures/.
+const SYNTHETIC: unknown = [
+  {
+    "searchQuery": {
+      "term": "Termo Stanley Classic 1 litro comprar Uruguay",
+      "url": "http://www.google.com.uy/search?q=Termo+Stanley+Classic+1+litro+comprar+Uruguay&gl=uy&hl=es",
+      "device": "DESKTOP",
+      "page": 1,
+      "type": "SEARCH",
+      "domain": "google.com.uy",
+      "countryCode": "UY",
+      "languageCode": "es",
+      "locationUule": null
+    },
+    "relatedQueries": [
+      {
+        "title": "termo stanley precio uruguay",
+        "url": "https://www.google.com.uy/search?q=termo+stanley+precio+uruguay"
+      }
+    ],
+    "paidResults": [
+      {
+        "title": "Anuncio que no debe aparecer",
+        "url": "https://anuncio-pago.com.uy/termo",
+        "displayedUrl": "anuncio-pago.com.uy",
+        "description": "Resultado pago: no es orgánico.",
+        "type": "paid",
+        "adPosition": 1
+      }
+    ],
+    "paidProducts": [],
+    "organicResults": [
+      {
+        "title": "Termo Stanley Classic 1 Litro - Ferretería Ejemplo",
+        "url": "https://www.ferreteria-ejemplo.com.uy/productos/termo-stanley-classic-1l",
+        "displayedUrl": "https://www.ferreteria-ejemplo.com.uy › productos",
+        "description": "Termo Stanley Classic de 1 litro, acero inoxidable. Envíos a todo el país. $ 2.490.",
+        "emphasizedKeywords": [
+          "Termo Stanley Classic",
+          "1 litro"
+        ],
+        "siteLinks": [],
+        "productInfo": {},
+        "type": "organic",
+        "position": 1
+      },
+      {
+        "title": "Termo Stanley Classic 1 Litro | MercadoLibre",
+        "url": "https://listado.mercadolibre.com.uy/termo-stanley-classic-1-litro",
+        "displayedUrl": "https://listado.mercadolibre.com.uy › termo-stanley",
+        "description": "Envíos gratis en el día. Comprá Termo Stanley Classic 1 Litro en cuotas sin interés.",
+        "emphasizedKeywords": [
+          "Termo Stanley Classic 1 Litro"
+        ],
+        "siteLinks": [],
+        "productInfo": {},
+        "type": "organic",
+        "position": 2
+      },
+      {
+        "title": "Termo Stanley Classic 1 L Verde",
+        "url": "https://articulo.mercadolibre.com.uy/MLU-600000001-termo-stanley-classic-1-l-verde",
+        "displayedUrl": "https://articulo.mercadolibre.com.uy › MLU-600000001",
+        "description": "Termo Stanley original, 1 litro, color verde.",
+        "type": "organic",
+        "position": 3
+      },
+      {
+        "title": "Termo Stanley Classic 1 L Negro",
+        "url": "https://articulo.mercadolibre.com.uy/MLU-600000002-termo-stanley-classic-1-l-negro",
+        "displayedUrl": "https://articulo.mercadolibre.com.uy › MLU-600000002",
+        "description": "Tercer resultado del mismo dominio: no debe mostrarse.",
+        "type": "organic",
+        "position": 4
+      },
+      {
+        "title": "Stanley Classic 1L - Tienda Outdoor",
+        "url": "https://tiendaoutdoor-ejemplo.com/uy/termo-stanley-classic-1l",
+        "displayedUrl": "https://tiendaoutdoor-ejemplo.com › uy",
+        "description": "Termo clásico con tapa vaso.",
+        "type": "organic",
+        "position": 5
+      },
+      {
+        "title": "Termos Stanley con envío a Uruguay",
+        "url": "https://importadora-ejemplo.com/termos/stanley-classic",
+        "displayedUrl": "https://importadora-ejemplo.com › termos",
+        "description": "Compralo desde Montevideo y recibilo en tu casa.",
+        "type": "organic",
+        "position": 6
+      },
+      {
+        "title": "Stanley Classic Vacuum Bottle 1L",
+        "url": "https://es.aliexpress.com/item/1005000000001.html",
+        "displayedUrl": "https://es.aliexpress.com › item",
+        "description": "Envío a Uruguay disponible.",
+        "type": "organic",
+        "position": 7
+      },
+      {
+        "title": "Termo Stanley Classic 1 litro - Oferta",
+        "url": "https://mercadolibre.com.uy.ofertas-ejemplo.com/termo-stanley",
+        "displayedUrl": "https://mercadolibre.com.uy.ofertas-ejemplo.com",
+        "description": "Oferta en Uruguay.",
+        "type": "organic",
+        "position": 8
+      },
+      {
+        "title": "Termo Stanley Classic: review completo - YouTube",
+        "url": "https://www.youtube.com/watch?v=abc123",
+        "displayedUrl": "https://www.youtube.com › watch",
+        "description": "Probamos el termo Stanley Classic de 1 litro en Uruguay.",
+        "type": "organic",
+        "position": 9
+      },
+      {
+        "title": "Stanley (marca) - Wikipedia, la enciclopedia libre",
+        "url": "https://es.wikipedia.org/wiki/Stanley_(marca)",
+        "displayedUrl": "https://es.wikipedia.org › wiki",
+        "description": "Stanley es una marca de termos.",
+        "type": "organic",
+        "position": 10
+      },
+      {
+        "title": "Los mejores termos para el mate - El País",
+        "url": "https://www.elpais.com.uy/vida-actual/los-mejores-termos-para-el-mate",
+        "displayedUrl": "https://www.elpais.com.uy › vida-actual",
+        "description": "Nota sobre termos en Uruguay.",
+        "type": "organic",
+        "position": 11
+      },
+      {
+        "title": "Cómo elegir un termo - Blog de Tienda Ejemplo",
+        "url": "https://tienda-ejemplo.com.uy/blog/como-elegir-un-termo",
+        "displayedUrl": "https://tienda-ejemplo.com.uy › blog",
+        "description": "Consejos para elegir un termo.",
+        "type": "organic",
+        "position": 12
+      },
+      {
+        "title": "Sitio sin https",
+        "url": "http://sitio-viejo.com.uy/termo",
+        "displayedUrl": "sitio-viejo.com.uy",
+        "description": "Enlace http: se descarta.",
+        "type": "organic",
+        "position": 13
+      },
+      {
+        "title": "Enlace a una IP",
+        "url": "https://192.168.1.20/termo",
+        "description": "Se descarta.",
+        "type": "organic",
+        "position": 14
+      },
+      {
+        "title": "Sin enlace",
+        "description": "Entrada sin url: se descarta.",
+        "type": "organic",
+        "position": 15
+      },
+      {
+        "title": "Enlace que no es texto",
+        "url": {
+          "href": "https://ejemplo.uy"
+        },
+        "type": "organic",
+        "position": 16
+      },
+      {
+        "url": "https://solo-enlace-ejemplo.com.uy/termo-stanley",
+        "type": "organic",
+        "position": 17
+      },
+      null,
+      "texto suelto"
+    ],
+    "peopleAlsoAsk": []
+  }
+];
+
 async function main() {
   console.log("--- Consulta ---");
   assert(cleanWebQuery("  Termo   Stanley\n1 litro ") === "Termo Stanley 1 litro", "Limpia espacios y saltos de línea");
@@ -149,15 +330,40 @@ async function main() {
   assert(googleSearchUrl("a&gl=us&q=otra").includes("q=a%26gl%3Dus%26q%3Dotra") && new URL(googleSearchUrl("a&gl=us&q=otra")).searchParams.getAll("gl").join() === "uy", "Un nombre con &gl= no puede cambiar los parámetros");
 
   console.log("--- Consulta que se manda a Google ---");
-  assert(buildSearchQuery("Termo Stanley Classic 1 litro") === '"Termo Stanley Classic 1 litro" comprar Uruguay', "Arma «\"<nombre>\" comprar Uruguay»");
-  assert(buildSearchQuery('  Mate   "de calabaza" «forrado»  ') === '"Mate de calabaza forrado" comprar Uruguay', "Recorta espacios y saca las comillas del nombre, que romperían la frase");
+  assert(buildSearchQuery("Termo Stanley Classic 1 litro") === "Termo Stanley Classic 1 litro comprar Uruguay", "Arma «<nombre> comprar Uruguay», sin comillas");
+  assert(buildSearchQuery("Stanley termo 1 litro") === "Stanley termo 1 litro comprar Uruguay", "La consulta de la prueba real: «Stanley termo 1 litro comprar Uruguay»");
+  assert(buildSearchQuery('  Mate   "de calabaza" «forrado»  ') === "Mate de calabaza forrado comprar Uruguay", "Recorta espacios y saca las comillas que traiga el nombre");
+  for (const name of ['"Termo Stanley"', "“Termo Stanley”", "«Termo Stanley»", "„Termo Stanley‟", "＂Termo Stanley＂", 'Termo "Stanley" 1 litro', '""""', '"a" "b" "c"', 'Termo Stanley" comprar "Uruguay', '" '.repeat(80) + "termo"]) {
+    const q = buildSearchQuery(name);
+    assert(!/["“”„‟«»＂]/.test(q) && q.endsWith("comprar Uruguay"), `Nunca arma una frase exacta: sin ninguna comilla (${name.slice(0, 26)} → ${q.slice(0, 40)})`);
+  }
   const longName = buildSearchQuery("palabra ".repeat(40));
-  assert(longName.length <= 100 + '"" comprar Uruguay'.length && longName.endsWith('" comprar Uruguay') && !/ "/.test(longName.slice(1)), `El nombre se limita a 100 caracteres (${longName.length} en total)`);
+  assert(longName.length <= WEB_LIMITS.nameInSearchMax + " comprar Uruguay".length && longName.endsWith(" comprar Uruguay") && WEB_LIMITS.nameInSearchMax === 100 && !/ {2}/.test(longName), `El nombre se limita a 100 caracteres (${longName.length} en total)`);
+  assert(buildSearchQuery("x".repeat(300)) === `${"x".repeat(100)} comprar Uruguay`, "Un nombre larguísimo se corta en 100 caracteres");
   assert(typeof buildSearchQuery("termo") === "string" && !buildSearchQuery("a\nb").includes("\n"), "Es una sola consulta: sin saltos de línea que el actor tomaría como varias");
 
-  console.log("--- Parser de la respuesta de Apify (fixture con el formato documentado) ---");
+  console.log("--- Respuesta real de Apify (fixture) ---");
   const fixture: unknown = JSON.parse(fs.readFileSync(new URL("./fixtures/apify_google_search.json", import.meta.url), "utf8"));
-  const raw = parseSearchItems(fixture);
+  const realRaw = parseSearchItems(fixture);
+  assert(realRaw !== null && realRaw.length === 9, `El parser lee los 9 resultados de la búsqueda real (${realRaw?.length})`);
+  assert(realRaw !== null && realRaw.every((x) => x.url.startsWith("https://") && x.title.length > 0 && x.description.length > 0), "Cada uno con enlace, título y descripción");
+  const realBuilt = buildWebSellers(realRaw ?? []);
+  assert(realBuilt.length === 9, `Salen 9 resultados (${realBuilt.length})`);
+  assert(realBuilt.every((x) => x.kind === "store"), "Todos son de tipo tienda: ninguno cae en «Otros resultados»");
+  assert(realBuilt.every((x) => x.uruguay === "confirmado" && !x.international), "Todos con Uruguay confirmado (todos son .uy)");
+  assert(realBuilt.every(isMainSeller), "Los 9 van a la lista principal");
+  assert(realBuilt.map((x) => x.site).join() === "tienda.farmashop.com.uy,planb.com.uy,almacenrural.com.uy,bagual.com.uy,bagual.com.uy,listado.mercadolibre.com.uy,alem.uy,stanley1913.uy,electroventas.com.uy", `Se respeta el orden de Google (${realBuilt.map((x) => x.site).join()})`);
+  const bagual = realBuilt.filter((x) => siteDomain(x.site) === "bagual.com.uy");
+  assert(bagual.length === 2 && bagual.length <= WEB_LIMITS.maxPerDomain && WEB_LIMITS.maxPerDomain === 2 && /rosa/.test(bagual[0].url) && /verde/.test(bagual[1].url), "Bagual respeta el máximo por dominio: sus dos productos entran");
+  const thirdBagual = buildWebSellers([...(realRaw ?? []), { url: "https://www.bagual.com.uy/catalogo/termo-stanley-1l-azul", title: "Termo Stanley 1L Azul - Bagual", description: "" }, { url: "https://tienda.bagual.com.uy/otro", title: "Otro", description: "" }]);
+  assert(thirdBagual.filter((x) => siteDomain(x.site) === "bagual.com.uy").length === 2 && thirdBagual.length === 9, "Un tercer y un cuarto resultado de Bagual (incluso desde un subdominio) no entran");
+  assert(new Set(realBuilt.map((x) => x.url)).size === 9 && realBuilt[0].url === "https://tienda.farmashop.com.uy/marcas/stanley.html" && realBuilt[8].url === "https://electroventas.com.uy/catalogo/termo-stanley-the-legendary-classic-nuevo-modelo-1-litro-silver_SDT15_994386", "Los enlaces llegan tal cual, sin tocar");
+  const page0 = (fixture as { organicResults: Record<string, unknown>[] }[])[0];
+  assert(page0.organicResults.every((e) => Object.keys(e).sort().join() === "description,displayedUrl,title,url"), "El fixture guarda solo title, url, displayedUrl y description de cada resultado");
+  assert(!/apify_api_|token|@/i.test(JSON.stringify(page0.organicResults)), "El fixture no tiene token ni datos personales");
+
+  console.log("--- Parser defensivo (casos armados a mano) ---");
+  const raw = parseSearchItems(SYNTHETIC);
   assert(raw !== null && raw.length === 15, `Lee los resultados orgánicos que tienen enlace (${raw?.length})`);
   assert(raw !== null && raw[0].title === "Termo Stanley Classic 1 Litro - Ferretería Ejemplo" && raw[0].url === "https://www.ferreteria-ejemplo.com.uy/productos/termo-stanley-classic-1l" && /acero inoxidable/.test(raw[0].description), "Toma title, url y description tal como vienen");
   assert(raw !== null && !raw.some((x) => /anuncio-pago/.test(x.url)), "Los resultados pagos no entran: solo organicResults");
@@ -214,8 +420,8 @@ async function main() {
   }
 
   console.log("--- Lo que valida la pantalla ---");
-  const screen = parseWebSellersResponse({ ok: true, query: "termo", cached: true, searchQueries: ['"termo" comprar Uruguay', 5, ""], results: [{ site: "ejemplo.uy", url: "https://ejemplo.uy/a", title: "T", why: "W", uruguay: "confirmado", international: false, kind: "store", price: 100 }, { site: "mercadolibre.com.uy", url: "https://otra-tienda.com/a", title: "", why: "", uruguay: "confirmado", international: false, kind: "store" }, { site: "mala.com", url: "javascript:alert(1)", title: "x" }, { site: "youtube.com", url: "https://www.youtube.com/watch?v=1", kind: "store", uruguay: "probable" }, "basura"] });
-  assert(screen !== null && screen.results.length === 3 && !("price" in screen.results[0]) && screen.cached && screen.searchQueries.join() === '"termo" comprar Uruguay', "Pasan solo los campos esperados; una entrada con enlace inseguro se descarta");
+  const screen = parseWebSellersResponse({ ok: true, query: "termo", cached: true, searchQueries: ["termo comprar Uruguay", 5, ""], results: [{ site: "ejemplo.uy", url: "https://ejemplo.uy/a", title: "T", why: "W", uruguay: "confirmado", international: false, kind: "store", price: 100 }, { site: "mercadolibre.com.uy", url: "https://otra-tienda.com/a", title: "", why: "", uruguay: "confirmado", international: false, kind: "store" }, { site: "mala.com", url: "javascript:alert(1)", title: "x" }, { site: "youtube.com", url: "https://www.youtube.com/watch?v=1", kind: "store", uruguay: "probable" }, "basura"] });
+  assert(screen !== null && screen.results.length === 3 && !("price" in screen.results[0]) && screen.cached && screen.searchQueries.join() === "termo comprar Uruguay", "Pasan solo los campos esperados; una entrada con enlace inseguro se descarta");
   assert(screen !== null && screen.results[1].site === "otra-tienda.com" && screen.results[1].uruguay === "probable" && screen.results[1].title === "otra-tienda.com", "El dominio se lee del enlace (no del campo site) y un «confirmado» en un dominio que no es .uy baja a «probable»");
   assert(screen !== null && screen.results[2].kind === "other", "YouTube queda como «otro» aunque el servidor dijera tienda");
   assert(parseWebSellersResponse({ ok: false }) === null && parseWebSellersResponse({ ok: true }) === null && parseWebSellersResponse(null) === null && parseWebSellersResponse("x") === null, "Una respuesta con otra forma no se muestra");
@@ -224,7 +430,7 @@ async function main() {
   const TOKEN = "apify_api_TOKEN-DE-PRUEBA-NO-DEBE-SALIR-9d2f";
   const fetchCalls: { url: string; method: string; headers: Record<string, string>; body: string }[] = [];
   type Reply = { status: number; body: unknown } | "network" | "hang";
-  let reply = { status: 201, body: fixture } as Reply;
+  let reply = { status: 201, body: SYNTHETIC } as Reply;
   const fakeFetch: FetchLike = async (url, init) => {
     fetchCalls.push({ url, method: init.method, headers: init.headers, body: init.body });
     if (reply === "network") throw new TypeError("fetch failed");
@@ -239,24 +445,27 @@ async function main() {
   const searcher = createApifySearcher({ token: TOKEN, fetch: fakeFetch, timeoutMs: 200 });
   const outcome = async (): Promise<string> => {
     try {
-      return `ok:${(await searcher('"termo" comprar Uruguay')).length}`;
+      return `ok:${(await searcher("termo comprar Uruguay")).length}`;
     } catch (err) {
       return err instanceof WebSearchError ? `${err.code}|${err.detail}|${err.message}` : `otro:${String(err)}`;
     }
   };
 
-  assert((await outcome()) === "ok:15", "Con una respuesta 201 del formato documentado devuelve los resultados orgánicos");
+  assert((await outcome()) === "ok:15", "Con una respuesta 201 devuelve los resultados orgánicos");
   const sent = fetchCalls[0];
   assert(fetchCalls.length === 1 && sent.method === "POST" && sent.url === "https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items" && sent.url === APIFY_SEARCH_URL, "Un solo POST al actor apify~google-search-scraper (run-sync-get-dataset-items)");
   assert(sent.headers.Authorization === `Bearer ${TOKEN}` && sent.headers["Content-Type"] === "application/json", "El token va en el encabezado Authorization: Bearer");
   assert(!sent.url.includes(TOKEN) && !sent.url.includes("token") && !sent.url.includes("?") && !sent.body.includes(TOKEN), "La dirección de la llamada no lleva el token (ni como parámetro), y el cuerpo tampoco");
   const sentBody = JSON.parse(sent.body);
   assert(
-    JSON.stringify(sentBody) === JSON.stringify({ queries: '"termo" comprar Uruguay', countryCode: "uy", languageCode: "es", maxPagesPerQuery: 1, mobileResults: false, saveHtml: false, saveHtmlToKeyValueStore: false }),
+    JSON.stringify(sentBody) === JSON.stringify({ queries: "termo comprar Uruguay", countryCode: "uy", languageCode: "es", maxPagesPerQuery: 1, mobileResults: false, saveHtml: false, saveHtmlToKeyValueStore: false }),
     "El cuerpo es el pedido: una consulta, Uruguay, español, una página, sin HTML"
   );
   assert(typeof sentBody.queries === "string" && !sentBody.queries.includes("\n") && JSON.stringify(searchInput("x")) === JSON.stringify({ ...sentBody, queries: "x" }), "Una sola consulta por búsqueda");
   assert(WEB_SEARCH_TIMEOUT_MS === 45_000, "La espera máxima por defecto es de 45 segundos");
+  reply = { status: 201, body: fixture };
+  assert((await outcome()) === "ok:9", "Con la respuesta real devuelve sus 9 resultados");
+  reply = { status: 201, body: SYNTHETIC };
 
   const errorCases: [string, Reply, string][] = [
     ["401 (token inválido)", { status: 401, body: { error: { type: "invalid-token", message: `Token ${TOKEN} is not valid` } } }, "WEB_SEARCH_NOT_CONFIGURED"],
@@ -359,9 +568,11 @@ async function main() {
     callsAt[name] = fetchCalls.length - before;
   };
   try {
-    reply = { status: 201, body: fixture };
+    reply = { status: 201, body: SYNTHETIC };
     await step("ok", () => post({ query: "  Termo Stanley Classic 1 litro " }));
     await step("cached", () => post({ query: "termo  STANLEY classic 1 litro" }));
+    reply = { status: 201, body: fixture };
+    await step("real", () => post({ query: "Stanley termo 1 litro" }));
     reply = { status: 201, body: [] };
     await step("empty", () => post({ query: "producto que no existe" }));
     reply = { status: 401, body: { error: { type: "invalid-token", message: `Token ${TOKEN} is not valid` } } };
@@ -398,7 +609,10 @@ async function main() {
 
   const ok = r.ok.data;
   assert(r.ok.status === 200 && ok.ok === true && ok.cached === false && ok.query === "Termo Stanley Classic 1 litro" && ok.results.length === 10, "Búsqueda válida: 200 con los resultados");
-  assert(fetchCalls.some((c) => JSON.parse(c.body).queries === '"Termo Stanley Classic 1 litro" comprar Uruguay') && ok.searchQueries.join() === '"Termo Stanley Classic 1 litro" comprar Uruguay', "A Google se le pregunta «\"<nombre>\" comprar Uruguay», y la respuesta dice qué se buscó");
+  assert(fetchCalls.some((c) => JSON.parse(c.body).queries === "Termo Stanley Classic 1 litro comprar Uruguay") && ok.searchQueries.join() === "Termo Stanley Classic 1 litro comprar Uruguay", "A Google se le pregunta «<nombre> comprar Uruguay», sin comillas, y la respuesta dice qué se buscó");
+  assert(!fetchCalls.some((c) => String(JSON.parse(c.body).queries).includes('"')), "Ninguna consulta enviada a Apify lleva comillas");
+  const realAnswer = r.real.data;
+  assert(r.real.status === 200 && realAnswer.results.length === 9 && realAnswer.results.every((x: any) => x.kind === "store" && x.uruguay === "confirmado") && realAnswer.searchQueries.join() === "Stanley termo 1 litro comprar Uruguay", "Con la respuesta real, el endpoint devuelve las 9 tiendas, todas confirmadas");
   assert(callsAt.ok === 1, "Una sola llamada a Apify por búsqueda");
   assert(Object.keys(ok).sort().join() === "cached,ok,query,results,searchQueries", "La respuesta tiene la misma forma de antes: ok, query, results, searchQueries, cached");
   assert(ok.results[0].site === "ferreteria-ejemplo.com.uy" && ok.results[0].uruguay === "confirmado" && ok.results.at(-1).kind === "other", "Los resultados llegan clasificados y ordenados");
