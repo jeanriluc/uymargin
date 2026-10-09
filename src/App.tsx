@@ -907,6 +907,11 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               manualPrices={manualPrices}
               onManualPricesChange={handleManualPricesChange}
               onSelectPrice={(p) => updateInputs({ salePrice: p })}
+              onBroaden={(q) => {
+                // Búsqueda ampliada: la pide el usuario con el botón; el nombre buscado queda a la vista en el cuadro.
+                updateInputs({ query: q });
+                handleSearch(q);
+              }}
             />
           </div>
 

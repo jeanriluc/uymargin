@@ -38,6 +38,8 @@ export interface BatchItemResult {
   /** Confiabilidad del precio de mercado ("Dato sólido" / "Dato flojo" / "Pocas muestras") y por qué. */
   reliabilityLabel?: string | null;
   reliabilityReasons?: string[];
+  /** Nombre más corto con el que se consiguió el precio, cuando el nombre completo no tuvo resultados. null = no se amplió. */
+  broadenedQuery?: string | null;
 }
 
 export const UNPRICED_LABEL = "Sin dato de mercado";
@@ -65,6 +67,7 @@ export const BATCH_CSV_HEADERS = [
   "Dólar de quiebre ($U)",
   "Colchón (%)",
   "Confiabilidad del dato",
+  "Búsqueda ampliada",
 ] as const;
 
 const pct = (value: number) => value.toFixed(1).replace(".", ",");
@@ -76,7 +79,7 @@ const pct = (value: number) => value.toFixed(1).replace(".", ",");
 export function batchCsvRow(r: BatchItemResult): Array<string | number> {
   const base = [`"${r.sku}"`, `"${r.name.replace(/"/g, '""')}"`, String(r.cost).replace(".", ","), r.currency, Math.round(r.costUyu)];
   if (r.status === "unpriced") {
-    return [...base, "", r.sampleSize, "", "", "", "", "", "", UNPRICED_LABEL, "", "", ""];
+    return [...base, "", r.sampleSize, "", "", "", "", "", "", UNPRICED_LABEL, "", "", "", ""];
   }
   return [
     ...base,
@@ -92,6 +95,7 @@ export function batchCsvRow(r: BatchItemResult): Array<string | number> {
     typeof r.breakEvenRate === "number" ? r.breakEvenRate.toFixed(2).replace(".", ",") : "",
     typeof r.rateCushionPct === "number" ? pct(r.rateCushionPct) : "",
     r.reliabilityLabel ?? "",
+    r.broadenedQuery ? `"${r.broadenedQuery.replace(/"/g, '""')}"` : "",
   ];
 }
 

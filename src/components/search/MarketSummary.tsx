@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { formatRate, formatUyu } from "@/lib/format";
 import type { MarketStats, MluItem, MluSearchError, RadarRelevance, UnsupportedListing } from "@/lib/mlu/types";
 import { convertToUyu, describeRate, type ExchangeRate } from "@/lib/currency";
+import { broadenQuery } from "@/lib/mlu/broaden";
 import { assessMarketData } from "@/lib/mlu/reliability";
 import { FAR_FROM_MEDIAN_FACTOR, isFarFromMedian } from "@/lib/mlu/statistics";
 import { CatalogProductCard } from "@/components/search/CatalogProductCard";
@@ -25,6 +26,8 @@ interface MarketSummaryProps {
   manualPrices: string;
   onManualPricesChange: (text: string) => void;
   onSelectPrice: (price: number) => void;
+  /** Buscar de nuevo con un nombre más corto. Solo se llama cuando el usuario toca el botón. */
+  onBroaden?: (query: string) => void;
 }
 
 function StatCard({
@@ -87,6 +90,7 @@ export function MarketSummary({
   manualPrices,
   onManualPricesChange,
   onSelectPrice,
+  onBroaden,
 }: MarketSummaryProps) {
   const loading = state.status === "loading";
   const items = state.status === "success" ? state.items : [];
@@ -115,6 +119,10 @@ export function MarketSummary({
         matching.filter((i) => i.condition === "used").length
       )
     : null;
+  // Sin precios para lo buscado: se ofrece (no se ejecuta sola) una búsqueda con el nombre más corto.
+  const noPrices =
+    (state.status === "error" && state.error.code === "NO_RESULTS") || (fromRadar && matching.length === 0);
+  const shorterQuery = noPrices && onBroaden && (state.status === "error" || state.status === "success") ? broadenQuery(state.query) : null;
   const quoted = (terms: string[]) => terms.map((t) => `«${t}»`).join(", ");
 
   return (
@@ -164,6 +172,20 @@ export function MarketSummary({
             <strong className="font-bold">No hay precios de mercado para “{state.query}”.</strong>{" "}
             {state.error.message}
           </div>
+        </div>
+      )}
+
+      {shorterQuery && onBroaden && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 p-3 text-xs text-zinc-700 dark:text-zinc-300">
+          <span>No hubo precios con el nombre completo. Podés ampliar la búsqueda sacando la medida o el detalle:</span>
+          <button
+            type="button"
+            data-broaden
+            onClick={() => onBroaden(shorterQuery)}
+            className="rounded-md bg-black px-3 py-2 text-xs font-black text-white dark:bg-white dark:text-black cursor-pointer hover:opacity-90"
+          >
+            Probar con «{shorterQuery}»
+          </button>
         </div>
       )}
 

@@ -1,4 +1,5 @@
-import { isFarFromMedian } from "./statistics";
+import { formatUyu } from "../format";
+import { FAR_FROM_MEDIAN_FACTOR, isFarFromMedian } from "./statistics";
 
 /**
  * Confiabilidad de un dato de mercado: cuántos precios hay, qué tan dispersos están y si hay
@@ -20,6 +21,22 @@ export const RELIABILITY_RULES = {
   solidSamples: 5,
   /** Dispersión máxima (p75 / p25) de un dato sólido: la mitad central no difiere más de un 50%. */
   solidSpread: 1.5,
+  /**
+   * Rango total máximo (máximo / mínimo) de un dato sólido. p75/p25 solo mira la mitad central:
+   * con [900, 1500, 2400, 2450, 2500, 6000] da 1,44 y parecía sólido aunque el más caro vale 6,7 veces
+   * el más barato. Con más de 4 veces de punta a punta es casi seguro que se mezclan productos,
+   * variantes o condiciones distintas, y la mediana ya no representa a un solo producto.
+   */
+  maxRange: 4,
+  /** Un precio está "muy fuera de rango" a más de estas veces la mediana, o a menos de 1 / estas veces. */
+  farFactor: FAR_FROM_MEDIAN_FACTOR,
+  /**
+   * Con pocos precios el corte es más estricto. Ejemplo: [2400, 2450, 2500, 2550, 5200] tiene un precio
+   * que duplica al resto; con el corte de 3 veces no se marcaba y el dato salía sólido. Con 5 o 6 precios,
+   * uno solo es entre el 17% y el 20% de la muestra, así que alcanza con que duplique (o sea la mitad).
+   */
+  smallSampleMax: 6,
+  smallSampleFarFactor: 2,
 } as const;
 
 export interface MarketReliability {
@@ -32,7 +49,14 @@ export interface MarketReliability {
   p75: number;
   /** p75 / p25: 1 = todos iguales. */
   spread: number;
-  /** Precios a más de 3 veces la mediana o a menos de un tercio. Siguen contando en las estadísticas. */
+  /** Mínimo y máximo, y cuántas veces el máximo es el mínimo. */
+  min: number;
+  max: number;
+  range: number;
+  /**
+   * Precios muy lejos de la mediana (ver `farFactor` y `smallSampleFarFactor`). Siguen contando en las estadísticas.
+   * Con 6 precios o menos el corte es 2 veces, más estricto que el de 3 veces con que el Radar marca las tarjetas.
+   */
   farCount: number;
   /** Precios que corresponden a productos usados. */
   usedCount: number;
@@ -60,7 +84,11 @@ export function assessMarketData(pricesUyu: number[], usedCount = 0): MarketReli
   const p25 = quantile(sorted, 0.25);
   const p75 = quantile(sorted, 0.75);
   const spread = p25 > 0 ? p75 / p25 : 1;
-  const farCount = sorted.filter((p) => isFarFromMedian(p, median)).length;
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  const range = max / min;
+  const farFactor = sorted.length <= RELIABILITY_RULES.smallSampleMax ? RELIABILITY_RULES.smallSampleFarFactor : RELIABILITY_RULES.farFactor;
+  const farCount = sorted.filter((p) => isFarFromMedian(p, median, farFactor)).length;
 
   const reasons: string[] = [];
   const few = sorted.length < RELIABILITY_RULES.minSamples;
@@ -70,11 +98,27 @@ export function assessMarketData(pricesUyu: number[], usedCount = 0): MarketReli
     reasons.push(`hay solo ${sorted.length} precios`);
   }
   if (spread > RELIABILITY_RULES.solidSpread) reasons.push("los precios están muy dispersos");
+  if (range > RELIABILITY_RULES.maxRange) reasons.push(`los precios van de ${formatUyu(min)} a ${formatUyu(max)}`);
   if (farCount > 0) reasons.push(farCount === 1 ? "hay 1 precio muy fuera de rango" : `hay ${farCount} precios muy fuera de rango`);
 
   const used = Math.max(0, Math.min(sorted.length, Math.floor(usedCount) || 0));
   if (used > 0 && used < sorted.length) reasons.push(used === 1 ? "hay 1 usado mezclado con nuevos" : `hay ${used} usados mezclados con nuevos`);
 
   const level: ReliabilityLevel = few ? "few" : reasons.length === 0 ? "solid" : "weak";
-  return { level, label: RELIABILITY_LABELS[level], sampleSize: sorted.length, median, p25, p75, spread, farCount, usedCount: used, reasons };
+  return { level, label: RELIABILITY_LABELS[level], sampleSize: sorted.length, median, p25, p75, spread, min, max, range, farCount, usedCount: used, reasons };
+}
+
+/** Motivo que lleva todo dato obtenido con una búsqueda ampliada (nombre más corto que el del catálogo). */
+export function broadenedReason(usedQuery: string): string {
+  return `se buscó «${usedQuery}» porque el nombre completo no tenía resultados`;
+}
+
+/**
+ * Un precio que salió de una búsqueda ampliada puede ser de otra variante del producto:
+ * nunca es "Dato sólido" (como mucho "Dato flojo") y siempre lleva el motivo con el nombre que se usó.
+ * `reliability` null = la respuesta no trajo los precios para evaluar; igual queda como flojo.
+ */
+export function asBroadened(reliability: MarketReliability | null, usedQuery: string): Pick<MarketReliability, "level" | "label" | "reasons"> {
+  const level: ReliabilityLevel = reliability?.level === "few" ? "few" : "weak";
+  return { level, label: RELIABILITY_LABELS[level], reasons: [...(reliability?.reasons ?? []), broadenedReason(usedQuery)] };
 }

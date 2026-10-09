@@ -106,3 +106,66 @@ Nada de esto cambia la mediana, el precio sugerido ni ningún número que ya se 
 8. El límite de 1.500 consultas por día por usuario frente al tamaño de tus lotes.
 9. La diferencia entre precios manuales (excluyen atípicos) y Radar (no excluyen): decidir si tiene que ser igual.
 10. `scripts/e2e_tabs.mjs` y `scripts/e2e_risk.mjs` no cubren lo nuevo de esta ronda; la prueba en navegador de hoy fue manual, con datos simulados.
+
+---
+
+# Ronda 10: calibración y búsqueda ampliada
+
+Rama `ronda-10-calibracion`, desde `main` (`52c19b7`). Ninguno de los dos cambios modifica la mediana ni el precio sugerido.
+
+## A. Calibración del indicador de confiabilidad (commit `fff89fb`)
+
+**Qué resuelve.** El indicador daba "Dato sólido" a datos con un rango enorme, porque p75/p25 solo mira la mitad central de los precios.
+
+**Cambios** (todos en `RELIABILITY_RULES`, `src/lib/mlu/reliability.ts`):
+- `maxRange: 4`: si el máximo es más de 4 veces el mínimo, el dato es "Dato flojo" con el motivo "los precios van de $U X a $U Y".
+- `smallSampleMax: 6` y `smallSampleFarFactor: 2`: con 6 precios o menos, un precio cuenta como "muy fuera de rango" si duplica la mediana (o es menos de la mitad). Con 7 o más sigue el corte de 3 veces.
+
+**Evidencia.**
+
+| Precios | Antes | Ahora |
+|---|---|---|
+| 900, 1.500, 2.400, 2.450, 2.500, 6.000 (la olla) | Dato sólido | Dato flojo: "los precios van de $U 900 a $U 6.000; hay 2 precios muy fuera de rango" |
+| 2.400, 2.450, 2.500, 2.550, 5.200 | Dato sólido | Dato flojo: "hay 1 precio muy fuera de rango" |
+| 2.400, 2.450, 2.500, 2.550, 2.600, 2.500 | Dato sólido | Dato sólido |
+| 1.000 … 4.000 (8 precios, rango 4,0) | Dato sólido | Dato sólido |
+| 1.000 … 4.100 (8 precios, rango 4,1) | Dato sólido | Dato flojo: "los precios van de $U 1.000 a $U 4.100" |
+
+En todos los casos la mediana es la misma antes y después. Tests: `scripts/verify_search.ts`, sección "Calibración".
+
+**Qué puede salir mal.**
+- El umbral de 4 veces es un criterio mío, no está medido con búsquedas reales. Productos con variantes legítimas muy distintas (por ejemplo, el mismo termo en 500 ml y 2 l que coinciden con la búsqueda) van a salir "flojo": es lo buscado, pero conviene mirarlo con datos reales.
+- Con 6 precios o menos, el indicador puede decir "hay 1 precio muy fuera de rango" (corte de 2 veces) sin que el Radar marque ninguna tarjeta como "precio muy distinto a la mediana" (corte de 3 veces). Son dos cortes distintos a propósito, pero puede confundir.
+- El motivo usa "$U" (como el resto de la app), no "$".
+
+**Impacto en números visibles.** Ninguno en precios, mediana, márgenes ni semáforo. Cambia la etiqueta de confiabilidad de algunos datos de "sólido" a "flojo", en pantalla y en la columna del CSV.
+
+**Valor 4 · Confianza 4 · Riesgo 1.**
+
+## B. Búsqueda ampliada cuando no hay precios (commits `217a8a0` y `cbff931`)
+
+**Qué resuelve.** Un nombre de catálogo con medida ("Termo Stanley Classic 1 litro") suele no coincidir con ningún producto con ofertas, y la fila del Lote quedaba "Sin dato de mercado".
+
+**Cambios.**
+- `src/lib/mlu/broaden.ts`, `broadenQuery(nombre)`: devuelve una versión más corta o `null`. Primero saca medidas y cantidades (1 litro, 5 lts, 500ml, 2 kg, x12, 128gb, 6.5", 24 piezas); si no había, saca palabras genéricas del final (Bluetooth, inalámbrico, colores, inox, LED). Nunca deja menos de dos palabras, no toca códigos de modelo (F9-5, A54, 5G, M170) y acorta de a un paso.
+- **Radar:** si no hay precios y existe una versión corta, aparece el botón "Probar con «…»". No se ejecuta solo; al tocarlo, el cuadro de búsqueda muestra el nombre que se buscó.
+- **Lote:** opción "Ampliar la búsqueda si no hay precios", apagada por defecto. Encendida, hace como máximo una consulta extra por fila sin precios, con la misma espera ante el límite por minuto y el mismo freno ante el diario. La fila queda marcada "Búsqueda ampliada: «…»", su confiabilidad es como mucho "Dato flojo" con el motivo "se buscó «…» porque el nombre completo no tenía resultados", y el CSV suma al final la columna "Búsqueda ampliada".
+- Los productos relacionados siguen sin usarse como precio: la consulta ampliada pasa por el mismo `/api/search-mlu`, que exige que las ofertas coincidan con todas las palabras del nombre corto.
+
+**Evidencia.** Tests de lógica en `scripts/verify_search.ts` (23 nombres, más las reglas de marcado) y `scripts/verify_tabs.ts` (columna del CSV). Prueba en navegador con Mercado Libre simulado, `scripts/e2e_search.mjs`: 22/22, incluida la opción apagada (sigue "sin dato", una consulta por fila), encendida (marcada, flojo, columna en el CSV, una sola consulta extra) y 1280 / 390 px sin desborde horizontal.
+
+**Qué puede salir mal.**
+- Ampliar puede traer precios de otra variante (el termo de 1,4 l en vez del de 1 l). Por eso es opcional, queda marcado y nunca cuenta como sólido. El margen y el semáforo de esa fila sí se calculan con ese precio: hay que leerlos junto con la marca.
+- Gasta cuota: hasta una consulta más por fila sin precios.
+- La lista de unidades y de palabras genéricas es corta y hecha a mano; nombres con otras formas ("pack de 6", "talle M") no se acortan.
+- No se probó contra Mercado Libre real: no sé cuántas filas rescata en un catálogo de verdad.
+
+**Impacto en números visibles.** Ninguno para las filas que hoy tienen precio (el test de navegador lo comprueba con una fila de control). Con la opción apagada, nada cambia. Con la opción encendida, filas que estaban "Sin dato de mercado" pasan a tener precio, margen y semáforo.
+
+**Valor 5 · Confianza 3 · Riesgo 2** (riesgo 3 si se enciende sin mirar la marca).
+
+## Qué revisar primero (ronda 10)
+
+1. Probar el Lote con la opción encendida sobre un catálogo real y contar cuántas filas rescata y cuántas traen una variante equivocada.
+2. Ver si el umbral de 4 veces marca como "flojo" búsquedas que vos considerás buenas.
+3. Decidir si el corte del Radar para marcar tarjetas (3 veces) tiene que seguir al del indicador con pocas muestras (2 veces).
