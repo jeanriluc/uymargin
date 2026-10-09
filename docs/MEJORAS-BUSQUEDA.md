@@ -46,7 +46,7 @@ Valor y riesgo de 1 (bajo) a 5 (alto).
 | M5 | Lote: botón Cancelar que conserva lo consultado | D6 | 3 | S | 2 | **Hecho** |
 | M6 | Lote: esperar el `Retry-After` ante un 429 en vez de seguir fallando | D11 | 4 | S | 2 | **Hecho** |
 | M13 | Lote: avisar en la fila cuando el dato es parcial (`matchedNotChecked`) | D8 | 3 | S | 1 | Pendiente |
-| M14 | Lote: al cancelar o frenar por límite, dejar las filas no consultadas como "sin consultar" para poder retomarlas | D6 | 3 | S | 2 | Pendiente |
+| M14 | Lote: al cancelar o frenar por límite, dejar las filas no consultadas como "sin consultar" para poder retomarlas | D6 | 3 | S | 2 | **Hecho** |
 | M7 | Segundo intento automático con menos palabras (marca + modelo) cuando no coincide nada, marcado como "búsqueda ampliada" | D5 | 5 | M | 3 | Pendiente |
 | M8 | Caché de búsquedas en el servidor (10–30 min por consulta y cotización) | D7 | 4 | M | 2 | Pendiente |
 | M9 | Filtro opcional "solo nuevos", apagado por defecto | D2 | 4 | M | 3 (cambia la mediana si se prende) | Pendiente |
@@ -67,24 +67,24 @@ Nada de esto cambia la mediana, el precio sugerido ni ningún número que ya se 
 **M4–M5 · Lote: reintentar y cancelar** — commit `29b2d57`.
 - "Reintentar N sin dato" vuelve a consultar solo las filas sin dato de mercado; las que ya tenían precio no se tocan ni gastan cuota.
 - "Cancelar" corta después de la consulta en curso y deja en la tabla lo ya consultado. Si se cancela un reintento, las filas que no se llegaron a consultar conservan su resultado anterior.
+- La prueba en navegador de esto fue manual, con Mercado Libre simulado (lote de 3 filas: cancelar, reintentar, 429 por minuto y 429 diario).
 - Cómo probarlo: correr el lote de ejemplo, tocar Cancelar a mitad; después "Reintentar". Tests: `npx tsx scripts/verify_tabs.ts` (casos de reintento y cancelación).
 
-**M6 · Lote: límite de uso** — commit de cierre de esta rama.
+**M6 y M14 · Lote: límite de uso y retomar** — commits `49c7658` y el de cierre de esta rama.
 - Si una consulta responde 429 con una espera de hasta 65 s (tope por minuto), el Lote espera ese tiempo, lo muestra en el progreso y repite la fila una vez. Se puede cancelar durante la espera.
 - Si la espera es mayor (tope diario), frena el lote, avisa "Llegaste al límite de uso de hoy" y deja en la tabla lo ya consultado.
-- Límite conocido: al cancelar o frenar, las filas que no se llegaron a consultar no quedan en la tabla, así que "Reintentar" no las retoma (M14).
+- Al cancelar o frenar, las filas que no se llegaron a consultar quedan en la tabla como "Sin dato de mercado" con el motivo "No se llegó a consultar", y "Reintentar" las retoma sin volver a consultar las demás.
 - Tests: `npx tsx scripts/verify_tabs.ts` (casos de `rateLimitDecision`).
 
 ## 5. Pendiente, ordenado por valor
 
 1. **M7** Segundo intento con menos palabras: es lo que más filas "sin dato" rescataría en el Lote. Hay que mostrar claramente que el dato salió de una búsqueda ampliada.
 2. **M10** Precio típico por producto: ataca el sesgo más grande (D1), pero cambia la mediana, así que tiene que ser opcional y compararse contra la actual antes de prenderlo.
-3. **M14** Retomar un lote cancelado o frenado sin volver a consultar todo.
-4. **M8** Caché de búsquedas: ahorra cuota y hace instantáneo repetir un lote.
-5. **M9** Filtro "solo nuevos".
-6. **M13** Aviso de dato parcial en el Lote.
-7. **M11** Agrupar variantes.
-8. **M12** Unificar el cálculo de la mediana.
+3. **M8** Caché de búsquedas: ahorra cuota y hace instantáneo repetir un lote.
+4. **M9** Filtro "solo nuevos".
+5. **M13** Aviso de dato parcial en el Lote.
+6. **M11** Agrupar variantes.
+7. **M12** Unificar el cálculo de la mediana.
 
 ## 6. Hipótesis de mejoras grandes
 

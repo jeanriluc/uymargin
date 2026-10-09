@@ -47,6 +47,10 @@ const SAMPLE_CATALOG: BatchItemInput[] = [
   { sku: "XIA-RGB", name: "Lampara inteligente Xiaomi Smart LED", cost: 8.9, currency: "USD" },
 ];
 
+/** Corta la consulta de la fila en curso cuando el lote se canceló o se frenó por el límite de uso. */
+class BatchHalted extends Error {}
+const NOT_CONSULTED = "No se llegó a consultar. Usá «Reintentar» para retomarla.";
+
 interface BatchAuditorProps {
   baseInputs: AnalysisInputs;
   exchangeRate: number;
@@ -172,14 +176,19 @@ export function BatchAuditor({
     setSavedToCloudCount(null);
 
     const batchResults: BatchItemResult[] = [];
+    const previousSkus = new Set(previous.map((r) => r.sku));
+    let halted = false;
 
     for (let i = 0; i < targets.length; i++) {
-      if (cancelRef.current) {
+      // Cancelado o frenado: las filas que faltan no se consultan, pero quedan en la tabla como
+      // "sin dato" para poder retomarlas con "Reintentar" sin volver a consultar las demás.
+      if (!halted && cancelRef.current) {
+        halted = true;
         setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
-        break;
       }
       const item = targets[i];
-      setProgress({ current: i + 1, total: targets.length, currentName: item.name });
+      if (halted && previousSkus.has(item.sku)) continue; // conserva su resultado anterior
+      if (!halted) setProgress({ current: i + 1, total: targets.length, currentName: item.name });
 
       const costUyu = item.currency === "USD" ? item.cost * exchangeRate : item.cost;
       // Placeholder so the row can be opened in the simulator; sampleSize 0 marks it as not a market price.
@@ -189,13 +198,15 @@ export function BatchAuditor({
       let reliability: MarketReliability | null = null;
 
       try {
+        if (halted) throw new BatchHalted();
         const searchUrl = `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`;
         let res = await apiFetch(searchUrl);
         // Límite de uso: con el tope por minuto se espera y se repite la fila una vez; con el diario se frena el lote.
         const limit = rateLimitDecision(res.status, res.headers.get("Retry-After"));
         if (limit.action === "stop") {
           setCancelNote(`Llegaste al límite de uso de hoy: se consultaron ${i} de ${targets.length} productos.`);
-          break;
+          halted = true;
+          throw new BatchHalted();
         }
         if (limit.action === "wait") {
           setProgress({ current: i + 1, total: targets.length, currentName: `${item.name} (esperando ${limit.seconds} s por el límite de uso)` });
@@ -204,7 +215,8 @@ export function BatchAuditor({
           }
           if (cancelRef.current) {
             setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
-            break;
+            halted = true;
+            throw new BatchHalted();
           }
           res = await apiFetch(searchUrl);
         }
@@ -236,8 +248,12 @@ export function BatchAuditor({
           marketError = "La búsqueda no devolvió precios.";
         }
       } catch (err) {
-        console.warn("[batch-auditor] MLU search error for item:", item.name, err);
-        marketError = "No se pudo conectar con el servidor.";
+        if (err instanceof BatchHalted) {
+          marketError = NOT_CONSULTED;
+        } else {
+          console.warn("[batch-auditor] MLU search error for item:", item.name, err);
+          marketError = "No se pudo conectar con el servidor.";
+        }
       }
 
       // Financial Engine Simulation
@@ -292,7 +308,7 @@ export function BatchAuditor({
       });
 
       // Small delay between queries to respect ML rate limits
-      await new Promise((r) => setTimeout(r, 250));
+      if (!halted) await new Promise((r) => setTimeout(r, 250));
     }
 
     // Ranking por margen neto; las filas nuevas reemplazan a las anteriores del mismo SKU.
@@ -474,7 +490,7 @@ export function BatchAuditor({
 
       {cancelNote && !isProcessing && (
         <p role="status" className="text-xs font-bold text-amber-800 dark:text-amber-300">
-          {cancelNote} Lo ya consultado quedó en la tabla.
+          {cancelNote} Lo ya consultado quedó en la tabla; lo que faltó figura sin dato y se puede retomar con «Reintentar».
         </p>
       )}
 

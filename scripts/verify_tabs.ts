@@ -171,6 +171,10 @@ assert(
   batchSource.includes("if (cancelRef.current)") && batchSource.includes("handleRetryUnpriced") && batchSource.includes("mergeBatchResults(previous, batchResults)"),
   "El Lote tiene botón Cancelar y reintento de filas sin dato"
 );
+assert(
+  batchSource.includes("if (halted && previousSkus.has(item.sku)) continue;") && batchSource.includes("marketError = NOT_CONSULTED") && !/\n\s+break;\n/.test(batchSource.slice(batchSource.indexOf("const runBatch"), batchSource.indexOf("const handleExportCsv"))),
+  "Al cancelar o frenar por el límite, las filas que faltan quedan sin dato (o con su resultado anterior) y se pueden retomar"
+);
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");
 assert(signedUyu(-292) === "−$U 292", "Pérdida: «−$U 292», sin el «+» adelante");
