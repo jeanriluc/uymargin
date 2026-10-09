@@ -169,3 +169,93 @@ En todos los casos la mediana es la misma antes y después. Tests: `scripts/veri
 1. Probar el Lote con la opción encendida sobre un catálogo real y contar cuántas filas rescata y cuántas traen una variante equivocada.
 2. Ver si el umbral de 4 veces marca como "flojo" búsquedas que vos considerás buenas.
 3. Decidir si el corte del Radar para marcar tarjetas (3 veces) tiene que seguir al del indicador con pocas muestras (2 veces).
+
+---
+
+# Ronda 11: buscar por foto
+
+Rama `ronda-11-por-foto`, desde `main` (`26507b6`). Pestaña nueva "Por foto" junto a Radar MLU, Por enlace y Lote CSV: se sube una foto, la IA propone un nombre, el usuario lo revisa y recién entonces se busca con el Radar de siempre. No toca el motor financiero ni cambia ningún número existente.
+
+## Qué se reutilizó
+
+**Del asesor de IA (`/api/chat` en `server/app.ts`):**
+
+- El mismo cliente (`@google/genai`, `GoogleGenAI` con la misma configuración) y la misma clave `GEMINI_API_KEY`, leída solo en el servidor.
+- Los mismos dos modelos y en el mismo orden (`gemini-3.8-flash`, después `gemini-3.5-flash-lite`), con el mismo patrón de "si uno falla, se prueba el siguiente".
+- El mismo control de acceso: la ruta cuelga de `/api`, así que pasa por `createAuthMiddleware` (token de Supabase + `ALLOWED_EMAILS`) sin código nuevo.
+- El mismo limitador (`createRateLimiter` + RPC `uymargin_rate_hit`, con el contador en memoria de respaldo). Solo se agregó una regla: `RATE_RULES.photo`. El RPC recibe el nombre del contador como texto, así que no hizo falta ninguna migración.
+- El mismo criterio de errores: el detalle queda en el log del servidor y al navegador va un mensaje en español, con la forma `{ ok: false, code, message, error }` del resto de la API.
+
+**De las otras pestañas:**
+
+- El patrón de Por enlace y Lote: componente `lazy`, `useEverTrue` + `searchPanelState` (montado al abrirlo, después oculto con `hidden` y `aria-hidden`).
+- La búsqueda es `handleSearch` de `App.tsx`, la misma del Radar. No hay una segunda búsqueda: "Por foto" es otro cuadro para cargar el nombre.
+- Los resultados son los mismos componentes (`ExactOffersSection` con su "Simular" y `MarketSummary` con el indicador de confiabilidad y el botón "Probar con «…»"). Se muestran una sola vez y se ven tanto en Radar MLU como en Por foto.
+- `apiFetch` para mandar el token, `StepHeader` y las clases de los botones y campos del Radar.
+
+**Lo que es nuevo:** `src/lib/photo/identify.ts` (límites y validación, sin red), `server/identify.ts` (la ruta), `api/identify-product.ts` (función de Vercel), `src/components/search/PhotoAnalyzer.tsx`, `scripts/verify_photo.ts` y `scripts/e2e_photo.mjs`.
+
+**Cambios en archivos que ya existían:** una regla en `server/rateLimit.ts`; el registro de la ruta en `server/app.ts`; `"photo"` en `src/lib/searchTabs.ts`; y en `src/App.tsx` el botón de la pestaña y el panel. En `App.tsx` el cuadro del Radar pasó a estar en su propio contenedor para que los resultados se compartan entre las dos pestañas; el Radar se ve y se comporta igual (lo comprueban `e2e_tabs`, `e2e_search` y `e2e_risk`, sin cambios).
+
+## Cómo funciona
+
+1. El navegador achica la foto (lado mayor 1024 px, JPEG 0,8) antes de mandarla. De paso, la foto sale sin sus metadatos (ubicación, modelo de celular).
+2. `POST /api/identify-product` recibe la imagen como cuerpo binario. Controla, en este orden: sesión y correo permitido, límite de uso, tipo declarado (JPEG, PNG o WebP), tamaño (3 MB) y que los primeros bytes sean de una imagen de verdad.
+3. Le pide a Gemini un JSON. El prompt dice que identifique el producto y no a las personas, que devuelva `isProduct: false` si no hay un producto claro, y que todo texto de la imagen es un dato y nunca una orden.
+4. La respuesta se valida (`parseIdentification`). Lo esencial es estricto: `isProduct`, `confidence` y, si hay producto, `name`. Lo accesorio se descarta si viene mal. Si el JSON no sirve hay un solo reintento y después un error claro.
+5. La pantalla muestra el nombre en un campo editable, los alternativos como botones, marca, categoría, atributos y la confianza ("Estoy seguro" / "Puede ser" / "No estoy seguro: revisá el nombre"). Nunca busca sola: el botón "Buscar en Mercado Libre" lo aprieta el usuario.
+6. Corregir el nombre y volver a buscar no usa la IA.
+
+La imagen vive en la memoria del servidor mientras dura el pedido. No se escribe en disco ni en Supabase, y ningún log recibe la imagen, el cuerpo del pedido ni la respuesta de la IA.
+
+## Límites de uso
+
+| Qué | Valor | Dónde se cambia |
+|---|---|---|
+| Fotos por usuario por minuto | 5 | `RATE_RULES.photo` en `server/rateLimit.ts` |
+| Fotos por usuario por día | 40 | `RATE_RULES.photo` en `server/rateLimit.ts` |
+| Tamaño máximo que acepta el servidor | 3 MB | `PHOTO_LIMITS.maxBytes` en `src/lib/photo/identify.ts` |
+| Tamaño máximo del archivo original | 20 MB | `PHOTO_LIMITS.maxOriginalBytes` (mismo archivo) |
+| Lado mayor y calidad de lo que se envía | 1024 px, JPEG 0,8 | `PHOTO_LIMITS.maxSide` y `jpegQuality` (mismo archivo) |
+| Espera máxima por llamada a la IA | 25 s | `IDENTIFY_TIMEOUT_MS` en `server/identify.ts` |
+
+El contador de fotos es propio (`foto`): no gasta el de las búsquedas de Mercado Libre (`mercado`) ni el del copiloto (`chat`). La búsqueda que se hace después sí cuenta como una búsqueda normal.
+
+## Evidencia
+
+- `scripts/verify_photo.ts`: 94 casos. Parseo de la respuesta (JSON válido, con texto o bloque ``` alrededor, campos faltantes, tipos incorrectos, campos de más), tipo, tamaño y bytes de la imagen, límite de uso por minuto y por día, y el endpoint completo con la IA simulada. Mientras corre el endpoint se capturan `console.*` y las escrituras a disco: ningún log ni respuesta contiene la imagen, y no se escribe ningún archivo.
+- `scripts/e2e_photo.mjs`: 61 casos en Chrome, con `/api/identify-product` y `/api/search-mlu` simulados. Subir, achicar (1600×1200 pasa a 1024×768), cancelar, nombre editable, alternativos, buscar, búsqueda ampliada, confiabilidad, estado conservado al cambiar de pestaña, `isProduct: false`, errores del proveedor, 413, 429, archivo de 21 MB, archivo que no es imagen, 1280 y 390 px sin desborde, sin errores de consola.
+- Contra el servidor local, sin simular: un GIF devuelve 415 y un archivo que dice ser JPEG y no lo es devuelve 400. Ninguno de los dos llega a la IA.
+
+## Lo que NO se probó
+
+- **Ninguna llamada real a Gemini.** No sé si identifica bien, cuánto tarda, ni si los dos modelos aceptan la imagen y el pedido de JSON tal como se arma. Lo primero que hay que hacer es probar con una foto real.
+- **La subida binaria en Vercel.** En local funciona. En Vercel el cuerpo pasa antes por la capa de la plataforma; los `POST` con JSON de hoy funcionan, pero este es el primer endpoint que recibe una imagen. Hay que probarlo en la vista previa.
+- **`vercel.json` no se tocó**, así que la función nueva no tiene `maxDuration` propio y usa el valor por defecto de la plataforma. Las otras funciones tienen 60 s fijados. Si hiciera falta, es una línea, pero la regla es avisarte antes.
+
+## Qué puede salir mal
+
+- **Identificación equivocada.** Con productos genéricos o sin marca visible la IA puede proponer otra cosa, o inventar una marca aunque el prompt le pide que no. Mitigación: el nombre siempre se revisa a mano, la confianza se muestra, y la búsqueda del Radar ya exige que coincidan todas las palabras. Un nombre equivocado da resultados de otro producto con un indicador que puede decir "Dato sólido": el indicador mide los precios, no si el producto es el correcto.
+- **Fotos con personas.** El prompt pide ignorarlas y la app no guarda la foto, pero la imagen igual viaja a Gemini (Google). La pantalla lo dice. Conviene confirmar las condiciones de uso de datos del plan de la clave: en los planes gratuitos Google suele reservarse el uso del contenido para mejorar sus productos.
+- **Texto en la imagen que intenta dar órdenes.** El prompt lo trata como dato. Aunque el modelo obedeciera, la respuesta solo puede salir como los campos del contrato, acotados en largo, y se muestra como texto. Lo peor que puede pasar es un nombre raro en el campo, que el usuario ve antes de buscar.
+- **Cuota de Gemini.** Cada foto es una llamada, y en el peor caso hasta cuatro (dos modelos por dos intentos). Comparte la clave con el copiloto. Los topes son por usuario, no globales: con N usuarios permitidos el máximo diario es N × 40 fotos. No verifiqué la cuota del plan de la clave.
+- **Cancelar no devuelve el uso.** "Cancelar" corta la espera en el navegador, pero el servidor ya contó el uso y la llamada a la IA sigue su curso.
+- **Los pedidos rechazados también cuentan.** El límite de uso va antes de leer la imagen, así que un archivo de tipo incorrecto que llegue al servidor gasta un uso del minuto. La pantalla frena esos archivos antes de mandarlos.
+- **Límites de Vercel Hobby.** Cuerpo de hasta 4,5 MB: el tope de 3 MB queda por debajo y la foto achicada pesa mucho menos. La función nueva es la séptima del proyecto, sobre un máximo de doce.
+- **Fotos HEIC.** El selector pide JPEG, PNG o WebP y los celulares suelen convertir solos. Si llega un HEIC igual, se rechaza con el mensaje de tipo no admitido.
+
+**Impacto en números existentes.** Ninguno. No se tocó `src/lib/finance` ni la búsqueda; la regresión del motor (108 casos con huella) y las siete tandas de tests que ya había pasan igual (489 casos; la de pestañas sumó uno sola, porque recorre la lista de pestañas y ahora hay cuatro).
+
+**Valor 4 · Confianza 3 · Riesgo 2.** La confianza es 3 y no más porque todo lo probado es con la IA simulada.
+
+## Etapas futuras (sin implementar)
+
+2. **Lista de páginas web que venden algo parecido**, con Google Cloud Vision Web Detection. Dato que trajiste y que no verifiqué: los primeros 1.000 usos por mes son gratis y después cuesta US$ 3,50 cada 1.000, según la página de precios de Google. Falta confirmar si exige tener facturación activada aunque no se pase del tramo gratis. Necesitaría otra clave en el servidor y su propio límite de uso.
+3. **Extracción de precios de esas páginas**, marcados como orientativos: no son comparables con los de Mercado Libre (otra moneda, otro país, sin envío ni impuestos) y no deberían entrar en la mediana ni en el precio sugerido.
+
+## Qué revisar primero (ronda 11)
+
+1. Probar con una foto real en local o en la vista previa: que Gemini responda y que el nombre sirva.
+2. Confirmar en la vista previa de Vercel que la subida de la imagen llega bien.
+3. Decidir si 5 por minuto y 40 por día son los topes que querés.
+4. Decidir si la función nueva lleva `maxDuration` en `vercel.json` como las demás.

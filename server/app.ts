@@ -31,6 +31,7 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { createAuthMiddleware, isAuthDisabled, requestUser } from "./auth.js";
 import { createMemoryRateStore, createRateLimiter, RATE_RULES } from "./rateLimit.js";
 import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabaseToken } from "./cloud.js";
+import { createGeminiIdentifier, createIdentifyRoute, type IdentifyModel } from "./identify.js";
 
 dotenv.config();
 
@@ -1266,6 +1267,23 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
     });
   }
 });
+
+// ------------------------------------------------------------------
+// 3b. Identificación de un producto por foto (server/identify.ts). Límite de uso propio, aparte del de las búsquedas.
+// ------------------------------------------------------------------
+let photoIdentifier: { key: string; model: IdentifyModel } | null = null;
+app.post(
+  "/api/identify-product",
+  rateLimit(RATE_RULES.photo),
+  ...createIdentifyRoute({
+    model: () => {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) return null;
+      if (photoIdentifier?.key !== apiKey) photoIdentifier = { key: apiKey, model: createGeminiIdentifier(apiKey) };
+      return photoIdentifier.model;
+    },
+  })
+);
 
 // ------------------------------------------------------------------
 // 4. Competitor Price Tracking & Alerts Endpoint

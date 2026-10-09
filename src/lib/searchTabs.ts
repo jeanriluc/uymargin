@@ -1,7 +1,7 @@
 /** Pestañas de "Precio de mercado". */
-export type SearchTab = "keyword" | "url" | "batch";
+export type SearchTab = "keyword" | "url" | "batch" | "photo";
 
-export const SEARCH_TABS: readonly SearchTab[] = ["keyword", "url", "batch"];
+export const SEARCH_TABS: readonly SearchTab[] = ["keyword", "url", "batch", "photo"];
 
 export interface SearchPanelState {
   /** El panel está en el árbol de React (conserva su estado interno). */
