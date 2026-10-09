@@ -3,7 +3,15 @@
 // lo cubre scripts/e2e_tabs.mjs, que necesita la app corriendo y Chrome.
 import { readFileSync } from "node:fs";
 import { SEARCH_TABS, searchPanelState, type SearchTab } from "../src/lib/searchTabs";
-import { batchCsvRow, batchResultsToCsv, BATCH_CSV_HEADERS, signedUyu, type BatchItemResult } from "../src/lib/export/batchCsv";
+import {
+  batchCsvRow,
+  batchResultsToCsv,
+  BATCH_CSV_HEADERS,
+  mergeBatchResults,
+  retryTargets,
+  signedUyu,
+  type BatchItemResult,
+} from "../src/lib/export/batchCsv";
 import { createDefaultInputs } from "../src/lib/finance/constants";
 
 let passedTests = 0;
@@ -126,6 +134,34 @@ assert(
   batchCsvRow({ ...priced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "Dato flojo" &&
     pricedRow[col("Confiabilidad del dato")] === "" && batchCsvRow({ ...unpriced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "",
   "CSV del Lote: la confiabilidad del dato va en la última columna; vacía si no hay dato de mercado"
+);
+// Reintento y cancelación del Lote
+const pricedLow: BatchItemResult = { ...priced, sku: "D-4", mlMargin: 12, status: "tight" };
+const failedB: BatchItemResult = { ...unpriced, sku: "B-2", marketError: "Mercado Libre no respondió (HTTP 429)." };
+const failedC: BatchItemResult = { ...unpriced, sku: "C-3", name: "Otro sin precio" };
+const firstRun = mergeBatchResults([], [failedB, pricedLow, priced, failedC]);
+assert(firstRun.map((r) => r.sku).join() === "A-1,D-4,B-2,C-3", "Lote: se ordena por margen y las filas sin dato van al final");
+const targets = retryTargets(firstRun);
+assert(
+  targets.length === 2 && targets.map((t) => t.sku).join() === "B-2,C-3" && targets[0].cost === failedB.cost && targets[0].currency === failedB.currency,
+  "Reintentar: solo se vuelven a consultar las filas sin dato de mercado, con su costo y moneda"
+);
+const recoveredB: BatchItemResult = { ...priced, sku: "B-2", mlMargin: 20, status: "good" };
+const afterRetry = mergeBatchResults(firstRun, [recoveredB, failedC]);
+assert(
+  afterRetry.length === 4 && afterRetry.map((r) => r.sku).join() === "A-1,B-2,D-4,C-3" && afterRetry[0] === priced && afterRetry[2] === pricedLow,
+  "Reintentar: la fila recuperada entra al ranking y las que ya tenían precio no se tocan"
+);
+const cancelledRetry = mergeBatchResults(firstRun, [recoveredB]);
+assert(
+  cancelledRetry.length === 4 && cancelledRetry.find((r) => r.sku === "C-3") === failedC,
+  "Cancelar a mitad de un reintento: la fila que no se llegó a consultar conserva su resultado anterior"
+);
+assert(mergeBatchResults([], [priced]).length === 1 && retryTargets([priced, pricedLow]).length === 0, "Corrida cancelada: queda lo consultado; sin filas fallidas no hay nada para reintentar");
+const batchSource = readFileSync(new URL("../src/components/search/BatchAuditor.tsx", import.meta.url), "utf8");
+assert(
+  batchSource.includes("if (cancelRef.current)") && batchSource.includes("handleRetryUnpriced") && batchSource.includes("mergeBatchResults(previous, batchResults)"),
+  "El Lote tiene botón Cancelar y reintento de filas sin dato"
 );
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");

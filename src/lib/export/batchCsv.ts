@@ -99,3 +99,29 @@ export function batchCsvRow(r: BatchItemResult): Array<string | number> {
 export function batchResultsToCsv(results: BatchItemResult[]): string {
   return "﻿" + [BATCH_CSV_HEADERS.join(";"), ...results.map((r) => batchCsvRow(r).join(";"))].join("\n");
 }
+
+/** Ranking del Lote: por margen neto del canal ganador; las filas sin dato de mercado van al final, fuera del ranking. */
+export function sortBatchResults(results: BatchItemResult[]): BatchItemResult[] {
+  const winningMargin = (r: BatchItemResult) => (r.bestChannel === "ml" ? r.mlMargin : r.directMargin);
+  return [...results].sort((a, b) => {
+    if ((a.status === "unpriced") !== (b.status === "unpriced")) return a.status === "unpriced" ? 1 : -1;
+    return a.status === "unpriced" ? 0 : winningMargin(b) - winningMargin(a);
+  });
+}
+
+/** Filas que vale la pena volver a consultar: las que quedaron sin dato de mercado. */
+export function retryTargets(results: BatchItemResult[]): BatchItemInput[] {
+  return results
+    .filter((r) => r.status === "unpriced")
+    .map((r) => ({ sku: r.sku, name: r.name, cost: r.cost, currency: r.currency }));
+}
+
+/**
+ * Resultado de una corrida (completa, cancelada o de reintento):
+ * las filas nuevas reemplazan a las anteriores con el mismo SKU; las que no se llegaron a consultar
+ * (corrida cancelada) conservan su resultado anterior, si lo tenían.
+ */
+export function mergeBatchResults(previous: BatchItemResult[], fresh: BatchItemResult[]): BatchItemResult[] {
+  const freshSkus = new Set(fresh.map((r) => r.sku));
+  return sortBatchResults([...previous.filter((r) => !freshSkus.has(r.sku)), ...fresh]);
+}

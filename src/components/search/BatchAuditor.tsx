@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   FileSpreadsheet,
   Upload,
@@ -18,7 +18,15 @@ import {
 } from "lucide-react";
 import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { VIABILITY_LABELS } from "@/lib/finance/constants";
-import { batchResultsToCsv, signedUyu, UNPRICED_LABEL, type BatchItemInput, type BatchItemResult } from "@/lib/export/batchCsv";
+import {
+  batchResultsToCsv,
+  mergeBatchResults,
+  retryTargets,
+  signedUyu,
+  UNPRICED_LABEL,
+  type BatchItemInput,
+  type BatchItemResult,
+} from "@/lib/export/batchCsv";
 import { createDirectModel, createMlModel } from "@/lib/finance/channels";
 import { analyzeAll } from "@/lib/finance/engine";
 import { breakEvenExchangeRate } from "@/lib/finance/sensitivity";
@@ -145,18 +153,32 @@ export function BatchAuditor({
     );
   };
 
+  // "Cancelar" corta la corrida después de la consulta en curso; lo ya consultado se conserva.
+  const cancelRef = useRef(false);
+  const [cancelNote, setCancelNote] = useState<string | null>(null);
+
+  const handleRunBatch = () => runBatch(items, []);
+  // Vuelve a consultar solo las filas que quedaron sin dato de mercado; las demás no se tocan.
+  const handleRetryUnpriced = () => runBatch(retryTargets(results), results);
+
   // Run Batch Simulation
-  const handleRunBatch = async () => {
-    if (items.length === 0 || usdRowsWithoutRate) return;
+  const runBatch = async (targets: BatchItemInput[], previous: BatchItemResult[]) => {
+    if (targets.length === 0 || usdRowsWithoutRate || isProcessing) return;
+    cancelRef.current = false;
+    setCancelNote(null);
     setIsProcessing(true);
-    setResults([]);
+    if (previous.length === 0) setResults([]);
     setSavedToCloudCount(null);
 
     const batchResults: BatchItemResult[] = [];
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      setProgress({ current: i + 1, total: items.length, currentName: item.name });
+    for (let i = 0; i < targets.length; i++) {
+      if (cancelRef.current) {
+        setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
+        break;
+      }
+      const item = targets[i];
+      setProgress({ current: i + 1, total: targets.length, currentName: item.name });
 
       const costUyu = item.currency === "USD" ? item.cost * exchangeRate : item.cost;
       // Placeholder so the row can be opened in the simulator; sampleSize 0 marks it as not a market price.
@@ -254,13 +276,8 @@ export function BatchAuditor({
       await new Promise((r) => setTimeout(r, 250));
     }
 
-    // Ranking por margen neto del canal ganador; las filas sin dato de mercado van al final, fuera del ranking.
-    const winningMargin = (r: BatchItemResult) => (r.bestChannel === "ml" ? r.mlMargin : r.directMargin);
-    batchResults.sort((a, b) => {
-      if ((a.status === "unpriced") !== (b.status === "unpriced")) return a.status === "unpriced" ? 1 : -1;
-      return a.status === "unpriced" ? 0 : winningMargin(b) - winningMargin(a);
-    });
-    setResults(batchResults);
+    // Ranking por margen neto; las filas nuevas reemplazan a las anteriores del mismo SKU.
+    setResults(mergeBatchResults(previous, batchResults));
     setIsProcessing(false);
   };
 
@@ -407,6 +424,15 @@ export function BatchAuditor({
             <Play className={`size-3.5 ${isProcessing ? "animate-spin" : ""}`} />
             <span>{isProcessing ? "Auditando en vivo..." : "Auditar Catálogo Completo"}</span>
           </button>
+          {isProcessing && (
+            <button
+              type="button"
+              onClick={() => { cancelRef.current = true; }}
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100 cursor-pointer hover:border-black dark:hover:border-white"
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       </div>
 
@@ -425,6 +451,12 @@ export function BatchAuditor({
           </div>
           <span className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate block mt-1">«{progress.currentName}»</span>
         </div>
+      )}
+
+      {cancelNote && !isProcessing && (
+        <p role="status" className="text-xs font-bold text-amber-800 dark:text-amber-300">
+          {cancelNote} Lo ya consultado quedó en la tabla.
+        </p>
       )}
 
       {/* Results Section */}
@@ -529,7 +561,18 @@ export function BatchAuditor({
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {results.some((r) => r.status === "unpriced") && (
+                  <button
+                    type="button"
+                    onClick={handleRetryUnpriced}
+                    disabled={isProcessing}
+                    title="Vuelve a consultar solo las filas sin dato de mercado; las demás no se tocan"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-900 dark:text-amber-200 cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    Reintentar {results.filter((r) => r.status === "unpriced").length} sin dato
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleExportCsv}
