@@ -366,7 +366,7 @@ La búsqueda de Google dentro de Gemini exige facturación activada en Google, y
 
 - **Proveedor.** `POST https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items`, con `countryCode: "uy"`, `languageCode: "es"`, una página, sin HTML. Espera máxima de 45 s (la función de Vercel tiene 60 s en `vercel.json`).
 - **Token.** `APIFY_TOKEN`, solo en el servidor. Viaja solo en el encabezado `Authorization: Bearer`, nunca en la dirección, y no aparece en logs ni en respuestas (lo comprueban los tests).
-- **Consulta.** Una sola por búsqueda: `"<nombre>" comprar Uruguay`, con el nombre recortado a 100 caracteres y sin comillas propias.
+- **Consulta.** Una sola por búsqueda: `<nombre> comprar Uruguay`, **sin comillas**, con el nombre recortado a 100 caracteres. La primera versión mandaba el nombre entre comillas y eso dejaba a Google casi sin resultados: en la prueba real, "Stanley termo 1 litro" entre comillas devolvió 1 resultado (un TikTok) y sin comillas devolvió 9 tiendas uruguayas. Las comillas que traiga el nombre también se sacan, para que nunca se arme una frase exacta.
 - **Sin IA en esta vista.** Título y descripción son los que da Google, recortados. Ya no hay una frase escrita por una IA ni una opinión de "mismo producto / parecido".
 - **Se eliminó:** la herramienta `googleSearch`, el parseo de `groundingChunks` y el resolvedor de redirecciones de `vertexaisearch.cloud.google.com`. El servidor ahora solo habla con `api.apify.com` y **nunca visita los enlaces de los resultados**: solo los valida y los muestra.
 - **Hasta 2 resultados por dominio** (antes 1), 10 en total.
@@ -393,14 +393,14 @@ Con el tope de 20 búsquedas por día por usuario, el máximo es de unos US$ 0,0
 
 ## Lo que NO se probó
 
-- **El parser no se probó contra una respuesta real.** No había `APIFY_TOKEN` en el `.env` local, así que no se hizo la llamada de prueba. El fixture (`scripts/fixtures/apify_google_search.json`) está armado a mano con el formato documentado del actor: una lista de páginas, cada una con `organicResults[]` (`title`, `url`, `displayedUrl`, `description`). El parser es defensivo, pero si el actor devuelve otra forma, la vista va a mostrar `WEB_SEARCH_UNAVAILABLE`.
+- **Una búsqueda de punta a punta desde la app.** El formato de respuesta de Apify **quedó verificado contra una respuesta real**: la búsqueda "Stanley termo 1 litro comprar Uruguay" (país `uy`, idioma `es`), hecha a mano con el actor, devolvió 9 resultados orgánicos con la forma esperada (`organicResults[]` con `title`, `url`, `displayedUrl`, `description`). Esos 9 resultados son ahora el fixture (`scripts/fixtures/apify_google_search.json`): las direcciones y su orden son los reales; los títulos y las descripciones están abreviados y escritos a mano. Con ese fixture salen 9 resultados, todos de tipo tienda y con Uruguay confirmado, y Bagual (dos productos) respeta el máximo por dominio. Lo que falta es ver la misma búsqueda hecha desde la vista previa, con el token de Vercel.
 - **Los códigos de error reales de Apify.** El 401 y el 402 están en su documentación. Qué tipo de error devuelve exactamente una cuenta sin crédito en este endpoint no está documentado; se reconocen el 402 y varios tipos (`not-enough-usage-to-run-paid-actor`, `monthly-usage-limit-too-low`, `limit-reached`, entre otros). Si llegara con otro tipo, se vería como "no respondió" con "Reintentar".
 - **Cuánto tarda.** Si una búsqueda tarda más de 45 s, se corta. No sé cuánto tarda de verdad con `countryCode: "uy"`.
-- **La calidad con la frase entre comillas.** `"<nombre>"` le pide a Google la frase exacta. Con nombres largos puede devolver pocos resultados o ninguno.
+- **La calidad con otros productos.** Sin comillas Google devuelve más, pero también puede traer productos parecidos o de otra marca. Solo se probó con un termo Stanley.
 
 ## Evidencia
 
-- `scripts/verify_web.ts`: 254 casos con `fetch` simulado. Parser con el fixture, consulta, clasificación de dominios y parecidos, sitios que no son tiendas, cada código de error, que la dirección de la llamada no lleva el token y que el token no aparece en logs ni en respuestas.
+- `scripts/verify_web.ts`: 281 casos con `fetch` simulado. Parser con el fixture real y con casos rotos armados a mano, consulta sin comillas, clasificación de dominios y parecidos, sitios que no son tiendas, cada código de error, que la dirección de la llamada no lleva el token y que el token no aparece en logs ni en respuestas.
 - `scripts/e2e_web.mjs`: 61 casos en Chrome con `/api/web-sellers` simulado, incluidos los tres avisos, "Reintentar", el bloque "Otros resultados" y que los botones de Google siguen en cada error.
 
 ## Qué puede salir mal (además de lo anterior)
@@ -410,10 +410,10 @@ Con el tope de 20 búsquedas por día por usuario, el máximo es de unos US$ 0,0
 - **Términos de uso.** Apify obtiene los resultados leyendo páginas de Google. Conviene revisar que ese uso sea aceptable para el proyecto.
 - **Se sigue necesitando `GEMINI_API_KEY`** para identificar la foto. Lo único que dejó de depender de Gemini es la vista web.
 
-**Valor 4 · Confianza 2 · Riesgo 2.** La confianza sigue en 2 porque tampoco con este proveedor se vio una respuesta real.
+**Valor 4 · Confianza 3 · Riesgo 2.** La confianza sube a 3 porque el formato ya se vio en una respuesta real; no pasa de ahí porque falta la búsqueda de punta a punta desde la app.
 
 ## Qué revisar primero (ronda 12b)
 
-1. Hacer una búsqueda real en la vista previa y mirar si aparecen resultados: es la única prueba del parser contra el actor de verdad.
+1. Hacer una búsqueda desde la vista previa y mirar que aparezcan las tiendas.
 2. Mirar en el panel de Apify cuánto costó esa búsqueda y cuánto tardó.
-3. Decidir si la consulta va con el nombre entre comillas o sin ellas.
+3. Probar con dos o tres productos distintos, sobre todo genéricos, para ver cuánto ruido trae la consulta sin comillas.
