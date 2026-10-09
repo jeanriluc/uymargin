@@ -21,6 +21,7 @@ import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import {
   batchResultsToCsv,
   mergeBatchResults,
+  rateLimitDecision,
   retryTargets,
   signedUyu,
   UNPRICED_LABEL,
@@ -188,9 +189,25 @@ export function BatchAuditor({
       let reliability: MarketReliability | null = null;
 
       try {
-        const res = await apiFetch(
-          `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`
-        );
+        const searchUrl = `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`;
+        let res = await apiFetch(searchUrl);
+        // Límite de uso: con el tope por minuto se espera y se repite la fila una vez; con el diario se frena el lote.
+        const limit = rateLimitDecision(res.status, res.headers.get("Retry-After"));
+        if (limit.action === "stop") {
+          setCancelNote(`Llegaste al límite de uso de hoy: se consultaron ${i} de ${targets.length} productos.`);
+          break;
+        }
+        if (limit.action === "wait") {
+          setProgress({ current: i + 1, total: targets.length, currentName: `${item.name} (esperando ${limit.seconds} s por el límite de uso)` });
+          for (let waited = 0; waited < limit.seconds && !cancelRef.current; waited++) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          if (cancelRef.current) {
+            setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
+            break;
+          }
+          res = await apiFetch(searchUrl);
+        }
         const data: MluSearchResponse | null = await res.json().catch(() => null);
         if (data?.ok && data.stats && data.stats.median > 0) {
           marketPriceUyu = Math.round(data.stats.median);

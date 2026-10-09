@@ -7,7 +7,9 @@ import {
   batchCsvRow,
   batchResultsToCsv,
   BATCH_CSV_HEADERS,
+  BATCH_MAX_WAIT_SECONDS,
   mergeBatchResults,
+  rateLimitDecision,
   retryTargets,
   signedUyu,
   type BatchItemResult,
@@ -158,6 +160,12 @@ assert(
   "Cancelar a mitad de un reintento: la fila que no se llegó a consultar conserva su resultado anterior"
 );
 assert(mergeBatchResults([], [priced]).length === 1 && retryTargets([priced, pricedLow]).length === 0, "Corrida cancelada: queda lo consultado; sin filas fallidas no hay nada para reintentar");
+assert(rateLimitDecision(200, null).action === "continue" && rateLimitDecision(502, "30").action === "continue", "Límite de uso: si no es un 429, el Lote sigue normalmente");
+const waitMinute = rateLimitDecision(429, "27");
+assert(waitMinute.action === "wait" && waitMinute.seconds === 27, "429 con Retry-After de 27 s (tope por minuto): espera 27 s y repite la fila");
+assert(rateLimitDecision(429, "65").action === "wait" && rateLimitDecision(429, "66").action === "stop" && rateLimitDecision(429, "40000").action === "stop", `429 con espera mayor a ${BATCH_MAX_WAIT_SECONDS} s (tope diario): frena el lote`);
+const noHeader = rateLimitDecision(429, null);
+assert(noHeader.action === "wait" && noHeader.seconds === 5 && rateLimitDecision(429, "abc").action === "wait", "429 sin Retry-After válido: espera corta de 5 s");
 const batchSource = readFileSync(new URL("../src/components/search/BatchAuditor.tsx", import.meta.url), "utf8");
 assert(
   batchSource.includes("if (cancelRef.current)") && batchSource.includes("handleRetryUnpriced") && batchSource.includes("mergeBatchResults(previous, batchResults)"),

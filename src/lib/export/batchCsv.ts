@@ -125,3 +125,23 @@ export function mergeBatchResults(previous: BatchItemResult[], fresh: BatchItemR
   const freshSkus = new Set(fresh.map((r) => r.sku));
   return sortBatchResults([...previous.filter((r) => !freshSkus.has(r.sku)), ...fresh]);
 }
+
+/** Espera máxima que el Lote hace solo ante un 429. Más que eso es el tope diario: no tiene sentido esperar. */
+export const BATCH_MAX_WAIT_SECONDS = 65;
+
+export type RateLimitDecision =
+  /** No es un 429: seguir normalmente. */
+  | { action: "continue" }
+  /** Tope por minuto: esperar y volver a consultar la misma fila. */
+  | { action: "wait"; seconds: number }
+  /** Tope diario (o espera desconocida demasiado larga): frenar el lote y conservar lo consultado. */
+  | { action: "stop" };
+
+/** Qué hace el Lote cuando una consulta responde con el límite de uso (HTTP 429 + Retry-After en segundos). */
+export function rateLimitDecision(status: number, retryAfterHeader: string | null | undefined): RateLimitDecision {
+  if (status !== 429) return { action: "continue" };
+  const seconds = Math.ceil(Number(retryAfterHeader));
+  // Sin Retry-After válido se espera un poco: puede ser Mercado Libre pidiendo ir más despacio.
+  if (!Number.isFinite(seconds) || seconds <= 0) return { action: "wait", seconds: 5 };
+  return seconds <= BATCH_MAX_WAIT_SECONDS ? { action: "wait", seconds } : { action: "stop" };
+}
