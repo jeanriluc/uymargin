@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { AlertCircle, Camera, ImagePlus, Loader2, Search, Sparkles, X } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
+import { AlertCircle, Camera, Globe, ImagePlus, Loader2, Search, Sparkles, X } from "lucide-react";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
+import { WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
 import {
   CONFIDENCE_PHRASES,
   PHOTO_LIMITS,
@@ -19,7 +20,16 @@ interface PhotoAnalyzerProps {
   /** Busca en el Radar con el nombre confirmado. Es la misma búsqueda de la pestaña Radar MLU. */
   onSearch: (name: string) => void;
   searchLoading: boolean;
+  /** Nombre de la última búsqueda del Radar que no encontró ningún producto, o null. */
+  marketEmptyFor?: string | null;
 }
+
+/** Dónde se busca el nombre confirmado. */
+type View = "ml" | "web";
+const VIEWS: { id: View; label: string }[] = [
+  { id: "ml", label: "Mercado Libre" },
+  { id: "web", label: "En la web (Uruguay)" },
+];
 
 interface Photo {
   blob: Blob;
@@ -63,7 +73,7 @@ async function shrinkPhoto(file: Blob): Promise<Omit<Photo, "url">> {
   }
 }
 
-export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
+export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }: PhotoAnalyzerProps) {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<IdentifiedProduct | null>(null);
@@ -71,6 +81,10 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [view, setView] = useState<View>("ml");
+  // Último nombre que se mandó al Radar desde acá: para saber si "sin resultados" habla de esta búsqueda.
+  const [lastMlSearch, setLastMlSearch] = useState<string | null>(null);
+  const web = useWebSellers();
 
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -109,6 +123,9 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
     setName("");
     setError(null);
     setNotice(null);
+    setView("ml");
+    setLastMlSearch(null);
+    web.reset();
   }
 
   async function choosePhoto(file: File | undefined) {
@@ -191,8 +208,28 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const q = name.trim();
-    if (q.length >= 2) onSearch(q);
+    if (q.length < 2) return;
+    // Cada vista busca solo en lo suyo, y solo cuando el usuario lo pide.
+    if (view === "web") return void web.search(q);
+    setLastMlSearch(q);
+    onSearch(q);
   }
+
+  function openView(next: View) {
+    setView(next);
+    requestAnimationFrame(() => document.getElementById(`photo-tab-${next}`)?.focus({ preventScroll: true }));
+  }
+
+  function handleTabKey(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
+    e.preventDefault();
+    const index = VIEWS.findIndex((v) => v.id === view);
+    const next = e.key === "Home" ? 0 : e.key === "End" ? VIEWS.length - 1 : (index + (e.key === "ArrowRight" ? 1 : -1) + VIEWS.length) % VIEWS.length;
+    openView(VIEWS[next].id);
+  }
+
+  const webLoading = web.state.status === "loading";
+  const suggestWeb = view === "ml" && !searchLoading && marketEmptyFor !== null && marketEmptyFor === lastMlSearch;
 
   const busy = phase !== "idle";
   const details = result?.isProduct
@@ -342,6 +379,33 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
 
             {result?.isProduct && (
               <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-3" data-photo-result>
+                <div
+                  role="tablist"
+                  aria-label="Dónde buscar el producto"
+                  className="flex self-start rounded-lg border border-zinc-200 dark:border-zinc-800 p-1"
+                >
+                  {VIEWS.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      role="tab"
+                      id={`photo-tab-${v.id}`}
+                      aria-selected={view === v.id}
+                      aria-controls={`photo-panel-${v.id}`}
+                      tabIndex={view === v.id ? 0 : -1}
+                      onClick={() => setView(v.id)}
+                      onKeyDown={handleTabKey}
+                      className={`rounded-md px-3 py-2 text-[11px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                        view === v.id
+                          ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                          : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+                      }`}
+                    >
+                      {v.label}
+                    </button>
+                  ))}
+                </div>
+
                 <div>
                   <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                     <label
@@ -370,10 +434,17 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
                       onChange={(e) => setName(e.target.value)}
                       className="h-12 w-full min-w-0 flex-1 rounded-md border border-zinc-400 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3.5 text-sm font-medium text-zinc-900 dark:text-zinc-100 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
                     />
-                    <button type="submit" disabled={searchLoading || name.trim().length < 2} className={PRIMARY_BUTTON}>
-                      {searchLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />}
-                      <span>{searchLoading ? "Buscando..." : "Buscar en Mercado Libre"}</span>
-                    </button>
+                    {view === "ml" ? (
+                      <button type="submit" disabled={searchLoading || name.trim().length < 2} className={PRIMARY_BUTTON}>
+                        {searchLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />}
+                        <span>{searchLoading ? "Buscando..." : "Buscar en Mercado Libre"}</span>
+                      </button>
+                    ) : (
+                      <button type="submit" disabled={webLoading || name.trim().length < 2} className={PRIMARY_BUTTON} data-web-search>
+                        {webLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Globe className="size-4" aria-hidden />}
+                        <span>{webLoading ? "Buscando..." : "Buscar en la web de Uruguay"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -413,9 +484,30 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
 
                 {result.notes && <p className="break-words text-xs text-zinc-600 dark:text-zinc-400">{result.notes}</p>}
 
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                  Los resultados aparecen acá abajo, igual que en el Radar. Si corregís el nombre y buscás de nuevo, no se vuelve a usar la IA.
-                </p>
+                <div role="tabpanel" id="photo-panel-ml" aria-labelledby="photo-tab-ml" hidden={view !== "ml"} className="min-w-0">
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Los resultados aparecen acá abajo, igual que en el Radar. Si corregís el nombre y buscás de nuevo, no se vuelve a usar la IA.
+                  </p>
+                  {suggestWeb && (
+                    <div
+                      role="status"
+                      data-web-suggestion
+                      className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+                    >
+                      <p className="min-w-0 flex-1 break-words">
+                        Mercado Libre no tiene precios para «{marketEmptyFor}». Puede que se venda en otros sitios.
+                      </p>
+                      <button type="button" onClick={() => openView("web")} className={SECONDARY_BUTTON}>
+                        <Globe className="size-3.5" aria-hidden />
+                        <span>Probá en la web de Uruguay</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div role="tabpanel" id="photo-panel-web" aria-labelledby="photo-tab-web" hidden={view !== "web"} className="min-w-0">
+                  <WebSellersPanel name={name} state={web.state} onCancel={web.cancel} />
+                </div>
               </form>
             )}
           </div>
