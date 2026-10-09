@@ -19,7 +19,9 @@ import {
 import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import { batchResultsToCsv, signedUyu, UNPRICED_LABEL, type BatchItemInput, type BatchItemResult } from "@/lib/export/batchCsv";
+import { createDirectModel, createMlModel } from "@/lib/finance/channels";
 import { analyzeAll } from "@/lib/finance/engine";
+import { breakEvenExchangeRate } from "@/lib/finance/sensitivity";
 import { saveAuditToCloud } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 import type { AnalysisInputs } from "@/lib/finance/types";
@@ -208,6 +210,12 @@ export function BatchAuditor({
       const bestChannel = directProfit >= mlProfit ? "direct" : "ml";
       const winningResult = bestChannel === "direct" ? analysis.direct : analysis.ml;
 
+      // Dólar de quiebre del canal ganador. Sin dato de mercado no hay precio real: no se calcula.
+      const breakEven =
+        sampleSize === 0
+          ? null
+          : breakEvenExchangeRate(bestChannel === "ml" ? createMlModel(itemInputs.ml) : createDirectModel(itemInputs.direct), itemInputs);
+
       // Same traffic light as the rest of the app; "unpriced" is not a viability level.
       const status: BatchItemResult["status"] = sampleSize === 0 ? "unpriced" : winningResult.viability;
 
@@ -227,6 +235,8 @@ export function BatchAuditor({
         roi: winningResult.roi,
         status,
         marketError,
+        breakEvenRate: breakEven?.rate ?? null,
+        rateCushionPct: breakEven?.deltaPct ?? null,
         // Sin dato de mercado no se pasa al simulador un precio provisorio como si fuera de venta.
         analysisInputs: sampleSize === 0 ? { ...itemInputs, salePrice: 0 } : itemInputs,
       });
@@ -553,6 +563,7 @@ export function BatchAuditor({
                     <th className="py-2.5 px-3">Tienda Propia</th>
                     <th className="py-2.5 px-3">Canal Ganador</th>
                     <th className="py-2.5 px-3">Estado</th>
+                    <th className="py-2.5 px-3">Dólar de quiebre</th>
                     <th className="py-2.5 px-3 text-right">Acción</th>
                   </tr>
                 </thead>
@@ -658,6 +669,18 @@ export function BatchAuditor({
                           <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-black text-red-600 dark:text-red-400 uppercase">
                             <span aria-hidden className="size-1.5 rounded-full bg-red-500" /> {VIABILITY_LABELS.loss}
                           </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        {typeof r.breakEvenRate === "number" && typeof r.rateCushionPct === "number" ? (
+                          <>
+                            <span className="num font-bold text-zinc-900 dark:text-zinc-100">$ {formatRate(r.breakEvenRate)}</span>
+                            <span className={`block text-[11px] font-bold ${r.rateCushionPct > 0 ? "text-zinc-600 dark:text-zinc-400" : "text-red-600 dark:text-red-400"}`}>
+                              colchón {r.rateCushionPct > 0 ? "+" : ""}{formatPct(r.rateCushionPct)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-zinc-500 dark:text-zinc-400">—</span>
                         )}
                       </td>
                       <td className="py-3 px-3 text-right">

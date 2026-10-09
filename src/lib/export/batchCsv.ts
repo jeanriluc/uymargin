@@ -28,6 +28,13 @@ export interface BatchItemResult {
   /** Por qué no hay dato de mercado cuando la consulta falló o no devolvió precios. */
   marketError?: string;
   analysisInputs: AnalysisInputs;
+  /**
+   * "Dólar de quiebre" del canal ganador (UYU por USD) y cuánto puede subir el dólar antes de perder plata, en %.
+   * null cuando no aplica: sin dato de mercado, costo en pesos, o no quiebra dentro del rango que se busca.
+   * Si la fila ya pierde plata, el colchón es negativo.
+   */
+  breakEvenRate?: number | null;
+  rateCushionPct?: number | null;
 }
 
 export const UNPRICED_LABEL = "Sin dato de mercado";
@@ -52,6 +59,8 @@ export const BATCH_CSV_HEADERS = [
   "Ganancia Tienda ($U)",
   "ROI (%)",
   "Viabilidad",
+  "Dólar de quiebre ($U)",
+  "Colchón (%)",
 ] as const;
 
 const pct = (value: number) => value.toFixed(1).replace(".", ",");
@@ -63,7 +72,7 @@ const pct = (value: number) => value.toFixed(1).replace(".", ",");
 export function batchCsvRow(r: BatchItemResult): Array<string | number> {
   const base = [`"${r.sku}"`, `"${r.name.replace(/"/g, '""')}"`, String(r.cost).replace(".", ","), r.currency, Math.round(r.costUyu)];
   if (r.status === "unpriced") {
-    return [...base, "", r.sampleSize, "", "", "", "", "", "", UNPRICED_LABEL];
+    return [...base, "", r.sampleSize, "", "", "", "", "", "", UNPRICED_LABEL, "", ""];
   }
   return [
     ...base,
@@ -76,6 +85,8 @@ export function batchCsvRow(r: BatchItemResult): Array<string | number> {
     Math.round(r.directProfit),
     pct(r.roi),
     VIABILITY_LABELS[r.status],
+    typeof r.breakEvenRate === "number" ? r.breakEvenRate.toFixed(2).replace(".", ",") : "",
+    typeof r.rateCushionPct === "number" ? pct(r.rateCushionPct) : "",
   ];
 }
 
