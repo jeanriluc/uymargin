@@ -244,7 +244,7 @@ El contador de fotos es propio (`foto`): no gasta el de las búsquedas de Mercad
 - **Límites de Vercel Hobby.** Cuerpo de hasta 4,5 MB: el tope de 3 MB queda por debajo y la foto achicada pesa mucho menos. La función nueva es la séptima del proyecto, sobre un máximo de doce.
 - **Fotos HEIC.** El selector pide JPEG, PNG o WebP y los celulares suelen convertir solos. Si llega un HEIC igual, se rechaza con el mensaje de tipo no admitido.
 
-**Impacto en números existentes.** Ninguno. No se tocó `src/lib/finance` ni la búsqueda; la regresión del motor (108 casos con huella) y los 489 casos previos pasan igual.
+**Impacto en números existentes.** Ninguno. No se tocó `src/lib/finance` ni la búsqueda; la regresión del motor (108 casos con huella) y las siete tandas de tests que ya había pasan igual (489 casos; la de pestañas sumó uno sola, porque recorre la lista de pestañas y ahora hay cuatro).
 
 **Valor 4 · Confianza 3 · Riesgo 2.** La confianza es 3 y no más porque todo lo probado es con la IA simulada.
 
