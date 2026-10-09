@@ -18,40 +18,13 @@ import {
 } from "lucide-react";
 import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { VIABILITY_LABELS } from "@/lib/finance/constants";
+import { batchResultsToCsv, signedUyu, UNPRICED_LABEL, type BatchItemInput, type BatchItemResult } from "@/lib/export/batchCsv";
 import { analyzeAll } from "@/lib/finance/engine";
 import { saveAuditToCloud } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
-import type { AnalysisInputs, Viability } from "@/lib/finance/types";
+import type { AnalysisInputs } from "@/lib/finance/types";
 import type { MluSearchResponse } from "@/lib/mlu/types";
 import { normalizeCurrency } from "@/lib/currency";
-
-export interface BatchItemInput {
-  sku: string;
-  name: string;
-  cost: number;
-  currency: "USD" | "UYU";
-}
-
-export interface BatchItemResult {
-  sku: string;
-  name: string;
-  cost: number;
-  currency: "USD" | "UYU";
-  costUyu: number;
-  marketPriceUyu: number;
-  sampleSize: number;
-  bestChannel: "ml" | "direct";
-  mlProfit: number;
-  mlMargin: number;
-  directProfit: number;
-  directMargin: number;
-  roi: number;
-  /** "unpriced": Mercado Libre returned no market price, so the row cannot be ranked. */
-  status: Viability | "unpriced";
-  /** Por qué no hay dato de mercado cuando la consulta falló o no devolvió precios. */
-  marketError?: string;
-  analysisInputs: AnalysisInputs;
-}
 
 const SAMPLE_CATALOG: BatchItemInput[] = [
   { sku: "STAN-950", name: "Botella termo Stanley Classic 950 ml", cost: 26, currency: "USD" },
@@ -276,41 +249,7 @@ export function BatchAuditor({
   const handleExportCsv = () => {
     if (results.length === 0) return;
 
-    const headers = [
-      "SKU",
-      "Producto",
-      "Costo Original",
-      "Moneda",
-      "Costo UYU",
-      "Precio Mediana MLU ($U)",
-      "Muestras MLU",
-      "Canal Ganador",
-      "Margen ML (%)",
-      "Ganancia ML ($U)",
-      "Margen Tienda (%)",
-      "Ganancia Tienda ($U)",
-      "ROI (%)",
-      "Viabilidad",
-    ];
-
-    const rows = results.map((r) => [
-      `"${r.sku}"`,
-      `"${r.name.replace(/"/g, '""')}"`,
-      String(r.cost).replace(".", ","),
-      r.currency,
-      Math.round(r.costUyu),
-      r.status === "unpriced" ? "" : r.marketPriceUyu,
-      r.sampleSize,
-      r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia",
-      r.mlMargin.toFixed(1).replace(".", ","),
-      Math.round(r.mlProfit),
-      r.directMargin.toFixed(1).replace(".", ","),
-      Math.round(r.directProfit),
-      r.roi.toFixed(1).replace(".", ","),
-      r.status === "unpriced" ? "Sin dato de mercado" : VIABILITY_LABELS[r.status],
-    ]);
-
-    const csvContent = "\uFEFF" + [headers.join(";"), ...rows.map((row) => row.join(";"))].join("\n");
+    const csvContent = batchResultsToCsv(results);
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -643,7 +582,7 @@ export function BatchAuditor({
                         {r.status === "unpriced" ? (
                           <>
                             <span className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400">
-                              Sin dato de mercado
+                              {UNPRICED_LABEL}
                             </span>
                             {r.marketError && (
                               <span role="alert" className="block text-[11px] text-red-600 dark:text-red-400">
@@ -693,14 +632,16 @@ export function BatchAuditor({
                             <span>{r.bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"}</span>
                           </div>
                         )}
-                        <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                          +{formatUyu(winningProfit)} ({formatPct(winningMargin)})
-                        </span>
+                        {r.status !== "unpriced" && (
+                          <span className={`num text-[11px] font-bold ${winningProfit > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                            {signedUyu(winningProfit)} ({formatPct(winningMargin)})
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         {r.status === "unpriced" && (
                           <span className="inline-flex rounded-full bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-black text-zinc-700 dark:text-zinc-300 uppercase">
-                            Sin dato de mercado
+                            {UNPRICED_LABEL}
                           </span>
                         )}
                         {(r.status === "good" || r.status === "excellent") && (
@@ -724,7 +665,6 @@ export function BatchAuditor({
                           type="button"
                           onClick={() => {
                             onSimulateProduct(r.analysisInputs);
-                            window.scrollTo({ top: 250, behavior: "smooth" });
                           }}
                           className="px-2.5 py-1 rounded bg-zinc-100 dark:bg-zinc-800 hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black text-[11px] font-black uppercase transition-all cursor-pointer"
                         >
