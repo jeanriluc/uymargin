@@ -17,6 +17,8 @@ export interface RateRule {
 export const RATE_RULES = {
   chat: { scope: "chat", perMinute: 10, perDay: 150 },
   market: { scope: "mercado", perMinute: 60, perDay: 1500 },
+  // Identificación por foto: cada uso es una llamada a la IA con una imagen, así que el tope es bajo.
+  photo: { scope: "foto", perMinute: 5, perDay: 40 },
 } as const satisfies Record<string, RateRule>;
 
 export interface RateCounts {
