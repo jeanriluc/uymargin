@@ -88,6 +88,11 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
     []
   );
 
+  // Al llegar un producto, el foco va al nombre: es lo que hay que revisar antes de buscar.
+  useEffect(() => {
+    if (result?.isProduct) nameInput.current?.focus({ preventScroll: true });
+  }, [result]);
+
   function replacePhoto(next: Photo | null) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
     photoUrlRef.current = next?.url ?? null;
@@ -158,7 +163,6 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
       if (!parsed.ok) return setError(PHOTO_MESSAGES.invalidAnswer);
       setResult(parsed.value);
       setName(parsed.value.name);
-      if (parsed.value.isProduct) requestAnimationFrame(() => nameInput.current?.focus({ preventScroll: true }));
     } catch {
       if (turn !== turnRef.current) return;
       if (controller.signal.aborted) return;
@@ -421,6 +425,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading }: PhotoAnalyzerProps) {
       {error && (
         <div
           role="alert"
+          data-photo-error
           className="mt-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs leading-relaxed text-red-800 dark:text-red-300"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
