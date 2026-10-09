@@ -1,4 +1,5 @@
 // Confiabilidad del dato de mercado (Radar y Lote). Sin red: solo lógica sobre listas de precios.
+import { broadenQuery } from "../src/lib/mlu/broaden";
 import { assessMarketData, RELIABILITY_LABELS, RELIABILITY_RULES } from "../src/lib/mlu/reliability";
 import { computeMarketStats } from "../src/lib/mlu/statistics";
 
@@ -99,6 +100,48 @@ const frozen = Object.freeze([3000, 1000, 2000]) as number[];
 assessMarketData(frozen);
 assert(frozen.join() === "3000,1000,2000", "No modifica ni reordena la lista que recibe");
 assert(assessMarketData([2290, 0, Number.NaN, -3, 2400])!.sampleSize === 2, "Ignora precios inválidos (cero, negativos, NaN)");
+
+console.log("--- Búsqueda ampliada (ronda 10): nombre más corto ---");
+const broadenCases: Array<[string, string | null]> = [
+  ["Termo Stanley Classic 1 litro", "Termo Stanley Classic"],
+  ["Olla a presion electrica 5 lts Xion", "Olla a presion electrica Xion"],
+  ["Auriculares F9-5 TWS Bluetooth", "Auriculares F9-5 TWS"],
+  ["Botella termo Stanley Classic 950 ml", "Botella termo Stanley Classic"],
+  ["Botella termo Stanley Classic 950ml", "Botella termo Stanley Classic"],
+  ["Set cubiertos Tramontina 24 piezas inox", "Set cubiertos Tramontina inox"],
+  ["Lampara inteligente Xiaomi Smart LED", "Lampara inteligente Xiaomi Smart"],
+  ["Celular Samsung A54 5G 128gb", "Celular Samsung A54 5G"],
+  ['Parlante JBL Flip 6.5"', "Parlante JBL Flip"],
+  ["Pilas Duracell AA x12", "Pilas Duracell AA"],
+  ["Pilas Duracell AA x 12", "Pilas Duracell AA"],
+  ["Yerba Canarias 1 kg", "Yerba Canarias"],
+  ["Mouse Logitech M170 inalámbrico negro", "Mouse Logitech M170"],
+  ["Cable HDMI 2 m", "Cable HDMI"],
+  ["Aceite de oliva 500 ml", "Aceite de oliva"],
+  // Sin forma razonable de acortar
+  ["Termo", null],
+  ["Termo Stanley", null],
+  ["Termo 1 litro", null],
+  ["Auriculares Bluetooth", null],
+  ["Olla Xion OP105", null],
+  ["Samsung Galaxy S24", null],
+  ["", null],
+  ["   ", null],
+];
+for (const [name, expected] of broadenCases) {
+  const got = broadenQuery(name);
+  assert(got === expected, `«${name}» → ${expected === null ? "sin versión corta" : `«${expected}»`}${got === expected ? "" : ` (dio ${JSON.stringify(got)})`}`);
+}
+const broadened = broadenCases.map(([name]) => [name, broadenQuery(name)] as const).filter(([, b]) => b !== null);
+assert(
+  broadened.every(([name, b]) => b !== name.trim() && b!.split(/\s+/).length >= 2 && b!.length < name.length),
+  "La versión corta nunca es igual al original ni tiene menos de dos palabras"
+);
+assert(
+  ["F9-5", "A54", "5G", "M170"].every((code) => broadened.filter(([name]) => name.includes(code)).every(([, b]) => b!.includes(code))),
+  "No rompe códigos de modelo (F9-5, A54, 5G, M170)"
+);
+assert(broadenQuery("Termo Stanley Classic 1 litro negro") === "Termo Stanley Classic negro" && broadenQuery("Termo Stanley Classic negro") === "Termo Stanley Classic" && broadenQuery("Termo Stanley Classic") === null, "Se acorta de a un paso: primero la medida, después la palabra genérica, y ahí termina");
 
 console.log("\n=================================================");
 console.log(`RESULTADO: ${passedTests}/${totalTests} casos de confiabilidad del dato de mercado`);
