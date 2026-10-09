@@ -47,6 +47,47 @@ assert(mixed.level === "weak" && mixed.usedCount === 2 && mixed.reasons.join() =
 assert(assessMarketData([2000, 2100, 2200, 2290, 2400, 2500], 6)!.level === "solid", "Todos usados (no hay mezcla): no baja la confiabilidad");
 assert(solid.usedCount === 0 && assessMarketData([2000, 2100], 9)!.usedCount === 2, "Sin usados no cambia nada; la cantidad de usados nunca supera a la de precios");
 
+console.log("--- Calibración (ronda 10): rango total y pocas muestras ---");
+// La olla: p75/p25 = 1,44 y nada supera 3 veces la mediana, pero el más caro vale 6,7 veces el más barato.
+const olla = assessMarketData([900, 1500, 2400, 2450, 2500, 6000])!;
+assert(Math.abs(olla.spread - 1.44) < 0.01 && Math.abs(olla.range - 6.67) < 0.01, "Olla: p75/p25 = 1,44 pero el rango total es de 6,7 veces");
+assert(
+  olla.level === "weak" && olla.reasons.includes("los precios van de $U 900 a $U 6.000"),
+  `Olla: ahora es Dato flojo, con el motivo del rango (${olla.reasons.join("; ")})`
+);
+assert(olla.median === 2425 && olla.sampleSize === 6, "Olla: la mediana (2.425) y la cantidad de precios no cambian");
+const realSolid = assessMarketData([2400, 2450, 2500, 2550, 2600, 2500])!;
+assert(realSolid.level === "solid" && realSolid.reasons.length === 0 && realSolid.min === 2400 && realSolid.max === 2600, "Seis precios entre 2.400 y 2.600: Dato sólido");
+// Rango justo en el umbral: 4,0 pasa, 4,1 no. (Ocho precios, para aislar la regla del rango de la de pocas muestras.)
+const atLimit = assessMarketData([1000, 2000, 2000, 2000, 2000, 2000, 2000, 4000])!;
+const overLimit = assessMarketData([1000, 2000, 2000, 2000, 2000, 2000, 2000, 4100])!;
+assert(atLimit.range === 4 && atLimit.level === "solid", `Rango de exactamente ${RELIABILITY_RULES.maxRange} veces: sigue siendo sólido`);
+assert(
+  overLimit.range === 4.1 && overLimit.level === "weak" && overLimit.reasons.join() === "los precios van de $U 1.000 a $U 4.100",
+  "Rango de 4,1 veces: Dato flojo, y el único motivo es el rango"
+);
+// Pocas muestras (5 o 6): alcanza con que un precio duplique a la mediana.
+const doubled = assessMarketData([2400, 2450, 2500, 2550, 5200])!;
+assert(
+  doubled.level === "weak" && doubled.farCount === 1 && doubled.reasons.join() === "hay 1 precio muy fuera de rango" && doubled.range < RELIABILITY_RULES.maxRange,
+  "Cinco precios y uno duplica al resto: Dato flojo (con el corte de 3 veces salía sólido)"
+);
+const doubledBig = assessMarketData([2400, 2450, 2500, 2500, 2500, 2550, 5200])!;
+assert(doubledBig.farCount === 0 && doubledBig.level === "solid", `Con más de ${RELIABILITY_RULES.smallSampleMax} precios el corte vuelve a ser de ${RELIABILITY_RULES.farFactor} veces`);
+const threeWide = assessMarketData([1000, 2000, 5000])!;
+assert(threeWide.level === "weak" && threeWide.reasons.includes("hay solo 3 precios") && threeWide.reasons.includes("los precios van de $U 1.000 a $U 5.000"), "Tres precios con rango de 5 veces: Dato flojo, con los dos motivos");
+const fourClose = assessMarketData([2400, 2450, 2500, 2550])!;
+assert(fourClose.level === "weak" && fourClose.reasons.join() === "hay solo 4 precios", "Cuatro precios parecidos: Dato flojo solo por la cantidad");
+const single = assessMarketData([2500])!;
+assert(single.level === "few" && single.range === 1 && single.reasons.join() === "hay un solo precio", "Un solo precio: Pocas muestras, sin motivo de rango");
+const twoWide = assessMarketData([500, 5000])!;
+assert(twoWide.level === "few" && twoWide.reasons.includes("los precios van de $U 500 a $U 5.000"), "Dos precios muy distintos: sigue siendo Pocas muestras y además avisa el rango");
+// Precios en dólares convertidos a pesos (cotización 40): U$S 60, 61, 62,5, 63, 65 y uno de U$S 300.
+const usdPrices = [60, 61, 62.5, 63, 65].map((usd) => usd * 40);
+assert(assessMarketData(usdPrices)!.level === "solid" && assessMarketData(usdPrices)!.median === 2500, "Precios en dólares pasados a pesos: se evalúan igual (sólido, mediana 2.500)");
+const usdWide = assessMarketData([...usdPrices, 300 * 40])!;
+assert(usdWide.level === "weak" && usdWide.reasons.includes("los precios van de $U 2.400 a $U 12.000"), "Dólares convertidos con uno muy caro: Dato flojo con el rango en pesos");
+
 // No excluye nada ni cambia la mediana que usa la app.
 const prices = [150, 2000, 2100, 2200, 2290, 2400, 2500, 9500];
 const appStats = computeMarketStats(prices, { excludeOutliers: false })!;

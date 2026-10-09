@@ -49,9 +49,13 @@ export function computeMarketStats(
 export const FAR_FROM_MEDIAN_FACTOR = 3;
 
 /** Solo marca: el precio no se excluye de ninguna estadística. Sin mediana no se marca nada. */
-export function isFarFromMedian(priceUyu: number, medianUyu: number | null | undefined): boolean {
+export function isFarFromMedian(
+  priceUyu: number,
+  medianUyu: number | null | undefined,
+  factor: number = FAR_FROM_MEDIAN_FACTOR,
+): boolean {
   if (!medianUyu || medianUyu <= 0 || !Number.isFinite(priceUyu) || priceUyu <= 0) return false;
-  return priceUyu > medianUyu * FAR_FROM_MEDIAN_FACTOR || priceUyu < medianUyu / FAR_FROM_MEDIAN_FACTOR;
+  return priceUyu > medianUyu * factor || priceUyu < medianUyu / factor;
 }
 
 export function priceToUyu(price: number, currency: Currency, exchangeRate: number): number {
