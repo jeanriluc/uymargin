@@ -99,17 +99,18 @@ export function webQueryKey(query: string): string {
 }
 
 /**
- * Lo que se le pide a Google: "<nombre>" comprar Uruguay. Una sola consulta por búsqueda.
- * Las comillas del nombre se sacan para que no rompan la frase exacta.
+ * Lo que se le pide a Google: <nombre> comprar Uruguay. Una sola consulta por búsqueda.
+ * Va sin comillas a propósito: como frase exacta Google devuelve casi nada (probado: 1 resultado con
+ * comillas contra 9 tiendas sin ellas). Por eso también se sacan las comillas que traiga el nombre.
  */
 export function buildSearchQuery(name: string): string {
   const inner = name
-    .replace(/["“”«»]/g, " ")
+    .replace(/["\u201c\u201d\u201e\u201f\u00ab\u00bb\uff02]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, WEB_LIMITS.nameInSearchMax)
     .trim();
-  return `"${inner}" comprar Uruguay`;
+  return `${inner} comprar Uruguay`;
 }
 
 // ------------------------------------------------------------------
