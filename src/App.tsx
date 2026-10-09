@@ -23,6 +23,7 @@ import { MarketSummary, type MarketState } from "@/components/search/MarketSumma
 import { ExactOffersSection } from "@/components/search/ExactOffersSection";
 import { CostPanel } from "@/components/calculator/CostPanel";
 import { ProfitHeroCard } from "@/components/calculator/ProfitHeroCard";
+import { RiskTools } from "@/components/calculator/RiskTools";
 import { BundleOptimizer } from "@/components/calculator/BundleOptimizer";
 import { PricingBar } from "@/components/calculator/PricingBar";
 import { StickyResultBar } from "@/components/calculator/StickyResultBar";
@@ -770,6 +771,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             updateInputs({ exchangeRate: newRate });
           }}
         />
+
+        {/* Riesgo: sensibilidad al dólar y escenarios (cerrados por defecto) */}
+        <RiskTools inputs={inputs} analysis={analysis} bestChannel={bestChannel} rateMissing={resultPending} />
 
         {renderTools("flex lg:hidden")}
 

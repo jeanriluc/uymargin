@@ -100,7 +100,7 @@ function solveMonotonic(f: (price: number) => number): number | null {
  * `f` must be non-increasing in `x`. Returns null when not even `x = 0` satisfies it.
  * The returned value is always on the side where `f >= 0`.
  */
-function solveMaxDecreasing(f: (x: number) => number, initialHi: number): number | null {
+export function solveMaxDecreasing(f: (x: number) => number, initialHi: number): number | null {
   if (f(0) < 0) return null;
   let lo = 0;
   let hi = Math.max(1, initialHi);

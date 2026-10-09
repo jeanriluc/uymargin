@@ -94,6 +94,7 @@ const unpriced: BatchItemResult = {
   ...priced, sku: "B-2", name: "Sin precio", marketPriceUyu: 600, sampleSize: 0, mlProfit: -292, mlMargin: -48.7, directProfit: -310, directMargin: -51.7, roi: -73, status: "unpriced",
 };
 const col = (name: (typeof BATCH_CSV_HEADERS)[number]) => BATCH_CSV_HEADERS.indexOf(name);
+const same14 = (x: Array<string | number>, y: Array<string | number>) => x.slice(0, 14).join("|") === y.slice(0, 14).join("|");
 const pricedRow = batchCsvRow(priced);
 const unpricedRow = batchCsvRow(unpriced);
 assert(pricedRow.length === BATCH_CSV_HEADERS.length && unpricedRow.length === BATCH_CSV_HEADERS.length, "Cada fila del CSV tiene una celda por columna");
@@ -105,6 +106,22 @@ assert(
 const emptyColumns = ["Precio Mediana MLU ($U)", "Canal Ganador", "Margen ML (%)", "Ganancia ML ($U)", "Margen Tienda (%)", "Ganancia Tienda ($U)", "ROI (%)"] as const;
 assert(emptyColumns.every((c) => unpricedRow[col(c)] === ""), "Fila sin dato de mercado: precio, canal, márgenes, ganancias y ROI van vacíos");
 assert(unpricedRow[col("Viabilidad")] === "Sin dato de mercado" && unpricedRow[col("Costo UYU")] === 400, "Fila sin dato de mercado: conserva el costo y dice «Sin dato de mercado»");
+// Columnas nuevas al final: no cambian el orden ni el contenido de las anteriores.
+assert(
+  BATCH_CSV_HEADERS.slice(0, 14).join("|") === "SKU|Producto|Costo Original|Moneda|Costo UYU|Precio Mediana MLU ($U)|Muestras MLU|Canal Ganador|Margen ML (%)|Ganancia ML ($U)|Margen Tienda (%)|Ganancia Tienda ($U)|ROI (%)|Viabilidad" &&
+    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)",
+  "CSV del Lote: las 14 columnas de antes quedan igual y se agregan al final «Dólar de quiebre» y «Colchón»"
+);
+const withBreakEven = batchCsvRow({ ...priced, breakEvenRate: 76.634, rateCushionPct: 89.22 });
+assert(
+  withBreakEven[col("Dólar de quiebre ($U)")] === "76,63" && withBreakEven[col("Colchón (%)")] === "89,2" && same14(withBreakEven, pricedRow),
+  "Fila con costo en dólares: exporta el dólar de quiebre y el colchón, sin tocar el resto"
+);
+assert(pricedRow[col("Dólar de quiebre ($U)")] === "" && pricedRow[col("Colchón (%)")] === "", "Fila sin dólar de quiebre (costo en pesos): esas dos celdas van vacías");
+assert(
+  batchCsvRow({ ...unpriced, breakEvenRate: 50, rateCushionPct: 20 })[col("Dólar de quiebre ($U)")] === "" && unpricedRow[col("Colchón (%)")] === "",
+  "Fila sin dato de mercado: dólar de quiebre y colchón vacíos"
+);
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");
 assert(signedUyu(-292) === "−$U 292", "Pérdida: «−$U 292», sin el «+» adelante");

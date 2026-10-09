@@ -1,0 +1,1082 @@
+[
+ {
+  "name": "literalE · producto 1 · simple",
+  "hash": "d4ba9ed44288a1132934c9d55039024aa4089d3672b432bd0a337bfaca0e0ece",
+  "mlNetProfit": 939.3,
+  "mlNetMargin": 41.0174672489083,
+  "mlViability": "excellent",
+  "directNetProfit": 935.52738,
+  "directNetMargin": 40.85272401746725,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 1 · riesgos",
+  "hash": "04839fd3d935b5b7459cb9f770405a7f5a406bcdf01dbeb4d77dab4841c5c284",
+  "mlNetProfit": 777.52,
+  "mlNetMargin": 33.9528384279476,
+  "mlViability": "excellent",
+  "directNetProfit": 773.74738,
+  "directNetMargin": 33.78809519650655,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "be66483fa06a32540d6232172739a7fe73ba7f5506aabc25c1c58f8f149fa5ad",
+  "mlNetProfit": 565.5,
+  "mlNetMargin": 24.694323144104803,
+  "mlViability": "good",
+  "directNetProfit": 1078.467,
+  "directNetMargin": 47.09462882096071,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 2 · simple",
+  "hash": "fee26b199aa9b5e384e3abb9cefca1946d315ffecdc48b608f431eb3bd532538",
+  "mlNetProfit": 151.5,
+  "mlNetMargin": 33.666666666666664,
+  "mlViability": "excellent",
+  "directNetProfit": 38.094899999999996,
+  "directNetMargin": 8.465533333333331,
+  "directViability": "tight"
+ },
+ {
+  "name": "literalE · producto 2 · riesgos",
+  "hash": "efe40eab7ddee234dad9df8c844e8dec1735db2af18a5fe1eed0bf97cb27b19a",
+  "mlNetProfit": 21.5,
+  "mlNetMargin": 4.777777777777778,
+  "mlViability": "tight",
+  "directNetProfit": -91.9051,
+  "directNetMargin": -20.423355555555556,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "60500bfd0eb8620cdc0ead438287ba5c52a75cf1d47028d8570a7d3a196ef551",
+  "mlNetProfit": -138.75,
+  "mlNetMargin": -30.833333333333336,
+  "mlViability": "loss",
+  "directNetProfit": 170.785,
+  "directNetMargin": 37.95222222222222,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 3 · simple",
+  "hash": "a29b554e808e4205ac0cb2dbe2e76f4d8391107c946a0b4f9a1a4d6e9a7861e0",
+  "mlNetProfit": 1025.3,
+  "mlNetMargin": 32.141065830721,
+  "mlViability": "excellent",
+  "directNetProfit": 1094.71718,
+  "directNetMargin": 34.317152978056434,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 3 · riesgos",
+  "hash": "e4d610e36ffb3f9c5012a8822d4fc71a4f10cae69b98b175d25204d45c37f1ba",
+  "mlNetProfit": 842.38,
+  "mlNetMargin": 26.40689655172414,
+  "mlViability": "excellent",
+  "directNetProfit": 911.7971800000001,
+  "directNetMargin": 28.582983699059568,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "cbbc6ab5856b8c49f3253b5fa18fc8cb4a84b578ac01316263ac386bc153b62a",
+  "mlNetProfit": 609.875,
+  "mlNetMargin": 19.11833855799373,
+  "mlViability": "good",
+  "directNetProfit": 1241.912,
+  "directNetMargin": 38.93141065830721,
+  "directViability": "excellent"
+ },
+ {
+  "name": "literalE · producto 4 · simple",
+  "hash": "eaa12356b952a49421ce62f53853e7a00b17f3f792946e9ed9d4d384430cd875",
+  "mlNetProfit": -648,
+  "mlNetMargin": -32.4,
+  "mlViability": "loss",
+  "directNetProfit": -675.356,
+  "directNetMargin": -33.7678,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 4 · riesgos",
+  "hash": "b0f895a3a67e02a31ab1c83feb067411e0f8396a3971d75a5fda7ca953ae7cea",
+  "mlNetProfit": -834.16,
+  "mlNetMargin": -41.708,
+  "mlViability": "loss",
+  "directNetProfit": -861.516,
+  "directNetMargin": -43.0758,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "539e9256d15d45a09e959027af488f28271d556617be3921093544d9214ef6d4",
+  "mlNetProfit": -1007.6999999999998,
+  "mlNetMargin": -50.38499999999999,
+  "mlViability": "loss",
+  "directNetProfit": -533.0999999999998,
+  "directNetMargin": -26.65499999999999,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 5 · simple",
+  "hash": "c9279ca659f0eb952b899457c2e55e952990b5d7773418900c4ae943451febe9",
+  "mlNetProfit": 103.13,
+  "mlNetMargin": 8.601334445371142,
+  "mlViability": "tight",
+  "directNetProfit": 50.63507799999999,
+  "directNetMargin": 4.223109090909091,
+  "directViability": "tight"
+ },
+ {
+  "name": "literalE · producto 5 · riesgos",
+  "hash": "c45d6823e8981ec98dd1ac9781f23fbb4394b9390191d34d976f57449dfae909",
+  "mlNetProfit": -46.86200000000001,
+  "mlNetMargin": -3.9084236864053388,
+  "mlViability": "loss",
+  "directNetProfit": -99.35692200000001,
+  "directNetMargin": -8.28664904086739,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "2473ba3024db583bdc3d086184af94a7140f9f339f1d7b0a17ffdab8a301a9c1",
+  "mlNetProfit": -220.825,
+  "mlNetMargin": -18.41743119266055,
+  "mlViability": "loss",
+  "directNetProfit": 187.8027,
+  "directNetMargin": 15.663277731442868,
+  "directViability": "good"
+ },
+ {
+  "name": "literalE · producto 6 · simple",
+  "hash": "6be14209e2bb2c47360be3dadab48de6f89588886b0adca74aa01b9ce41c9377",
+  "mlNetProfit": -480,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -670,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 6 · riesgos",
+  "hash": "f5c86037276f97d4af8e9b529871b95956fea40a8def21eb8659a14ee2226273",
+  "mlNetProfit": -612,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -802,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "literalE · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "f4d676985aa2789d83481f98c26a4bf45cc03db4bcc136cda3663c3ee57e2aab",
+  "mlNetProfit": -750,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -540,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 1 · simple",
+  "hash": "b34073a2559c7317c46cc1b1e609d4c5d91de1071da197a3da0bd4decb6ed16d",
+  "mlNetProfit": 769.9180327868852,
+  "mlNetMargin": 33.62087479418713,
+  "mlViability": "excellent",
+  "directNetProfit": 766.8257213114754,
+  "directNetMargin": 33.48583935857971,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 1 · riesgos",
+  "hash": "ca4b6b3f809eca46d9285161bffddbcf1a9f65895cb267b4d46bff7b032546a7",
+  "mlNetProfit": 608.1380327868852,
+  "mlNetMargin": 26.556245973226428,
+  "mlViability": "excellent",
+  "directNetProfit": 605.0457213114754,
+  "directNetMargin": 26.42121053761901,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "5d7506bb47e96fa94897e7dfa548ff3aa1729bbd0a84b7c1e9116a2c9dc02fc2",
+  "mlNetProfit": 452.5696721311475,
+  "mlNetMargin": 19.76286777865273,
+  "mlViability": "good",
+  "directNetProfit": 873.0344262295083,
+  "directNetMargin": 38.12377407115757,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 2 · simple",
+  "hash": "e3b03ff2ead8b80ab8050818061d353adfdd65f9458302b4fd2194ebb75470ed",
+  "mlNetProfit": 124.18032786885246,
+  "mlNetMargin": 27.595628415300546,
+  "mlViability": "excellent",
+  "directNetProfit": 31.225327868852453,
+  "directNetMargin": 6.938961748633879,
+  "directViability": "tight"
+ },
+ {
+  "name": "general · producto 2 · riesgos",
+  "hash": "b379f2a3371ae0b1617ad905630ebcba447d512a32563ba828a666132c57e652",
+  "mlNetProfit": -5.819672131147545,
+  "mlNetMargin": -1.2932604735883433,
+  "mlViability": "loss",
+  "directNetProfit": -98.77467213114755,
+  "directNetMargin": -21.949927140255014,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "ed80b3fa9f62442365885e846473c968f1dfcc74cad0dd6246fafdefe26262f2",
+  "mlNetProfit": -124.54918032786885,
+  "mlNetMargin": -27.677595628415304,
+  "mlViability": "loss",
+  "directNetProfit": 129.16803278688525,
+  "directNetMargin": 28.704007285974498,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 3 · simple",
+  "hash": "88ad538d596af34637538d17dae38ed1ef7f4d3dd0d1832bf5d07dc8c80aabc2",
+  "mlNetProfit": 840.4098360655737,
+  "mlNetMargin": 26.34513592682049,
+  "mlViability": "excellent",
+  "directNetProfit": 897.3091639344264,
+  "directNetMargin": 28.1288139164397,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 3 · riesgos",
+  "hash": "85d37b935b1c1c786f1b4c21e3a2fdb1db202258aeb17d8bac983fd872dd8b50",
+  "mlNetProfit": 657.4898360655739,
+  "mlNetMargin": 20.61096664782363,
+  "mlViability": "good",
+  "directNetProfit": 714.3891639344264,
+  "directNetMargin": 22.394644637442834,
+  "directViability": "good"
+ },
+ {
+  "name": "general · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "7315b19716ae26e66fcde342895586f53757145f3f851e7132aa02477dbcb4f2",
+  "mlNetProfit": 488.7397540983607,
+  "mlNetMargin": 15.3209954262809,
+  "mlViability": "good",
+  "directNetProfit": 1006.8028688524591,
+  "directNetMargin": 31.561218459324735,
+  "directViability": "excellent"
+ },
+ {
+  "name": "general · producto 4 · simple",
+  "hash": "5b05a971b81755d3e0e7d039036efde5eca50014222e81659d488052fde8cbda",
+  "mlNetProfit": -531.1475409836065,
+  "mlNetMargin": -26.557377049180324,
+  "mlViability": "loss",
+  "directNetProfit": -553.5704918032786,
+  "directNetMargin": -27.67852459016393,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 4 · riesgos",
+  "hash": "37e440f3ee0b121eb1dcc939bd1488ff1509502195ee4818a1deee4405924b6d",
+  "mlNetProfit": -717.3075409836065,
+  "mlNetMargin": -35.865377049180324,
+  "mlViability": "loss",
+  "directNetProfit": -739.7304918032787,
+  "directNetMargin": -36.98652459016393,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "a40b32df1fe82cde3017fef36d943302ed7c130b6f56ced146fcffdaad3bfcc5",
+  "mlNetProfit": -836.7491803278687,
+  "mlNetMargin": -41.83745901639343,
+  "mlViability": "loss",
+  "directNetProfit": -447.7327868852457,
+  "directNetMargin": -22.38663934426228,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 5 · simple",
+  "hash": "7d12f11cebaa9aa4e6c0651be49f5c20c4fedac06a03989c363a6dba2c69efc4",
+  "mlNetProfit": 84.53278688524587,
+  "mlNetMargin": 7.050274135550113,
+  "mlViability": "tight",
+  "directNetProfit": 41.50416229508193,
+  "directNetMargin": 3.4615648286140064,
+  "directViability": "tight"
+ },
+ {
+  "name": "general · producto 5 · riesgos",
+  "hash": "bc5bb26024d2bfe0489321fe53899e528aa955227ed981ac34f51b27ffd157b0",
+  "mlNetProfit": -65.45921311475414,
+  "mlNetMargin": -5.459483996226366,
+  "mlViability": "loss",
+  "directNetProfit": -108.48783770491806,
+  "directNetMargin": -9.048193303162474,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "486161f24e23febcdb3a1108e73b981d13b1636ad3a8af1d359bfecd43569544",
+  "mlNetProfit": -191.8237704918033,
+  "mlNetMargin": -15.998646412994436,
+  "mlViability": "loss",
+  "directNetProfit": 143.11696721311472,
+  "directNetMargin": 11.936360901844429,
+  "directViability": "tight"
+ },
+ {
+  "name": "general · producto 6 · simple",
+  "hash": "516b0b48daa5e22f71e34ea4d213b571fb35d90e079e8b46f7a14a06cdcd84a2",
+  "mlNetProfit": -393.44262295081967,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -549.1803278688525,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 6 · riesgos",
+  "hash": "93814eefd9e1b7a9f2a28c624bbcada0a1ee83bc016aaec9403112cb6ae01f12",
+  "mlNetProfit": -525.4426229508197,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -681.1803278688525,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "general · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "1c77737a676fd9e694dabb116e32c7f18694131292d411bb9de1efc50d75707a",
+  "mlNetProfit": -625.5737704918033,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -453.44262295081967,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 1 · simple",
+  "hash": "33eb87926309064f3da14b39b6c962333374f078af054160613d2b2729360686",
+  "mlNetProfit": 580.0327868852459,
+  "mlNetMargin": 25.328942658744356,
+  "mlViability": "excellent",
+  "directNetProfit": 576.940475409836,
+  "directNetMargin": 25.193907223136947,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinCredito · producto 1 · riesgos",
+  "hash": "81aac2a3241b5f517d645516419ee0e49c6e5cae8bb7c87b5078ad81d8e22534",
+  "mlNetProfit": 418.2527868852459,
+  "mlNetMargin": 18.264313837783664,
+  "mlViability": "good",
+  "directNetProfit": 415.16047540983607,
+  "directNetMargin": 18.129278402176247,
+  "directViability": "good"
+ },
+ {
+  "name": "generalSinCredito · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "0698932c9ee643f1607ef185ca631b6c61372d24dbe41addf1078530e2e69be0",
+  "mlNetProfit": 262.6844262295082,
+  "mlNetMargin": 11.470935643209964,
+  "mlViability": "tight",
+  "directNetProfit": 683.1491803278689,
+  "directNetMargin": 29.8318419357148,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinCredito · producto 2 · simple",
+  "hash": "ef58171a2a082a475e069af829b5bda3fae077ff002e33047c0bb74c3487f05e",
+  "mlNetProfit": 88.11475409836065,
+  "mlNetMargin": 19.581056466302364,
+  "mlViability": "good",
+  "directNetProfit": -4.840245901639349,
+  "directNetMargin": -1.0756102003643,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 2 · riesgos",
+  "hash": "9f725c44202b8cc197fe0e04f9ecb01456689362cd699ae17e247357ba349ab7",
+  "mlNetProfit": -41.88524590163935,
+  "mlNetMargin": -9.307832422586522,
+  "mlViability": "loss",
+  "directNetProfit": -134.84024590163935,
+  "directNetMargin": -29.964499089253188,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "508b825160cca229e62d84e78bd04e05ea1d04b2ecdff3346fab31cee96e7cfe",
+  "mlNetProfit": -160.61475409836066,
+  "mlNetMargin": -35.69216757741348,
+  "mlViability": "loss",
+  "directNetProfit": 93.10245901639344,
+  "directNetMargin": 20.68943533697632,
+  "directViability": "good"
+ },
+ {
+  "name": "generalSinCredito · producto 3 · simple",
+  "hash": "e1eccc529712694069d788081d2f267842d46b57adf3aa6f230916e1a1656af6",
+  "mlNetProfit": 524.8360655737705,
+  "mlNetMargin": 16.45254124055707,
+  "mlViability": "good",
+  "directNetProfit": 581.7353934426231,
+  "directNetMargin": 18.236219230176275,
+  "directViability": "good"
+ },
+ {
+  "name": "generalSinCredito · producto 3 · riesgos",
+  "hash": "a9c831a09c3e20bad1a575e3f5179d2096740efeaed8156014de393e3a2e3a19",
+  "mlNetProfit": 341.91606557377054,
+  "mlNetMargin": 10.718371961560205,
+  "mlViability": "tight",
+  "directNetProfit": 398.8153934426232,
+  "directNetMargin": 12.502049951179412,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalSinCredito · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "8c65e9d8944cb318f8da00dd75c70f0f37070e2788827229427d809f8c9bef69",
+  "mlNetProfit": 173.16598360655746,
+  "mlNetMargin": 5.428400740017475,
+  "mlViability": "tight",
+  "directNetProfit": 691.2290983606558,
+  "directNetMargin": 21.66862377306131,
+  "directViability": "good"
+ },
+ {
+  "name": "generalSinCredito · producto 4 · simple",
+  "hash": "b6ae5c414c17f741aab2157304245758162db79eef6365a6463c127862ad845d",
+  "mlNetProfit": -961.7704918032787,
+  "mlNetMargin": -48.088524590163935,
+  "mlViability": "loss",
+  "directNetProfit": -984.1934426229509,
+  "directNetMargin": -49.20967213114755,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 4 · riesgos",
+  "hash": "83ea46ad484a47d48ca8a4c64fab1e1f83384d81b138812f3aaeb2042d7ef36f",
+  "mlNetProfit": -1147.9304918032788,
+  "mlNetMargin": -57.396524590163935,
+  "mlViability": "loss",
+  "directNetProfit": -1170.3534426229508,
+  "directNetMargin": -58.517672131147535,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "5b84a9a88f2dc53fb77c5283407769ac0c45da419a8cc681c7fc500a00f6c6a1",
+  "mlNetProfit": -1267.3721311475408,
+  "mlNetMargin": -63.368606557377035,
+  "mlViability": "loss",
+  "directNetProfit": -878.3557377049178,
+  "directNetMargin": -43.91778688524589,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 5 · simple",
+  "hash": "006000e22394bff6ee1a416d40fc40cd476cadba2b44a7f69886c3ce32938f22",
+  "mlNetProfit": -77.76229508196724,
+  "mlNetMargin": -6.48559592009735,
+  "mlViability": "loss",
+  "directNetProfit": -120.7909196721312,
+  "directNetMargin": -10.074305227033461,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 5 · riesgos",
+  "hash": "faa70a413ad9795034a28b2f8cb9be3eb6250155548d9f8360aead2b34825c92",
+  "mlNetProfit": -227.75429508196726,
+  "mlNetMargin": -18.995354051873832,
+  "mlViability": "loss",
+  "directNetProfit": -270.7829196721312,
+  "directNetMargin": -22.584063358809942,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "535ada5063664a38bba92f8cf5b822c0cced695713d1697318289ee46589fe85",
+  "mlNetProfit": -354.1188524590164,
+  "mlNetMargin": -29.534516468641904,
+  "mlViability": "loss",
+  "directNetProfit": -19.178114754098402,
+  "directNetMargin": -1.599509153803036,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 6 · simple",
+  "hash": "93d44cf8f40ccb49303f27394089b8c1713df125a21581a60e5bdc51b2302892",
+  "mlNetProfit": -480,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -635.7377049180328,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 6 · riesgos",
+  "hash": "307765cbf8ca155416ab5f41c8bed75cff844b9e644588bb7fc8d9dddda66edb",
+  "mlNetProfit": -612,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -767.7377049180328,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinCredito · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "397aac8dfae911db9601fdf57eb5ef74316d7cb53f43d5ab75c7bbcb36f95302",
+  "mlNetProfit": -712.1311475409836,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -540,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 1 · simple",
+  "hash": "9501b8f46296f5b08dfbf09c0631cb6ffb2df14a4c95851a50a76c0094033c35",
+  "mlNetProfit": 826.8454545454546,
+  "mlNetMargin": 36.10678840809845,
+  "mlViability": "excellent",
+  "directNetProfit": 823.0728345454546,
+  "directNetMargin": 35.94204517665741,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 1 · riesgos",
+  "hash": "7699b298e433b969633092370fd25147a60549f81de8412de4b2a8092ec19258",
+  "mlNetProfit": 665.0654545454546,
+  "mlNetMargin": 29.042159587137757,
+  "mlViability": "excellent",
+  "directNetProfit": 661.2928345454546,
+  "directNetMargin": 28.87741635569671,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "b17a72ac05c422a0399d78ee8c11b0b11be7486cead5c5a76e8ed0dfd4cbb90a",
+  "mlNetProfit": 453.04545454545456,
+  "mlNetMargin": 19.78364430329496,
+  "mlViability": "good",
+  "directNetProfit": 966.0124545454547,
+  "directNetMargin": 42.18394998015086,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 2 · simple",
+  "hash": "63625bb52a3337871567e6bfef357c396bee20a095f816916a84adb13ca3435f",
+  "mlNetProfit": 128.77272727272728,
+  "mlNetMargin": 28.616161616161616,
+  "mlViability": "excellent",
+  "directNetProfit": 15.367627272727269,
+  "directNetMargin": 3.415028282828282,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalSinRut · producto 2 · riesgos",
+  "hash": "b24dacb463a84165ffa4a4b0b4ccd09986b67f65d6ad7207608d2bd61c734ed2",
+  "mlNetProfit": -1.2272727272727266,
+  "mlNetMargin": -0.2727272727272726,
+  "mlViability": "loss",
+  "directNetProfit": -114.63237272727272,
+  "directNetMargin": -25.473860606060605,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "35e2c1f12e3af1a77cba177ff6b5bd4442136b9b1f0974134f4b4074e0fed250",
+  "mlNetProfit": -161.47727272727272,
+  "mlNetMargin": -35.88383838383839,
+  "mlViability": "loss",
+  "directNetProfit": 148.05772727272728,
+  "directNetMargin": 32.90171717171717,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 3 · simple",
+  "hash": "c4e35a5032650d7c1655eb0f46664240fe78147d1674e0c7222563a4cb77f696",
+  "mlNetProfit": 894.390909090909,
+  "mlNetMargin": 28.037332573382727,
+  "mlViability": "excellent",
+  "directNetProfit": 963.8080890909091,
+  "directNetMargin": 30.213419720718154,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 3 · riesgos",
+  "hash": "89e1b476c74d0bb19b2797f98f39234f4570ce1b3f32d9b3d602c1c64b14b24d",
+  "mlNetProfit": 711.4709090909091,
+  "mlNetMargin": 22.303163294385868,
+  "mlViability": "good",
+  "directNetProfit": 780.8880890909093,
+  "directNetMargin": 24.47925044172129,
+  "directViability": "good"
+ },
+ {
+  "name": "generalSinRut · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "1ce68bd0a67a2c5d55617fa2cd544445fb43175ea1ce738fe5aa002d378a428b",
+  "mlNetProfit": 478.96590909090907,
+  "mlNetMargin": 15.014605300655456,
+  "mlViability": "good",
+  "directNetProfit": 1111.002909090909,
+  "directNetMargin": 34.82767740096894,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalSinRut · producto 4 · simple",
+  "hash": "f36020bdc45a28658fa4cb91c520530ded0554151451bcb661726471861598bc",
+  "mlNetProfit": -612.7272727272727,
+  "mlNetMargin": -30.63636363636364,
+  "mlViability": "loss",
+  "directNetProfit": -640.0832727272727,
+  "directNetMargin": -32.004163636363636,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 4 · riesgos",
+  "hash": "cef9047aa553767adb1d44c8fc46f19dc4cb68e9ff1b6fda4b9f46eb51977c1f",
+  "mlNetProfit": -798.8872727272727,
+  "mlNetMargin": -39.94436363636363,
+  "mlViability": "loss",
+  "directNetProfit": -826.2432727272727,
+  "directNetMargin": -41.312163636363636,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "558f6a45dc9c9f3af9b7caa30ffa539ea30eb6d03673c315526af4fc96a95c69",
+  "mlNetProfit": -972.4272727272726,
+  "mlNetMargin": -48.62136363636363,
+  "mlViability": "loss",
+  "directNetProfit": -497.82727272727254,
+  "directNetMargin": -24.89136363636363,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 5 · simple",
+  "hash": "304ed7aa32daf05d58ee59b490f07f67b8301787f9ec7d9aec429aef2992c9f9",
+  "mlNetProfit": 75.94818181818181,
+  "mlNetMargin": 6.33429372962317,
+  "mlViability": "tight",
+  "directNetProfit": 23.453259818181806,
+  "directNetMargin": 1.956068375161118,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalSinRut · producto 5 · riesgos",
+  "hash": "382238323a6f398a25b49481c2f46512fb0255c12401923017b7f210f27d6262",
+  "mlNetProfit": -74.0438181818182,
+  "mlNetMargin": -6.1754644021533105,
+  "mlViability": "loss",
+  "directNetProfit": -126.5387401818182,
+  "directNetMargin": -10.553689756615363,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "0225131bd4880e2f13104a83f128540d13052916cefa38edac2bfda74c4f4f81",
+  "mlNetProfit": -248.00681818181818,
+  "mlNetMargin": -20.684471908408522,
+  "mlViability": "loss",
+  "directNetProfit": 160.6208818181818,
+  "directNetMargin": 13.396237015694895,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalSinRut · producto 6 · simple",
+  "hash": "7c54f605dc073bfb536ed2ed0a1c4120a3a6fcc34d716ba4031807364514a9ef",
+  "mlNetProfit": -436.3636363636364,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -626.3636363636364,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 6 · riesgos",
+  "hash": "b235a627864654644c07535e397ece2e1fbe64096807ebfa973547c5deeb983f",
+  "mlNetProfit": -568.3636363636364,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -758.3636363636364,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalSinRut · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "baf50a2a76b511c4dd2fecc1c2b6afce6d81d856bd1ca1df75087bea5cf0dd5b",
+  "mlNetProfit": -706.3636363636364,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -496.3636363636364,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 1 · simple",
+  "hash": "d49fae6b8e451a72f3cb1df7b31d98296edef94ea842ca4cb9d3a5ee84527be0",
+  "mlNetProfit": 577.4385245901639,
+  "mlNetMargin": 25.215656095640345,
+  "mlViability": "excellent",
+  "directNetProfit": 575.1192909836066,
+  "directNetMargin": 25.114379518934783,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalIrae · producto 1 · riesgos",
+  "hash": "f1bd771dd174ab7b417a9f9c4ec7acc02ae8e1d08e589f458d42b4b9fbb760c0",
+  "mlNetProfit": 456.10352459016394,
+  "mlNetMargin": 19.917184479919822,
+  "mlViability": "good",
+  "directNetProfit": 453.7842909836065,
+  "directNetMargin": 19.81590790321426,
+  "directViability": "good"
+ },
+ {
+  "name": "generalIrae · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "b4caedd4c3eb4b5da2e4ace20972164b9bd7bad189105ca43cbe3833e4d2a99f",
+  "mlNetProfit": 339.42725409836066,
+  "mlNetMargin": 14.822150833989548,
+  "mlViability": "tight",
+  "directNetProfit": 654.7758196721312,
+  "directNetMargin": 28.592830553368177,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalIrae · producto 2 · simple",
+  "hash": "e94bea726003c040979911c9eedd09299f251e1c6634f5d9932d0302a109667b",
+  "mlNetProfit": 93.13524590163934,
+  "mlNetMargin": 20.696721311475407,
+  "mlViability": "good",
+  "directNetProfit": 23.41899590163934,
+  "directNetMargin": 5.2042213114754095,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalIrae · producto 2 · riesgos",
+  "hash": "86d6be86cc7b174bec4c04088230f0a27e552d842a49535efcfcea018c5dea05",
+  "mlNetProfit": -5.819672131147545,
+  "mlNetMargin": -1.2932604735883433,
+  "mlViability": "loss",
+  "directNetProfit": -98.77467213114755,
+  "directNetMargin": -21.949927140255014,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "cf8cd28b2deb186ff09abbb9af66e0b19a5218274030581ae252a0642194ca70",
+  "mlNetProfit": -124.54918032786885,
+  "mlNetMargin": -27.677595628415304,
+  "mlViability": "loss",
+  "directNetProfit": 96.87602459016392,
+  "directNetMargin": 21.52800546448087,
+  "directViability": "good"
+ },
+ {
+  "name": "generalIrae · producto 3 · simple",
+  "hash": "441d997291180e450c1d1af00a12df6ebae9e5829aa1ead7d3d698231900588a",
+  "mlNetProfit": 630.3073770491803,
+  "mlNetMargin": 19.75885194511537,
+  "mlViability": "good",
+  "directNetProfit": 672.9818729508198,
+  "directNetMargin": 21.096610437329772,
+  "directViability": "good"
+ },
+ {
+  "name": "generalIrae · producto 3 · riesgos",
+  "hash": "a59b50617a79bebffbf617d4f4010ab5eb7057411f1fc97a4c018dc7f7ee2475",
+  "mlNetProfit": 493.11737704918033,
+  "mlNetMargin": 15.458224985867721,
+  "mlViability": "good",
+  "directNetProfit": 535.7918729508199,
+  "directNetMargin": 16.795983478082128,
+  "directViability": "good"
+ },
+ {
+  "name": "generalIrae · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "a850c775845871813a9c6da6285d546a0c9680bea3937ba897bbc261b282e9bf",
+  "mlNetProfit": 366.55481557377055,
+  "mlNetMargin": 11.490746569710677,
+  "mlViability": "tight",
+  "directNetProfit": 755.1021516393444,
+  "directNetMargin": 23.670913844493555,
+  "directViability": "good"
+ },
+ {
+  "name": "generalIrae · producto 4 · simple",
+  "hash": "c9a55c60f66d0e6bda5f6c7e7136332883f8680be4982afed27beb2356750dcf",
+  "mlNetProfit": -531.1475409836065,
+  "mlNetMargin": -26.557377049180324,
+  "mlViability": "loss",
+  "directNetProfit": -553.5704918032786,
+  "directNetMargin": -27.67852459016393,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 4 · riesgos",
+  "hash": "80e404a16191a22d7aa48cc770bfd301010c41b620d64db43427ff2fe10863dd",
+  "mlNetProfit": -717.3075409836065,
+  "mlNetMargin": -35.865377049180324,
+  "mlViability": "loss",
+  "directNetProfit": -739.7304918032787,
+  "directNetMargin": -36.98652459016393,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "f55167608480ff57bd1f30a5dfd203faa58f8dfa8730929bb5bf7fb5a78d5532",
+  "mlNetProfit": -836.7491803278687,
+  "mlNetMargin": -41.83745901639343,
+  "mlViability": "loss",
+  "directNetProfit": -447.7327868852457,
+  "directNetMargin": -22.38663934426228,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 5 · simple",
+  "hash": "c3af0f5f19a30ef97f4d5bbcea89657b0509e284214d8f901f6e5e9d2cd56858",
+  "mlNetProfit": 63.399590163934405,
+  "mlNetMargin": 5.287705601662586,
+  "mlViability": "tight",
+  "directNetProfit": 31.12812172131145,
+  "directNetMargin": 2.5961736214605047,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalIrae · producto 5 · riesgos",
+  "hash": "a70874d943f92339aea8ab1bf21fb4a5a7dc90f29670499b27be8f23148ee219",
+  "mlNetProfit": -65.45921311475414,
+  "mlNetMargin": -5.459483996226366,
+  "mlViability": "loss",
+  "directNetProfit": -108.48783770491806,
+  "directNetMargin": -9.048193303162474,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "d6bb0ad18018e96f8b3e7ace749c7672e60f871305af5a2d5e2e792372681046",
+  "mlNetProfit": -191.8237704918033,
+  "mlNetMargin": -15.998646412994436,
+  "mlViability": "loss",
+  "directNetProfit": 107.33772540983603,
+  "directNetMargin": 8.952270676383321,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalIrae · producto 6 · simple",
+  "hash": "d41aa4307be8a75a29713523bf4e7df5d71b1953a15c6a0ab4d10891b8c05000",
+  "mlNetProfit": -393.44262295081967,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -549.1803278688525,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 6 · riesgos",
+  "hash": "82b35aaf9031881cd01c145b263411a50c7886e37fbb446a34a5524522fa8dc2",
+  "mlNetProfit": -525.4426229508197,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -681.1803278688525,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalIrae · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "6ee87f052e1d27b4abc830df485f9898c4881e012623befcd0e194b68c892654",
+  "mlNetProfit": -625.5737704918033,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -453.44262295081967,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 1 · simple",
+  "hash": "1f3f936ea87fe9bbbfc7c6005c3573d333c2970f28eedf977d5cf8a02533e483",
+  "mlNetProfit": 992.983606557377,
+  "mlNetMargin": 43.361729543990265,
+  "mlViability": "excellent",
+  "directNetProfit": 989.8912950819672,
+  "directNetMargin": 43.226694108382844,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 1 · riesgos",
+  "hash": "cd389e511f5c1001932dfd9b6b3bb310eef8c175b046e3ab84d7a84447d4c3cb",
+  "mlNetProfit": 831.203606557377,
+  "mlNetMargin": 36.297100723029565,
+  "mlViability": "excellent",
+  "directNetProfit": 828.1112950819672,
+  "directNetMargin": 36.16206528742215,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 1 · premium-envio-vendedor-flete-usd",
+  "hash": "cc3c1182d3a612b553064e7147c9f384156e315c372aa242c8a88c7098568e5f",
+  "mlNetProfit": 675.6352459016393,
+  "mlNetMargin": 29.503722528455867,
+  "mlViability": "excellent",
+  "directNetProfit": 1096.1000000000001,
+  "directNetMargin": 47.864628820960704,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 2 · simple",
+  "hash": "fc01a23abdc36ed5c42d7228ebfb7c9cc517f0d56c4397148e6a38b71b53279b",
+  "mlNetProfit": 169.2622950819672,
+  "mlNetMargin": 37.61384335154827,
+  "mlViability": "excellent",
+  "directNetProfit": 76.30729508196721,
+  "directNetMargin": 16.957176684881603,
+  "directViability": "good"
+ },
+ {
+  "name": "generalExento · producto 2 · riesgos",
+  "hash": "bb93994dee8818659f332d598408bb46c205fc6bbc46315456bb4bcb6ba0ca42",
+  "mlNetProfit": 39.26229508196721,
+  "mlNetMargin": 8.72495446265938,
+  "mlViability": "tight",
+  "directNetProfit": -53.69270491803279,
+  "directNetMargin": -11.931712204007287,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 2 · premium-envio-vendedor-flete-usd",
+  "hash": "bea20a1e336aeaf6918bd1152fdaabf812974cc09558ed604875ba42723bbf6f",
+  "mlNetProfit": -79.46721311475409,
+  "mlNetMargin": -17.659380692167577,
+  "mlViability": "loss",
+  "directNetProfit": 174.25,
+  "directNetMargin": 38.72222222222222,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 3 · simple",
+  "hash": "1782ddb15e3aeb30ca6f49fdb236dde316b8a60baab170002e1a1300db293c56",
+  "mlNetProfit": 1100.0819672131147,
+  "mlNetMargin": 34.485328125802965,
+  "mlViability": "excellent",
+  "directNetProfit": 1156.9812950819673,
+  "directNetMargin": 36.26900611542217,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 3 · riesgos",
+  "hash": "0e5984612867e905aeb67ae4ef93f771baecb0e33c8bf4a36b14b238d42c8bdd",
+  "mlNetProfit": 917.1619672131147,
+  "mlNetMargin": 28.751158846806103,
+  "mlViability": "excellent",
+  "directNetProfit": 974.0612950819674,
+  "directNetMargin": 30.53483683642531,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 3 · premium-envio-vendedor-flete-usd",
+  "hash": "95a4711b521aad52f55997194c590df8274ac26f072d68f30ddae951705cd561",
+  "mlNetProfit": 748.4118852459017,
+  "mlNetMargin": 23.461187625263374,
+  "mlViability": "good",
+  "directNetProfit": 1266.4750000000001,
+  "directNetMargin": 39.70141065830721,
+  "directViability": "excellent"
+ },
+ {
+  "name": "generalExento · producto 4 · simple",
+  "hash": "7219235d2023cd30ec5ebda34a16adf8020ddf30d64dc2ecd1829d1d8c40f2f0",
+  "mlNetProfit": -601.1147540983607,
+  "mlNetMargin": -30.055737704918034,
+  "mlViability": "loss",
+  "directNetProfit": -623.5377049180328,
+  "directNetMargin": -31.176885245901637,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 4 · riesgos",
+  "hash": "b661bdded8d7a4da098c9736051b7843411043a1067477761067c6208e8bf38a",
+  "mlNetProfit": -787.2747540983606,
+  "mlNetMargin": -39.36373770491804,
+  "mlViability": "loss",
+  "directNetProfit": -809.6977049180327,
+  "directNetMargin": -40.48488524590164,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 4 · premium-envio-vendedor-flete-usd",
+  "hash": "eb59b9d943791c71cd663b930e862b3d70aba28e404643ebc35fed873e295312",
+  "mlNetProfit": -906.7163934426228,
+  "mlNetMargin": -45.33581967213114,
+  "mlViability": "loss",
+  "directNetProfit": -517.6999999999998,
+  "directNetMargin": -25.88499999999999,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 5 · simple",
+  "hash": "b0a042ac9ab4bf62fd0d30b46a8f6137e8003a15ed7018382b16e2c2cf1db8ac",
+  "mlNetProfit": 138.45081967213116,
+  "mlNetMargin": 11.547190965148554,
+  "mlViability": "tight",
+  "directNetProfit": 95.4221950819672,
+  "directNetMargin": 7.958481658212444,
+  "directViability": "tight"
+ },
+ {
+  "name": "generalExento · producto 5 · riesgos",
+  "hash": "35fbfe4ace3bd19c7d26518e5fd839a792ad5fd6b2ad745843397d6b2a15f197",
+  "mlNetProfit": -11.541180327868858,
+  "mlNetMargin": -0.9625671666279281,
+  "mlViability": "loss",
+  "directNetProfit": -54.569804918032794,
+  "directNetMargin": -4.5512764735640365,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 5 · premium-envio-vendedor-flete-usd",
+  "hash": "f5771c4d1fb249e48e7d71987c9cc1bfadb9df8bfa4c927e04cbbae22e579c81",
+  "mlNetProfit": -137.905737704918,
+  "mlNetMargin": -11.501729583395997,
+  "mlViability": "loss",
+  "directNetProfit": 197.035,
+  "directNetMargin": 16.433277731442868,
+  "directViability": "good"
+ },
+ {
+  "name": "generalExento · producto 6 · simple",
+  "hash": "815735aac1be4d338b95f5ca6d4f3e9ffee3646b772998e9c722d72565f48324",
+  "mlNetProfit": -480,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -635.7377049180328,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 6 · riesgos",
+  "hash": "47e2c1ed2c7b1c58613af62c9b28a56ac4d41ba13bc6e59666a1b25c6d0b1246",
+  "mlNetProfit": -612,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -767.7377049180328,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ },
+ {
+  "name": "generalExento · producto 6 · premium-envio-vendedor-flete-usd",
+  "hash": "7ebd3ddeac4726dbd14199f37480350e29bbc9f7be201936de001e28bc0985b4",
+  "mlNetProfit": -712.1311475409836,
+  "mlNetMargin": 0,
+  "mlViability": "loss",
+  "directNetProfit": -540,
+  "directNetMargin": 0,
+  "directViability": "loss"
+ }
+]
