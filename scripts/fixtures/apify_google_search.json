@@ -1,146 +1,67 @@
 [
   {
-    "_nota": "Fixture armado a mano con el formato documentado del actor apify/google-search-scraper (apify.com/apify/google-search-scraper). NO es una respuesta real: no había APIFY_TOKEN local para hacer la llamada de prueba. Los sitios son inventados, salvo los dominios conocidos que se usan para probar la clasificación.",
+    "_nota": "Resultados orgánicos de una búsqueda real hecha a mano con el actor apify/google-search-scraper: \"Stanley termo 1 litro comprar Uruguay\", país uy, idioma es. Las 9 direcciones y su orden son los reales. De cada resultado se guardan solo title, url, displayedUrl y description; los títulos y las descripciones están abreviados y escritos a mano (no son el texto literal de Google).",
     "searchQuery": {
-      "term": "\"Termo Stanley Classic 1 litro\" comprar Uruguay",
-      "url": "http://www.google.com.uy/search?q=%22Termo+Stanley+Classic+1+litro%22+comprar+Uruguay&gl=uy&hl=es",
-      "device": "DESKTOP",
-      "page": 1,
-      "type": "SEARCH",
-      "domain": "google.com.uy",
+      "term": "Stanley termo 1 litro comprar Uruguay",
       "countryCode": "UY",
       "languageCode": "es",
-      "locationUule": null
+      "page": 1
     },
-    "relatedQueries": [{ "title": "termo stanley precio uruguay", "url": "https://www.google.com.uy/search?q=termo+stanley+precio+uruguay" }],
-    "paidResults": [
-      { "title": "Anuncio que no debe aparecer", "url": "https://anuncio-pago.com.uy/termo", "displayedUrl": "anuncio-pago.com.uy", "description": "Resultado pago: no es orgánico.", "type": "paid", "adPosition": 1 }
-    ],
-    "paidProducts": [],
     "organicResults": [
       {
-        "title": "Termo Stanley Classic 1 Litro - Ferretería Ejemplo",
-        "url": "https://www.ferreteria-ejemplo.com.uy/productos/termo-stanley-classic-1l",
-        "displayedUrl": "https://www.ferreteria-ejemplo.com.uy › productos",
-        "description": "Termo Stanley Classic de 1 litro, acero inoxidable. Envíos a todo el país. $ 2.490.",
-        "emphasizedKeywords": ["Termo Stanley Classic", "1 litro"],
-        "siteLinks": [],
-        "productInfo": {},
-        "type": "organic",
-        "position": 1
+        "title": "Stanley - Farmashop",
+        "url": "https://tienda.farmashop.com.uy/marcas/stanley.html",
+        "displayedUrl": "https://tienda.farmashop.com.uy › marcas › stanley",
+        "description": "Productos de la marca Stanley en Farmashop."
       },
       {
-        "title": "Termo Stanley Classic 1 Litro | MercadoLibre",
-        "url": "https://listado.mercadolibre.com.uy/termo-stanley-classic-1-litro",
-        "displayedUrl": "https://listado.mercadolibre.com.uy › termo-stanley",
-        "description": "Envíos gratis en el día. Comprá Termo Stanley Classic 1 Litro en cuotas sin interés.",
-        "emphasizedKeywords": ["Termo Stanley Classic 1 Litro"],
-        "siteLinks": [],
-        "productInfo": {},
-        "type": "organic",
-        "position": 2
+        "title": "Combo Termo Stanley Adventure To Go 1 Lt + Mate 200 ml + Bombilla Spoon - Plan B",
+        "url": "https://www.planb.com.uy/collections/todos/products/combo-termo-stanley-adventure-to-go-1-lt-mate-200-ml-bombilla-spoon",
+        "displayedUrl": "https://www.planb.com.uy › collections › todos › products",
+        "description": "Combo de termo Stanley de 1 litro con mate y bombilla."
       },
       {
-        "title": "Termo Stanley Classic 1 L Verde",
-        "url": "https://articulo.mercadolibre.com.uy/MLU-600000001-termo-stanley-classic-1-l-verde",
-        "displayedUrl": "https://articulo.mercadolibre.com.uy › MLU-600000001",
-        "description": "Termo Stanley original, 1 litro, color verde.",
-        "type": "organic",
-        "position": 3
+        "title": "Termo STANLEY To go sin asa - Almacén Rural",
+        "url": "https://www.almacenrural.com.uy/Termo-STANLEY-To-go-sin-asa/",
+        "displayedUrl": "https://www.almacenrural.com.uy › Termo-STANLEY-To-go-sin-asa",
+        "description": "Termo Stanley To Go sin asa."
       },
       {
-        "title": "Termo Stanley Classic 1 L Negro",
-        "url": "https://articulo.mercadolibre.com.uy/MLU-600000002-termo-stanley-classic-1-l-negro",
-        "displayedUrl": "https://articulo.mercadolibre.com.uy › MLU-600000002",
-        "description": "Tercer resultado del mismo dominio: no debe mostrarse.",
-        "type": "organic",
-        "position": 4
+        "title": "Termo Stanley 1L Rosa - Bagual",
+        "url": "https://www.bagual.com.uy/catalogo/termo-stanley-1l-rosa_Stanley1L_TS1LR",
+        "displayedUrl": "https://www.bagual.com.uy › catalogo",
+        "description": "Termo Stanley de 1 litro, color rosa."
       },
       {
-        "title": "Stanley Classic 1L - Tienda Outdoor",
-        "url": "https://tiendaoutdoor-ejemplo.com/uy/termo-stanley-classic-1l",
-        "displayedUrl": "https://tiendaoutdoor-ejemplo.com › uy",
-        "description": "Termo clásico con tapa vaso.",
-        "type": "organic",
-        "position": 5
+        "title": "Termo Stanley 1L Verde - Bagual",
+        "url": "https://www.bagual.com.uy/catalogo/termo-stanley-1l-verde_Stanley1L_1LV",
+        "displayedUrl": "https://www.bagual.com.uy › catalogo",
+        "description": "Termo Stanley de 1 litro, color verde."
       },
       {
-        "title": "Termos Stanley con envío a Uruguay",
-        "url": "https://importadora-ejemplo.com/termos/stanley-classic",
-        "displayedUrl": "https://importadora-ejemplo.com › termos",
-        "description": "Compralo desde Montevideo y recibilo en tu casa.",
-        "type": "organic",
-        "position": 6
+        "title": "Termo Stanley 1 L | MercadoLibre",
+        "url": "https://listado.mercadolibre.com.uy/termo-stanley-1-l",
+        "displayedUrl": "https://listado.mercadolibre.com.uy › termo-stanley-1-l",
+        "description": "Listado de termos Stanley de 1 litro en Mercado Libre Uruguay."
       },
       {
-        "title": "Stanley Classic Vacuum Bottle 1L",
-        "url": "https://es.aliexpress.com/item/1005000000001.html",
-        "displayedUrl": "https://es.aliexpress.com › item",
-        "description": "Envío a Uruguay disponible.",
-        "type": "organic",
-        "position": 7
+        "title": "Termo Stanley 1 Lt - Alem",
+        "url": "https://alem.uy/product/termo-stanley-1-lt-2/",
+        "displayedUrl": "https://alem.uy › product › termo-stanley-1-lt-2",
+        "description": "Termo Stanley de 1 litro."
       },
       {
-        "title": "Termo Stanley Classic 1 litro - Oferta",
-        "url": "https://mercadolibre.com.uy.ofertas-ejemplo.com/termo-stanley",
-        "displayedUrl": "https://mercadolibre.com.uy.ofertas-ejemplo.com",
-        "description": "Oferta en Uruguay.",
-        "type": "organic",
-        "position": 8
+        "title": "Stanley Tienda Oficial",
+        "url": "https://stanley1913.uy/inicio/",
+        "displayedUrl": "https://stanley1913.uy › inicio",
+        "description": "Tienda oficial de Stanley."
       },
       {
-        "title": "Termo Stanley Classic: review completo - YouTube",
-        "url": "https://www.youtube.com/watch?v=abc123",
-        "displayedUrl": "https://www.youtube.com › watch",
-        "description": "Probamos el termo Stanley Classic de 1 litro en Uruguay.",
-        "type": "organic",
-        "position": 9
-      },
-      {
-        "title": "Stanley (marca) - Wikipedia, la enciclopedia libre",
-        "url": "https://es.wikipedia.org/wiki/Stanley_(marca)",
-        "displayedUrl": "https://es.wikipedia.org › wiki",
-        "description": "Stanley es una marca de termos.",
-        "type": "organic",
-        "position": 10
-      },
-      {
-        "title": "Los mejores termos para el mate - El País",
-        "url": "https://www.elpais.com.uy/vida-actual/los-mejores-termos-para-el-mate",
-        "displayedUrl": "https://www.elpais.com.uy › vida-actual",
-        "description": "Nota sobre termos en Uruguay.",
-        "type": "organic",
-        "position": 11
-      },
-      {
-        "title": "Cómo elegir un termo - Blog de Tienda Ejemplo",
-        "url": "https://tienda-ejemplo.com.uy/blog/como-elegir-un-termo",
-        "displayedUrl": "https://tienda-ejemplo.com.uy › blog",
-        "description": "Consejos para elegir un termo.",
-        "type": "organic",
-        "position": 12
-      },
-      {
-        "title": "Sitio sin https",
-        "url": "http://sitio-viejo.com.uy/termo",
-        "displayedUrl": "sitio-viejo.com.uy",
-        "description": "Enlace http: se descarta.",
-        "type": "organic",
-        "position": 13
-      },
-      {
-        "title": "Enlace a una IP",
-        "url": "https://192.168.1.20/termo",
-        "description": "Se descarta.",
-        "type": "organic",
-        "position": 14
-      },
-      { "title": "Sin enlace", "description": "Entrada sin url: se descarta.", "type": "organic", "position": 15 },
-      { "title": "Enlace que no es texto", "url": { "href": "https://ejemplo.uy" }, "type": "organic", "position": 16 },
-      { "url": "https://solo-enlace-ejemplo.com.uy/termo-stanley", "type": "organic", "position": 17 },
-      null,
-      "texto suelto"
-    ],
-    "peopleAlsoAsk": []
+        "title": "Termo Stanley The Legendary Classic nuevo modelo 1 litro Silver - Electroventas",
+        "url": "https://electroventas.com.uy/catalogo/termo-stanley-the-legendary-classic-nuevo-modelo-1-litro-silver_SDT15_994386",
+        "displayedUrl": "https://electroventas.com.uy › catalogo",
+        "description": "Termo Stanley The Legendary Classic de 1 litro, color silver."
+      }
+    ]
   }
 ]
