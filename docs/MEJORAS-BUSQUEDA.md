@@ -70,7 +70,7 @@ Nada de esto cambia la mediana, el precio sugerido ni ningún número que ya se 
 - La prueba en navegador de esto fue manual, con Mercado Libre simulado (lote de 3 filas: cancelar, reintentar, 429 por minuto y 429 diario).
 - Cómo probarlo: correr el lote de ejemplo, tocar Cancelar a mitad; después "Reintentar". Tests: `npx tsx scripts/verify_tabs.ts` (casos de reintento y cancelación).
 
-**M6 y M14 · Lote: límite de uso y retomar** — commits `49c7658` y el de cierre de esta rama.
+**M6 y M14 · Lote: límite de uso y retomar** — commits `49c7658` y `7e577f3`.
 - Si una consulta responde 429 con una espera de hasta 65 s (tope por minuto), el Lote espera ese tiempo, lo muestra en el progreso y repite la fila una vez. Se puede cancelar durante la espera.
 - Si la espera es mayor (tope diario), frena el lote, avisa "Llegaste al límite de uso de hoy" y deja en la tabla lo ya consultado.
 - Al cancelar o frenar, las filas que no se llegaron a consultar quedan en la tabla como "Sin dato de mercado" con el motivo "No se llegó a consultar", y "Reintentar" las retoma sin volver a consultar las demás.
