@@ -506,7 +506,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                 </div>
 
                 <div role="tabpanel" id="photo-panel-web" aria-labelledby="photo-tab-web" hidden={view !== "web"} className="min-w-0">
-                  <WebSellersPanel name={name} state={web.state} onCancel={web.cancel} />
+                  <WebSellersPanel name={name} state={web.state} onCancel={web.cancel} onRetry={(query) => void web.search(query)} />
                 </div>
               </form>
             )}

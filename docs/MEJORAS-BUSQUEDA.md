@@ -351,3 +351,69 @@ Los botones "Buscar en Google Uruguay" y "Google Shopping Uruguay" son enlaces a
 2. Mirar cuántas búsquedas de Google cobra una consulta típica antes de abrirlo a más usuarios.
 3. Leer los Términos del Servicio sobre las sugerencias de búsqueda.
 4. Decidir si los resultados de Mercado Libre se ocultan mientras se mira la vista web.
+
+---
+
+# Ronda 12b: la búsqueda web pasa de Gemini a Apify
+
+Misma rama (`ronda-12-web-uruguay`) y mismo PR (#11). **Esta nota reemplaza lo que la sección "Ronda 12" dice sobre Gemini, `groundingChunks`, la resolución de redirecciones y el aviso de facturación: ese código ya no existe.** Lo demás de la ronda 12 sigue igual: la vista, el botón explícito, los botones gratuitos de Google, el límite de uso, la memoria y la clasificación de dominios.
+
+## Por qué
+
+La búsqueda de Google dentro de Gemini exige facturación activada en Google, y no se va a activar. La fuente de datos pasa a ser Apify, con el actor `apify/google-search-scraper`, que devuelve los resultados orgánicos de Google con enlaces directos.
+
+## Qué cambió
+
+- **Proveedor.** `POST https://api.apify.com/v2/acts/apify~google-search-scraper/run-sync-get-dataset-items`, con `countryCode: "uy"`, `languageCode: "es"`, una página, sin HTML. Espera máxima de 45 s (la función de Vercel tiene 60 s en `vercel.json`).
+- **Token.** `APIFY_TOKEN`, solo en el servidor. Viaja solo en el encabezado `Authorization: Bearer`, nunca en la dirección, y no aparece en logs ni en respuestas (lo comprueban los tests).
+- **Consulta.** Una sola por búsqueda: `"<nombre>" comprar Uruguay`, con el nombre recortado a 100 caracteres y sin comillas propias.
+- **Sin IA en esta vista.** Título y descripción son los que da Google, recortados. Ya no hay una frase escrita por una IA ni una opinión de "mismo producto / parecido".
+- **Se eliminó:** la herramienta `googleSearch`, el parseo de `groundingChunks` y el resolvedor de redirecciones de `vertexaisearch.cloud.google.com`. El servidor ahora solo habla con `api.apify.com` y **nunca visita los enlaces de los resultados**: solo los valida y los muestra.
+- **Hasta 2 resultados por dominio** (antes 1), 10 en total.
+- **"Otros resultados".** Wikipedia, YouTube, Facebook, Instagram, TikTok, Reddit, Pinterest, X, diarios y blogs van a un bloque aparte, cerrado, sin indicador de Uruguay. No se muestran como vendedores. La lista de dominios está en `NON_STORE_DOMAINS` (`src/lib/web/sellers.ts`); también cuenta una ruta `/blog/` o `/noticias/` dentro de una tienda.
+- **Uruguay "probable".** Antes lo decía la IA. Ahora un sitio que no es `.uy` queda "probable" si el título o la descripción de Google nombran a Uruguay o a Montevideo, o si la ruta tiene `/uy/`. Solo un `.uy` queda "confirmado".
+
+## Errores
+
+| Qué pasa | Código | Qué ve el usuario |
+|---|---|---|
+| Falta `APIFY_TOKEN`, o Apify lo rechaza (401) | `WEB_SEARCH_NOT_CONFIGURED` | "La búsqueda web no está configurada en el servidor…" |
+| Sin crédito (402, o un error de uso insuficiente) | `WEB_SEARCH_NO_CREDIT` | "Se agotó el crédito del servicio de búsqueda web" |
+| Tiempo agotado, error de red o cualquier otro error de Apify | `WEB_SEARCH_UNAVAILABLE` | Aviso con botón "Reintentar" |
+
+El aviso viejo `WEB_SEARCH_NEEDS_BILLING` ya no existe.
+
+**Advertencia: si se agota el crédito de Apify, la vista muestra el aviso y los botones gratuitos "Buscar en Google Uruguay" y "Google Shopping Uruguay" siguen andando**, porque son enlaces armados en el navegador que no pasan por el servidor. Lo mismo vale para los otros dos errores.
+
+## Costo
+
+Estimado: **≈ US$ 0,0045 por búsqueda** (una consulta, una página). La página del actor lo publica como "from $1.80 / 1,000 scraped search result pages" con cobro por evento; el número por búsqueda es el que se usó para decidir y hay que contrastarlo con el consumo real en el panel de Apify después de las primeras búsquedas.
+
+Con el tope de 20 búsquedas por día por usuario, el máximo es de unos US$ 0,09 por usuario por día. La memoria de 30 minutos evita pagar dos veces la misma consulta, pero es por instancia: en Vercel ayuda poco entre instancias distintas. No hay reintentos automáticos: "Reintentar" lo aprieta el usuario y cada intento es otra búsqueda paga y otro uso del límite.
+
+## Lo que NO se probó
+
+- **El parser no se probó contra una respuesta real.** No había `APIFY_TOKEN` en el `.env` local, así que no se hizo la llamada de prueba. El fixture (`scripts/fixtures/apify_google_search.json`) está armado a mano con el formato documentado del actor: una lista de páginas, cada una con `organicResults[]` (`title`, `url`, `displayedUrl`, `description`). El parser es defensivo, pero si el actor devuelve otra forma, la vista va a mostrar `WEB_SEARCH_UNAVAILABLE`.
+- **Los códigos de error reales de Apify.** El 401 y el 402 están en su documentación. Qué tipo de error devuelve exactamente una cuenta sin crédito en este endpoint no está documentado; se reconocen el 402 y varios tipos (`not-enough-usage-to-run-paid-actor`, `monthly-usage-limit-too-low`, `limit-reached`, entre otros). Si llegara con otro tipo, se vería como "no respondió" con "Reintentar".
+- **Cuánto tarda.** Si una búsqueda tarda más de 45 s, se corta. No sé cuánto tarda de verdad con `countryCode: "uy"`.
+- **La calidad con la frase entre comillas.** `"<nombre>"` le pide a Google la frase exacta. Con nombres largos puede devolver pocos resultados o ninguno.
+
+## Evidencia
+
+- `scripts/verify_web.ts`: 254 casos con `fetch` simulado. Parser con el fixture, consulta, clasificación de dominios y parecidos, sitios que no son tiendas, cada código de error, que la dirección de la llamada no lleva el token y que el token no aparece en logs ni en respuestas.
+- `scripts/e2e_web.mjs`: 61 casos en Chrome con `/api/web-sellers` simulado, incluidos los tres avisos, "Reintentar", el bloque "Otros resultados" y que los botones de Google siguen en cada error.
+
+## Qué puede salir mal (además de lo anterior)
+
+- **Las descripciones de Google pueden traer precios.** Se muestran tal cual, sin tocar, y pueden estar desactualizados. La vista aclara que hay que confirmar precio y stock en la tienda. No entran en ningún cálculo.
+- **Una tienda puede caer en "Otros resultados"** si su dominio empieza con `blog.` o la página está en `/blog/`, y un sitio que no vende puede quedar como tienda si no está en la lista.
+- **Términos de uso.** Apify obtiene los resultados leyendo páginas de Google. Conviene revisar que ese uso sea aceptable para el proyecto.
+- **Se sigue necesitando `GEMINI_API_KEY`** para identificar la foto. Lo único que dejó de depender de Gemini es la vista web.
+
+**Valor 4 · Confianza 2 · Riesgo 2.** La confianza sigue en 2 porque tampoco con este proveedor se vio una respuesta real.
+
+## Qué revisar primero (ronda 12b)
+
+1. Hacer una búsqueda real en la vista previa y mirar si aparecen resultados: es la única prueba del parser contra el actor de verdad.
+2. Mirar en el panel de Apify cuánto costó esa búsqueda y cuánto tardó.
+3. Decidir si la consulta va con el nombre entre comillas o sin ellas.

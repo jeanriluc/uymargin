@@ -1,7 +1,8 @@
 /**
- * "En la web (Uruguay)": qué sitios venden un producto, según una búsqueda de Google hecha por la IA.
- * Acá va todo lo que no necesita red: validar la consulta, clasificar dominios, validar enlaces y armar
- * la lista final. Sin DOM y sin Node: lo usan el servidor, la pantalla y los tests.
+ * "En la web (Uruguay)": qué sitios venden un producto, según una búsqueda en Google Uruguay.
+ * Acá va todo lo que no necesita red: armar y validar la consulta, leer la respuesta del buscador,
+ * clasificar dominios, validar enlaces y armar la lista final. Sin DOM y sin Node: lo usan el servidor,
+ * la pantalla y los tests.
  */
 
 /** Límites de la búsqueda web. Único lugar donde se cambian. */
@@ -9,25 +10,31 @@ export const WEB_LIMITS = {
   queryMin: 2,
   /** El mismo largo que admite el nombre de búsqueda del Radar. */
   queryMax: 120,
-  /** Resultados que se devuelven como mucho, sumando los dos grupos. */
+  /** Largo máximo del nombre dentro de la consulta que se manda a Google. */
+  nameInSearchMax: 100,
+  /** Resultados que se devuelven como mucho, sumando todos los grupos. */
   maxResults: 10,
-  /** Fuentes de la búsqueda que se miran como mucho (cada una puede necesitar resolver un enlace). */
-  maxSources: 20,
-  /** Búsquedas de Google que se muestran como mucho. */
-  maxSearchQueries: 5,
+  /** Resultados del mismo dominio que se muestran como mucho. */
+  maxPerDomain: 2,
+  /** Resultados del buscador que se miran como mucho. */
+  maxRawResults: 40,
+  titleMax: 140,
+  descriptionMax: 220,
 } as const;
 
 export const WEB_MESSAGES = {
   query: "Escribí el nombre del producto (entre 2 y 120 caracteres).",
-  billing: "La búsqueda web necesita activar la facturación de la clave de Gemini.",
-  notConfigured: "La búsqueda web no está disponible: falta configurar la IA en el servidor.",
-  provider: "No se pudo hacer la búsqueda web en este momento. Probá de nuevo en unos minutos o usá los botones de Google.",
+  notConfigured: "La búsqueda web no está configurada en el servidor. Mientras tanto podés usar los botones de Google.",
+  noCredit: "Se agotó el crédito del servicio de búsqueda web",
+  unavailable: "La búsqueda web no respondió en este momento. Probá de nuevo o usá los botones de Google.",
   network: "Error de red al buscar en la web. Revisá la conexión y probá de nuevo.",
   empty: "No encontré sitios que vendan ese producto. Probá con un nombre más corto o usá los botones de Google.",
-  notice: "Usa la búsqueda de Google. Los resultados pueden ser productos parecidos: verificá en cada sitio.",
+  notice: "Son resultados de Google Uruguay y pueden ser productos parecidos. Confirmá precio y stock en cada tienda.",
 } as const;
 
-export type WebConfidence = "alta" | "media" | "baja";
+/** Códigos de error de /api/web-sellers que la pantalla distingue. */
+export type WebSearchErrorCode = "WEB_SEARCH_NOT_CONFIGURED" | "WEB_SEARCH_NO_CREDIT" | "WEB_SEARCH_UNAVAILABLE";
+
 export type UruguayStatus = "confirmado" | "probable" | "no_confirmado";
 
 export const URUGUAY_LABELS: Record<UruguayStatus, string> = {
@@ -39,22 +46,24 @@ export const URUGUAY_LABELS: Record<UruguayStatus, string> = {
 export interface WebSeller {
   /** Dominio del sitio, sin "www.". */
   site: string;
-  /** Enlace https a la página que encontró la búsqueda. null si no se pudo obtener un enlace seguro. */
-  url: string | null;
+  /** Enlace https a la página que devolvió Google. Nunca se visita: solo se muestra. */
+  url: string;
+  /** Título que da Google, recortado. */
   title: string;
-  /** Una frase sobre qué vende. Sin precios. */
+  /** Descripción que da Google, recortada. Puede estar vacía. */
   why: string;
-  confidence: WebConfidence;
   uruguay: UruguayStatus;
   /** Tienda o marketplace global: hay que confirmar que envía a Uruguay. */
   international: boolean;
+  /** "other": sitios que claramente no son tiendas (redes, enciclopedias, diarios, blogs). */
+  kind: "store" | "other";
 }
 
 export interface WebSellersResponse {
   ok: true;
   query: string;
   results: WebSeller[];
-  /** Lo que Google buscó para armar la respuesta. */
+  /** Lo que se buscó en Google. */
   searchQueries: string[];
   /** La respuesta salió de la memoria del servidor, sin gastar otra búsqueda. */
   cached: boolean;
@@ -83,10 +92,24 @@ export function cleanWebQuery(value: unknown): string | null {
 export function webQueryKey(query: string): string {
   return query
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Lo que se le pide a Google: "<nombre>" comprar Uruguay. Una sola consulta por búsqueda.
+ * Las comillas del nombre se sacan para que no rompan la frase exacta.
+ */
+export function buildSearchQuery(name: string): string {
+  const inner = name
+    .replace(/["“”«»]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, WEB_LIMITS.nameInSearchMax)
+    .trim();
+  return `"${inner}" comprar Uruguay`;
 }
 
 // ------------------------------------------------------------------
@@ -154,17 +177,37 @@ export function looksLikeImitation(host: string): boolean {
 }
 
 /**
- * Qué tan seguro es que el sitio vende en Uruguay. El dominio manda: solo un .uy queda "confirmado",
- * y solo si el dominio se leyó del enlace real (verified). Para el resto vale lo que dijo la fuente,
- * y nunca pasa de "probable".
+ * Qué tan seguro es que el sitio vende en Uruguay. El dominio manda: solo un .uy queda "confirmado".
+ * Para el resto, si el resultado de Google nombra a Uruguay queda "probable"; nunca pasa de ahí.
  */
-export function classifyUruguay(host: string, claim: unknown, verified = true): { uruguay: UruguayStatus; international: boolean } {
-  if (isUruguayDomain(host)) return { uruguay: verified ? "confirmado" : "probable", international: false };
+export function classifyUruguay(host: string, mentionsUruguay: boolean): { uruguay: UruguayStatus; international: boolean } {
+  if (isUruguayDomain(host)) return { uruguay: "confirmado", international: false };
   if (isInternationalStore(host)) return { uruguay: "no_confirmado", international: true };
   if (looksLikeImitation(host)) return { uruguay: "no_confirmado", international: false };
-  const says = typeof claim === "string" ? claim.trim().toLowerCase() : "";
-  const positive = says === "confirmado" || says === "probable" || says === "si" || says === "sí";
-  return { uruguay: positive ? "probable" : "no_confirmado", international: false };
+  return { uruguay: mentionsUruguay ? "probable" : "no_confirmado", international: false };
+}
+
+/** Sitios que claramente no son tiendas: redes sociales, enciclopedias, videos, foros, diarios y blogs. */
+const NON_STORE_DOMAINS = [
+  "wikipedia.org", "youtube.com", "youtu.be", "facebook.com", "instagram.com", "tiktok.com", "reddit.com",
+  "twitter.com", "x.com", "linkedin.com", "quora.com", "medium.com", "blogspot.com", "wordpress.com", "tumblr.com",
+  // Diarios y portales de noticias.
+  "elpais.com.uy", "elobservador.com.uy", "montevideo.com.uy", "ladiaria.com.uy", "subrayado.com.uy", "teledoce.com",
+  "infobae.com", "clarin.com", "lanacion.com.ar", "elpais.com", "bbc.com", "cnn.com",
+];
+
+/** ¿El resultado es de un sitio que no vende? Mira el dominio y, para blogs, también la ruta. */
+export function isNonStore(host: string, url = ""): boolean {
+  if (NON_STORE_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`))) return true;
+  if (/(?:^|\.)pinterest\.(?:[a-z]{2,3}|com?\.[a-z]{2})$/.test(host)) return true;
+  if (/^(?:blog|blogs|noticias|news|foro|forum)\./.test(host)) return true;
+  let path = "";
+  try {
+    path = new URL(url).pathname.toLowerCase();
+  } catch {
+    // sin ruta que mirar
+  }
+  return /^\/(?:blog|blogs|noticias|news|foro|forum)(?:\/|$)/.test(path);
 }
 
 // ------------------------------------------------------------------
@@ -203,137 +246,95 @@ export const googleSearchUrl = (name: string) => googleUrl(name, false);
 export const googleShoppingUrl = (name: string) => googleUrl(name, true);
 
 // ------------------------------------------------------------------
-// Respuesta de la IA y lista final
+// Respuesta del buscador y lista final
 // ------------------------------------------------------------------
 
-/** Precios dentro de un texto: en esta etapa no se muestran. */
-const PRICE = /(?:US\$|U\$S|USD|UYU|\$U|\$)\s?\d[\d.,]*|\d[\d.,]*\s?(?:US\$|U\$S|USD|UYU|\$U|pesos|d[oó]lares)\b/gi;
-
-function withoutPrices(text: string): string {
-  return text.replace(PRICE, "").replace(/\s+([.,;:])/g, "$1").replace(/\s+/g, " ").trim();
-}
-
-/** Lo que dijo la IA de un sitio, todavía sin cruzar con las fuentes. */
-export interface SellerClaim {
-  site: string;
+/** Un resultado orgánico de Google tal como lo entrega el buscador, todavía sin validar el enlace. */
+export interface RawSearchResult {
   title: string;
-  why: string;
-  confidence: WebConfidence;
-  uruguay: string;
-}
-
-function extractJson(text: string): unknown {
-  const attempts = [text.trim()];
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) attempts.push(fenced[1].trim());
-  const first = text.indexOf("{");
-  const last = text.lastIndexOf("}");
-  if (first >= 0 && last > first) attempts.push(text.slice(first, last + 1));
-  for (const candidate of attempts) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // se prueba la siguiente forma
-    }
-  }
-  return undefined;
+  url: string;
+  description: string;
 }
 
 /**
- * Lee la lista de sitios de la respuesta de la IA. null = la respuesta no se pudo leer.
- * Cada entrada necesita un dominio válido; lo demás se acota o se descarta en silencio.
+ * Lee la respuesta del actor de Apify (google-search-scraper): una lista de páginas, cada una con
+ * organicResults[] (title, url, description). Es defensivo: lo que no tenga esa forma se saltea sin
+ * romper. null = la respuesta entera tiene otra forma.
  */
-export function parseSellerClaims(text: unknown): SellerClaim[] | null {
-  if (typeof text !== "string" || !text.trim()) return null;
-  const raw = extractJson(text);
-  const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? (raw as { results?: unknown }).results : undefined;
-  if (!Array.isArray(list)) return null;
-  const claims: SellerClaim[] = [];
-  for (const entry of list.slice(0, 50)) {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
-    const e = entry as Record<string, unknown>;
-    const site = normalizeHost(typeof e.site === "string" ? e.site.replace(/^[a-z]+:\/\//i, "").split(/[/?#]/)[0] : null);
-    if (!site) continue;
-    claims.push({
-      site,
-      title: withoutPrices(clean(e.title, 140)),
-      why: withoutPrices(clean(e.why, 220)),
-      confidence: e.confidence === "alta" || e.confidence === "media" ? e.confidence : "baja",
-      uruguay: clean(e.uruguay, 20),
-    });
+export function parseSearchItems(data: unknown): RawSearchResult[] | null {
+  const pages = Array.isArray(data) ? data : data && typeof data === "object" && "organicResults" in data ? [data] : null;
+  if (!pages) return null;
+  const results: RawSearchResult[] = [];
+  let recognized = pages.length === 0;
+  for (const page of pages) {
+    if (!page || typeof page !== "object" || Array.isArray(page)) continue;
+    const organic = (page as { organicResults?: unknown }).organicResults;
+    if (!Array.isArray(organic)) continue;
+    recognized = true;
+    for (const entry of organic) {
+      if (results.length >= WEB_LIMITS.maxRawResults) break;
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+      const e = entry as Record<string, unknown>;
+      if (typeof e.url !== "string" || !e.url.trim()) continue;
+      results.push({ url: e.url.trim(), title: clean(e.title, WEB_LIMITS.titleMax), description: clean(e.description, WEB_LIMITS.descriptionMax) });
+    }
   }
-  return claims;
+  return recognized ? results : null;
 }
 
-/** Una fuente real de la búsqueda, con su enlace ya resuelto y validado. */
-export interface ResolvedSource {
-  /** Dominio de la página. */
-  host: string;
-  /** Enlace https seguro, o null si no se pudo resolver (en ese caso el dominio no está verificado). */
-  url: string | null;
-  title: string;
+/** ¿El resultado nombra a Uruguay? Se mira el texto de Google y la ruta del enlace ("/uy/"). */
+function mentionsUruguay(result: RawSearchResult, url: string): boolean {
+  if (/\buruguay[oa]?s?\b|\bmontevideo\b/i.test(`${result.title} ${result.description}`)) return true;
+  return /\/uy(?:\/|$)/i.test(new URL(url).pathname);
 }
 
 const URUGUAY_ORDER: Record<UruguayStatus, number> = { confirmado: 0, probable: 1, no_confirmado: 2 };
-const CONFIDENCE_ORDER: Record<WebConfidence, number> = { alta: 0, media: 1, baja: 2 };
 
 /**
- * Lista final. Solo entran sitios que están en las fuentes reales de la búsqueda: lo que la IA mencione
- * sin fuente se descarta. Un sitio por dominio, como mucho WEB_LIMITS.maxResults.
- * Si la respuesta de la IA no se pudo leer (claims null), se listan las fuentes con confianza baja.
+ * Lista final a partir de los resultados de Google. Los enlaces que no son seguros se descartan, quedan
+ * como mucho WEB_LIMITS.maxPerDomain por dominio y WEB_LIMITS.maxResults en total. Dentro de cada grupo
+ * se respeta el orden de Google. Título y descripción son los de Google, sin agregar nada.
  */
-export function buildWebSellers(claims: SellerClaim[] | null, sources: ResolvedSource[]): WebSeller[] {
-  const byDomain = new Map<string, ResolvedSource>();
-  for (const source of sources) {
-    const domain = siteDomain(source.host);
-    const current = byDomain.get(domain);
-    // Se queda con la primera fuente del dominio, salvo que una posterior sí tenga enlace.
-    if (!current || (!current.url && source.url)) byDomain.set(domain, source);
-  }
-
+export function buildWebSellers(raw: RawSearchResult[]): WebSeller[] {
+  const perDomain = new Map<string, number>();
+  const seenUrls = new Set<string>();
   const sellers: WebSeller[] = [];
-  const used = new Set<string>();
-  const add = (source: ResolvedSource, claim: SellerClaim | null) => {
-    const domain = siteDomain(source.host);
-    if (used.has(domain)) return;
-    used.add(domain);
-    const site = source.host;
+  for (const result of raw) {
+    const url = safeHttpsUrl(result.url);
+    if (!url || seenUrls.has(url)) continue;
+    const site = normalizeHost(new URL(url).hostname);
+    if (!site) continue;
+    const domain = siteDomain(site);
+    const count = perDomain.get(domain) ?? 0;
+    if (count >= WEB_LIMITS.maxPerDomain) continue;
+    perDomain.set(domain, count + 1);
+    seenUrls.add(url);
     sellers.push({
       site,
-      url: source.url,
-      title: claim?.title || withoutPrices(clean(source.title, 140)) || site,
-      why: claim?.why ?? "",
-      confidence: claim?.confidence ?? "baja",
-      // Sin enlace resuelto, el dominio viene del título de la fuente: no alcanza para "confirmado".
-      ...classifyUruguay(site, claim?.uruguay, source.url !== null),
+      url,
+      title: clean(result.title, WEB_LIMITS.titleMax) || site,
+      why: clean(result.description, WEB_LIMITS.descriptionMax),
+      ...classifyUruguay(site, mentionsUruguay(result, url)),
+      kind: isNonStore(site, url) ? "other" : "store",
     });
-  };
-
-  if (claims) {
-    for (const claim of claims) {
-      const source = byDomain.get(siteDomain(claim.site));
-      if (source) add(source, claim);
-    }
-  } else {
-    for (const source of byDomain.values()) add(source, null);
   }
-
   return sellers
     .map((seller, index) => ({ seller, index }))
     .sort(
       (a, b) =>
-        Number(a.seller.international) - Number(b.seller.international) ||
-        URUGUAY_ORDER[a.seller.uruguay] - URUGUAY_ORDER[b.seller.uruguay] ||
-        CONFIDENCE_ORDER[a.seller.confidence] - CONFIDENCE_ORDER[b.seller.confidence] ||
+        Number(a.seller.kind === "other") - Number(b.seller.kind === "other") ||
+        // Entre lo que no es tienda no hay nada que ordenar por país: queda como lo dio Google.
+        (a.seller.kind === "other" ? 0 : Number(a.seller.international) - Number(b.seller.international)) ||
+        (a.seller.kind === "other" ? 0 : URUGUAY_ORDER[a.seller.uruguay] - URUGUAY_ORDER[b.seller.uruguay]) ||
         a.index - b.index
     )
     .slice(0, WEB_LIMITS.maxResults)
     .map(({ seller }) => seller);
 }
 
-/** Sitios que van en la lista principal: de Uruguay, confirmados o probables. */
+/** Tiendas que van en la lista principal: de Uruguay, confirmadas o probables. */
 export function isMainSeller(seller: WebSeller): boolean {
-  return !seller.international && seller.uruguay !== "no_confirmado";
+  return seller.kind === "store" && !seller.international && seller.uruguay !== "no_confirmado";
 }
 
 /** Valida en la pantalla lo que devolvió el servidor: solo pasan los campos esperados y enlaces https seguros. */
@@ -345,22 +346,20 @@ export function parseWebSellersResponse(data: unknown): WebSellersResponse | nul
   for (const entry of d.results.slice(0, WEB_LIMITS.maxResults)) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
-    const site = normalizeHost(e.site);
-    if (!site) continue;
     const url = safeHttpsUrl(e.url);
-    const { uruguay, international } = classifyUruguay(site, e.uruguay, url !== null);
+    if (!url) continue;
+    // El dominio se lee del enlace, no del campo "site": así no pueden no coincidir.
+    const site = normalizeHost(new URL(url).hostname);
+    if (!site) continue;
     results.push({
       site,
       url,
-      title: clean(e.title, 140) || site,
-      why: clean(e.why, 220),
-      confidence: e.confidence === "alta" || e.confidence === "media" ? e.confidence : "baja",
-      uruguay,
-      international,
+      title: clean(e.title, WEB_LIMITS.titleMax) || site,
+      why: clean(e.why, WEB_LIMITS.descriptionMax),
+      ...classifyUruguay(site, e.uruguay === "probable" || e.uruguay === "confirmado"),
+      kind: e.kind === "other" || isNonStore(site, url) ? "other" : "store",
     });
   }
-  const searchQueries = Array.isArray(d.searchQueries)
-    ? d.searchQueries.map((q) => clean(q, WEB_LIMITS.queryMax)).filter(Boolean).slice(0, WEB_LIMITS.maxSearchQueries)
-    : [];
+  const searchQueries = Array.isArray(d.searchQueries) ? d.searchQueries.map((q) => clean(q, 200)).filter(Boolean).slice(0, 3) : [];
   return { ok: true, query: clean(d.query, WEB_LIMITS.queryMax), results, searchQueries, cached: d.cached === true };
 }

@@ -32,7 +32,7 @@ import { createAuthMiddleware, isAuthDisabled, requestUser } from "./auth.js";
 import { createMemoryRateStore, createRateLimiter, RATE_RULES } from "./rateLimit.js";
 import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabaseToken } from "./cloud.js";
 import { createGeminiIdentifier, createIdentifyRoute, type IdentifyModel } from "./identify.js";
-import { createGeminiWebSearcher, createLinkResolver, createWebSellersRoute, type WebSearchModel } from "./webSellers.js";
+import { createApifySearcher, createWebSellersRoute, type WebSearchProvider } from "./webSellers.js";
 
 dotenv.config();
 
@@ -1289,17 +1289,19 @@ app.post(
 // ------------------------------------------------------------------
 // 3c. Sitios web de Uruguay que venden un producto (server/webSellers.ts). Límite de uso propio.
 // ------------------------------------------------------------------
-let webSearcher: { key: string; model: WebSearchModel } | null = null;
+let webSearcher: { token: string; search: WebSearchProvider } | null = null;
 app.post(
   "/api/web-sellers",
   ...createWebSellersRoute({
     limiter: rateLimit(RATE_RULES.web),
-    resolveLink: createLinkResolver({ fetch: (url, init) => fetch(url, init) }),
-    model: () => {
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) return null;
-      if (webSearcher?.key !== apiKey) webSearcher = { key: apiKey, model: createGeminiWebSearcher(apiKey) };
-      return webSearcher.model;
+    search: () => {
+      // El token de Apify se lee solo acá y viaja solo en el encabezado Authorization (server/webSellers.ts).
+      const token = (process.env.APIFY_TOKEN || "").trim();
+      if (!token) return null;
+      if (webSearcher?.token !== token) {
+        webSearcher = { token, search: createApifySearcher({ token, fetch: (url, init) => fetch(url, init) }) };
+      }
+      return webSearcher.search;
     },
   })
 );

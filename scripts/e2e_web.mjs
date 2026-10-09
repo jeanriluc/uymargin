@@ -2,7 +2,7 @@
 // No corre dentro de `npm test` (necesita la app levantada y Chrome). Uso:
 //   AUTH_DISABLED=true VITE_AUTH_DISABLED=true PORT=3917 npx tsx server/local.ts
 //   node scripts/e2e_web.mjs [carpeta-para-capturas]     (APP_URL y CHROME_PATH son opcionales)
-// /api/identify-product, /api/web-sellers y /api/search-mlu se simulan acá: no se llama a Gemini, a Google ni a Mercado Libre.
+// /api/identify-product, /api/web-sellers y /api/search-mlu se simulan acá: no se llama a Gemini, a Apify ni a Mercado Libre.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -74,15 +74,17 @@ const queries = [];
 const webCalls = [];
 let webMode = "ok";
 let webDelayMs = 0;
-const seller = (site, extra = {}) => ({ site, url: `https://${site}/termo-stanley`, title: `Termo Stanley Classic en ${site}`, why: "Vende el termo Stanley Classic de 1 litro.", confidence: "alta", uruguay: "confirmado", international: false, ...extra });
+const seller = (site, extra = {}) => ({ site, url: `https://${site}/termo-stanley`, title: `Termo Stanley Classic en ${site}`, why: "Termo Stanley Classic de 1 litro. Envíos a todo Uruguay.", uruguay: "confirmado", international: false, kind: "store", ...extra });
 const SELLERS = [
   seller("ferreteria.com.uy"),
-  seller("tiendaejemplo.com", { uruguay: "probable", confidence: "media" }),
-  seller("sinenlace.com.uy", { url: null, uruguay: "probable" }),
+  seller("ferreteria.com.uy", { url: "https://ferreteria.com.uy/termo-stanley-negro", title: "Termo Stanley Classic negro" }),
+  seller("tiendaejemplo.com", { uruguay: "probable" }),
   // Lo que el servidor no debería mandar nunca; la pantalla igual lo tiene que frenar.
   seller("enlacemalo.com.uy", { url: "javascript:alert(document.domain)" }),
   seller("es.aliexpress.com", { uruguay: "no_confirmado", international: true }),
-  seller("dudosa.com", { uruguay: "no_confirmado", confidence: "baja" }),
+  seller("dudosa.com", { uruguay: "no_confirmado" }),
+  seller("youtube.com", { url: "https://www.youtube.com/watch?v=abc", title: "Review del termo Stanley", uruguay: "no_confirmado", kind: "other" }),
+  seller("es.wikipedia.org", { url: "https://es.wikipedia.org/wiki/Stanley", title: "Stanley - Wikipedia", uruguay: "no_confirmado", kind: "other" }),
 ];
 const identify = [];
 let mode = "ok";
@@ -122,13 +124,14 @@ page.on("request", async (req) => {
     webCalls.push({ method: req.method(), type: req.headers()["content-type"], body });
     if (webDelayMs) await sleep(webDelayMs);
     const fail = (status, code, message, headers) => json({ ok: false, code, message, error: message }, status, headers);
-    if (webMode === "billing") return fail(503, "WEB_SEARCH_NEEDS_BILLING", "La búsqueda web necesita activar la facturación de la clave de Gemini.");
-    if (webMode === "provider") return fail(502, "AI_ERROR", "No se pudo hacer la búsqueda web en este momento. Probá de nuevo en unos minutos o usá los botones de Google.");
+    if (webMode === "notConfigured") return fail(503, "WEB_SEARCH_NOT_CONFIGURED", "La búsqueda web no está configurada en el servidor. Mientras tanto podés usar los botones de Google.");
+    if (webMode === "noCredit") return fail(503, "WEB_SEARCH_NO_CREDIT", "Se agotó el crédito del servicio de búsqueda web");
+    if (webMode === "unavailable") return fail(502, "WEB_SEARCH_UNAVAILABLE", "La búsqueda web no respondió en este momento. Probá de nuevo o usá los botones de Google.");
     if (webMode === "rate") return fail(429, "RATE_LIMITED", "Llegaste al límite de 5 usos por minuto. Probá de nuevo en 40 segundos.", { "Retry-After": "40" });
     if (webMode === "garbage") return json({ ok: true, results: "muchos" });
     if (webMode === "empty") return json({ ok: true, query: body?.query ?? "", results: [], searchQueries: [], cached: false });
     if (webMode === "onlyOthers") return json({ ok: true, query: body?.query ?? "", results: [SELLERS[4]], searchQueries: [], cached: false });
-    return json({ ok: true, query: body?.query ?? "", results: SELLERS, searchQueries: ["termo stanley classic comprar Uruguay"], cached: false });
+    return json({ ok: true, query: body?.query ?? "", results: SELLERS, searchQueries: [`"${body?.query ?? ""}" comprar Uruguay`], cached: false });
   }
   if (url.pathname !== "/api/search-mlu") return req.continue();
   const q = url.searchParams.get("q") || "";
@@ -206,7 +209,7 @@ await sleep(200);
 assert((await tabState()) === "Mercado Libre:false:-1 | En la web (Uruguay):true:0" && (await panelHidden("photo-panel-ml")) && !(await panelHidden("photo-panel-web")), "Al elegir «En la web (Uruguay)» cambia la vista y se oculta la otra");
 assert(webCalls.length === 0 && queries.length === 0, "Abrir la vista no busca nada: ni en la web ni en Mercado Libre");
 assert(/^Buscar en la web de Uruguay$/i.test(await textOf("#mercado [data-web-search]")) && !/Mercado Libre/i.test(await textOf("#mercado [data-photo-result] button[type='submit']")), "El botón pasa a ser «Buscar en la web de Uruguay»");
-assert(/Usa la búsqueda de Google\. Los resultados pueden ser productos parecidos: verificá en cada sitio\./.test(await textOf(WEB)), "Muestra el aviso de la búsqueda de Google");
+assert(/Son resultados de Google Uruguay y pueden ser productos parecidos\. Confirmá precio y stock en cada tienda\./.test(await textOf(WEB)), "Aclara que son resultados de Google Uruguay y que hay que confirmar precio y stock en la tienda");
 
 // --- Botones de Google: siempre visibles y con la búsqueda bien armada ---
 let google = await links(`${WEB} a[data-google]`);
@@ -249,27 +252,28 @@ await page.waitForSelector(`${WEB} [data-web-results]`, { timeout: 10000 }).catc
 const call = webCalls.at(-1);
 assert(webCalls.length === callsBefore + 1 && call.method === "POST" && /application\/json/.test(call.type) && JSON.stringify(call.body) === '{"query":"Termo Stanley Classic"}', `Se manda un POST con la consulta y nada más (${JSON.stringify(call.body)})`);
 assert(queries.length === 0, "Buscar en la web no dispara una búsqueda en Mercado Libre");
-const cards = () => page.$$eval(`${WEB} [data-web-seller]`, (els) => els.map((el) => ({ site: el.getAttribute("data-web-seller"), shown: el.checkVisibility(), uruguay: el.querySelector("[data-web-uruguay]")?.innerText.trim(), text: el.innerText.replace(/\s+/g, " ").trim(), link: el.querySelector("a")?.href ?? null, inDetails: !!el.closest("details") })));
+const cards = () => page.$$eval(`${WEB} [data-web-seller]`, (els) => els.map((el) => ({ site: el.getAttribute("data-web-seller"), shown: el.checkVisibility(), uruguay: el.querySelector("[data-web-uruguay]")?.innerText.trim() ?? null, text: el.innerText.replace(/\s+/g, " ").trim(), link: el.querySelector("a")?.href ?? null, group: el.closest("details")?.hasAttribute("data-web-non-stores") ? "otros" : el.closest("details") ? "sin-confirmar" : "principal" })));
 let c = await cards();
-const mainCards = c.filter((x) => !x.inDetails);
-assert(mainCards.map((x) => x.site).join() === "ferreteria.com.uy,tiendaejemplo.com,sinenlace.com.uy,enlacemalo.com.uy" && mainCards.every((x) => x.shown), `Lista principal: los sitios de Uruguay confirmados y probables (${mainCards.map((x) => x.site).join()})`);
-assert(mainCards[0].uruguay === "Uruguay: confirmado" && mainCards[1].uruguay === "Uruguay: probable", "Cada tarjeta dice Confirmado o Probable");
-assert(/ferreteria\.com\.uy/.test(mainCards[0].text) && /Termo Stanley Classic en ferreteria\.com\.uy/.test(mainCards[0].text) && /Vende el termo Stanley Classic de 1 litro\./.test(mainCards[0].text) && /Ver en el sitio/i.test(mainCards[0].text), "La tarjeta muestra sitio, título, la frase y «Ver en el sitio»");
+const mainCards = c.filter((x) => x.group === "principal");
+assert(mainCards.map((x) => x.site).join() === "ferreteria.com.uy,ferreteria.com.uy,tiendaejemplo.com" && mainCards.every((x) => x.shown), `Lista principal: las tiendas de Uruguay confirmadas y probables, hasta dos por dominio (${mainCards.map((x) => x.site).join()})`);
+assert(mainCards[0].uruguay === "Uruguay: confirmado" && mainCards[2].uruguay === "Uruguay: probable", "Cada tarjeta dice Confirmado o Probable");
+assert(/ferreteria\.com\.uy/.test(mainCards[0].text) && /Termo Stanley Classic en ferreteria\.com\.uy/.test(mainCards[0].text) && /Termo Stanley Classic de 1 litro\. Envíos a todo Uruguay\./.test(mainCards[0].text) && /Ver en el sitio/i.test(mainCards[0].text), "La tarjeta muestra sitio, título y descripción de Google, y «Ver en el sitio»");
+assert(!/parece el mismo producto|producto parecido|coincidencia dudosa/i.test(await textOf(`${WEB} [data-web-results]`)), "Ya no se muestra una opinión de la IA sobre cada resultado");
 const siteLinks = await links(`${WEB} [data-web-seller] a`);
-assert(siteLinks.length === 4 && siteLinks.every((a) => a.target === "_blank" && a.rel === "noopener noreferrer" && a.href.startsWith("https://")), `Todos los enlaces a sitios son https, abren en pestaña nueva y llevan rel="noopener noreferrer" (${siteLinks.length})`);
-assert(mainCards[2].link === null && /Sin enlace directo/.test(mainCards[2].text) && mainCards[2].uruguay === "Uruguay: probable", "Un sitio sin enlace resuelto se muestra sin enlace");
-assert(mainCards[3].link === null && !(await page.evaluate((s) => document.querySelector(s).innerHTML.includes("javascript:"), WEB)), "Un enlace javascript: que llegara del servidor no se convierte en enlace");
-assert(!/\$\s?\d|US\$|\d\s?pesos/i.test(await textOf(`${WEB} [data-web-results]`)), "No hay precios en los resultados");
+assert(siteLinks.length === 7 && siteLinks.every((a) => a.target === "_blank" && a.rel === "noopener noreferrer" && a.href.startsWith("https://")), `Todos los enlaces a sitios son https, abren en pestaña nueva y llevan rel="noopener noreferrer" (${siteLinks.length})`);
+assert(!c.some((x) => x.site === "enlacemalo.com.uy") && !(await page.evaluate((s) => document.querySelector(s).innerHTML.includes("javascript:"), WEB)), "Un resultado con enlace javascript: que llegara del servidor no se muestra");
 
-const others = c.filter((x) => x.inDetails);
+const others = c.filter((x) => x.group === "sin-confirmar");
 assert(others.map((x) => x.site).join() === "es.aliexpress.com,dudosa.com" && others.every((x) => !x.shown) && (await page.$eval(`${WEB} details[data-web-others]`, (d) => !d.open)), "Internacionales y sin confirmar van en un bloque aparte, cerrado por defecto");
 assert(/Internacionales y sin confirmar: confirmá que envían a Uruguay \(2\)/.test(await textOf(`${WEB} details[data-web-others] summary`)), "El bloque dice que hay que confirmar que envían a Uruguay");
+const nonStores = c.filter((x) => x.group === "otros");
+assert(nonStores.map((x) => x.site).join() === "youtube.com,es.wikipedia.org" && nonStores.every((x) => !x.shown && x.uruguay === null) && /^Otros resultados: no son tiendas \(2\)$/.test(await textOf(`${WEB} details[data-web-non-stores] summary`)), "YouTube y Wikipedia van a «Otros resultados», cerrado, sin indicador de Uruguay: no se muestran como vendedores");
 await page.click(`${WEB} details[data-web-others] summary`);
 await sleep(200);
 c = await cards();
-assert(c.filter((x) => x.inDetails).every((x) => x.shown && x.uruguay === "Uruguay: no confirmado"), "Al abrirlo se ven, marcados «no confirmado»");
+assert(c.filter((x) => x.group === "sin-confirmar").every((x) => x.shown && x.uruguay === "Uruguay: no confirmado"), "Al abrirlo se ven, marcados «no confirmado»");
 const searched = await links(`${WEB} [data-web-results] p a`);
-assert(searched.length === 1 && searched[0].text === "termo stanley classic comprar Uruguay" && searched[0].href.startsWith("https://www.google.com/search?q=") && searched[0].rel === "noopener noreferrer" && searched[0].target === "_blank", "Muestra lo que buscó Google, como enlace a esa búsqueda");
+assert(searched.length === 1 && searched[0].text === '"Termo Stanley Classic" comprar Uruguay' && searched[0].href.startsWith("https://www.google.com/search?q=") && searched[0].rel === "noopener noreferrer" && searched[0].target === "_blank", "Muestra lo que se buscó en Google, como enlace a esa búsqueda");
 assert((await overflow()).length === 0, "Resultados web a 1280 px: sin desborde horizontal");
 await shot("r12-web-resultados-1280", 1280);
 await page.setViewport({ width: 390, height: 844 });
@@ -285,7 +289,7 @@ await sleep(300);
 const webCount = webCalls.length;
 await click("^Mercado Libre$");
 await sleep(200);
-assert((await panelHidden("photo-panel-web")) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 6, "Al pasar a «Mercado Libre» los resultados web quedan montados y ocultos");
+assert((await panelHidden("photo-panel-web")) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7, "Al pasar a «Mercado Libre» los resultados web quedan montados y ocultos");
 await click("^Lote CSV$");
 await sleep(500);
 await click("^Por foto$");
@@ -294,7 +298,7 @@ assert((await tabState()).startsWith("Mercado Libre:true:0") && (await page.$eva
 await click("^En la web \\(Uruguay\\)$");
 await sleep(200);
 c = await cards();
-assert(c.length === 6 && c.filter((x) => !x.inDetails).every((x) => x.shown) && (await page.$eval(`${WEB} details[data-web-others]`, (d) => d.open)), "Al volver a la vista web están los mismos resultados, con el bloque abierto como quedó");
+assert(c.length === 7 && c.filter((x) => x.group === "principal").every((x) => x.shown) && (await page.$eval(`${WEB} details[data-web-others]`, (d) => d.open)), "Al volver a la vista web están los mismos resultados, con el bloque abierto como quedó");
 assert(webCalls.length === webCount, "Cambiar de vista o de pestaña no repite la búsqueda web");
 
 // --- Sin resultados, facturación y errores ---
@@ -308,18 +312,29 @@ await webCase("empty", "producto rarísimo");
 assert(/No encontré sitios que vendan ese producto\. Probá con un nombre más corto o usá los botones de Google\./.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 0, "Sin resultados: lo dice y sugiere acortar el nombre o usar Google");
 assert((await links(`${WEB} a[data-google]`)).length === 2, "Sin resultados, los botones de Google siguen ahí");
 await webCase("onlyOthers", "termo importado");
-assert(/No encontré sitios de Uruguay para «termo importado»\. Hay 1 para revisar acá abajo\./.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && /^Internacionales: confirmá que envían a Uruguay \(1\)$/.test(await textOf(`${WEB} details[data-web-others] summary`)), "Solo internacionales: lo avisa y el bloque se llama «Internacionales: confirmá que envían a Uruguay»");
-await webCase("billing", "termo stanley");
-assert((await page.$eval(`${WEB} [data-web-error]`, (el) => `${el.getAttribute("data-web-error")}|${el.getAttribute("role")}`).catch(() => "")) === "billing|alert" && /La búsqueda web necesita activar la facturación de la clave de Gemini\./.test(await webError()), `Sin facturación: mensaje claro con role=alert (${(await webError()).slice(0, 70)}…)`);
-assert(!/api key|quota|403|billing|stack/i.test(await webError()) && (await links(`${WEB} a[data-google]`)).length === 2 && (await page.$(`${WEB} [data-web-results]`)) === null, "Ese mensaje no expone detalles internos y los botones de Google siguen funcionando");
-await webCase("provider", "termo stanley");
-assert((await page.$eval(`${WEB} [data-web-error]`, (el) => el.getAttribute("data-web-error")).catch(() => "")) === "error" && /No se pudo hacer la búsqueda web en este momento/.test(await webError()), "Error del proveedor: aviso claro");
+assert(/No encontré tiendas de Uruguay para «termo importado»\. Mirá los otros resultados acá abajo\./.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && /^Internacionales: confirmá que envían a Uruguay \(1\)$/.test(await textOf(`${WEB} details[data-web-others] summary`)), "Solo internacionales: lo avisa y el bloque se llama «Internacionales: confirmá que envían a Uruguay»");
+const errorBox = () => page.$eval(`${WEB} [data-web-error]`, (el) => `${el.getAttribute("data-web-error")}|${el.getAttribute("role")}|${el.querySelector("[data-web-retry]") ? "con-reintento" : "sin-reintento"}`).catch(() => "");
+const googleStillThere = async () => (await links(`${WEB} a[data-google]`)).filter((a) => a.shown && a.href.startsWith("https://www.google.com/search?")).length === 2;
+await webCase("noCredit", "termo stanley");
+assert((await errorBox()) === "WEB_SEARCH_NO_CREDIT|alert|sin-reintento" && /Se agotó el crédito del servicio de búsqueda web/.test(await webError()), `Sin crédito: aviso claro con role=alert, sin botón de reintentar (${(await webError()).slice(0, 70)}…)`);
+assert((await googleStillThere()) && (await page.$(`${WEB} [data-web-results]`)) === null, "Sin crédito, los botones gratuitos de Google siguen visibles y con su enlace");
+assert(!/apify|token|402|billing|facturaci|gemini|stack/i.test(await webError()), "El aviso no nombra al proveedor ni expone detalles internos");
+await webCase("notConfigured", "termo stanley");
+assert((await errorBox()) === "WEB_SEARCH_NOT_CONFIGURED|alert|sin-reintento" && /La búsqueda web no está configurada en el servidor/.test(await webError()) && (await googleStillThere()), "Sin configurar: aviso claro, sin reintentar, y los botones de Google siguen");
+await webCase("unavailable", "termo stanley");
+assert((await errorBox()) === "WEB_SEARCH_UNAVAILABLE|alert|con-reintento" && /La búsqueda web no respondió en este momento/.test(await webError()) && (await googleStillThere()), "Servicio caído o lento: aviso claro con botón «Reintentar», y los botones de Google siguen");
+const beforeRetry = webCalls.length;
+webMode = "ok";
+await page.click(`${WEB} [data-web-retry]`);
+await page.waitForSelector(`${WEB} [data-web-results]`, { timeout: 10000 }).catch(() => null);
+assert(webCalls.length === beforeRetry + 1 && webCalls.at(-1).body?.query === "termo stanley" && (await page.$(`${WEB} [data-web-error]`)) === null && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7, "«Reintentar» repite la misma búsqueda una vez y muestra los resultados");
 await webCase("rate", "termo stanley");
-assert(/Llegaste al límite de 5 usos por minuto/.test(await webError()), "Límite de uso: muestra el mensaje del servidor");
+assert(/Llegaste al límite de 5 usos por minuto/.test(await webError()) && (await errorBox()).endsWith("sin-reintento"), "Límite de uso: muestra el mensaje del servidor, sin invitar a reintentar");
 await webCase("garbage", "termo stanley");
-assert(/No se pudo hacer la búsqueda web/.test(await webError()) && (await page.$(`${WEB} [data-web-results]`)) === null, "Respuesta con forma inesperada: no se muestra, se avisa");
+assert(/La búsqueda web no respondió/.test(await webError()) && (await page.$(`${WEB} [data-web-results]`)) === null, "Respuesta con forma inesperada: no se muestra, se avisa");
+assert(!/facturaci[oó]n|billing|Gemini/i.test(await textOf(WEB)), "No queda nada del aviso viejo de facturación de Google");
 await webCase("ok", "Termo Stanley Classic");
-assert((await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 6 && (await page.$(`${WEB} [data-web-error]`)) === null, "Después de un error se puede buscar de nuevo y el aviso se va");
+assert((await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7 && (await page.$(`${WEB} [data-web-error]`)) === null, "Después de un error se puede buscar de nuevo y el aviso se va");
 
 // --- Sugerencia cuando Mercado Libre no lo encuentra ---
 await click("^Mercado Libre$");
