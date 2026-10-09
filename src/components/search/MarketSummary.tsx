@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { formatRate, formatUyu } from "@/lib/format";
 import type { MarketStats, MluItem, MluSearchError, RadarRelevance, UnsupportedListing } from "@/lib/mlu/types";
 import { convertToUyu, describeRate, type ExchangeRate } from "@/lib/currency";
+import { assessMarketData } from "@/lib/mlu/reliability";
 import { FAR_FROM_MEDIAN_FACTOR, isFarFromMedian } from "@/lib/mlu/statistics";
 import { CatalogProductCard } from "@/components/search/CatalogProductCard";
 
@@ -107,6 +108,10 @@ export function MarketSummary({
     return c.status === "ok" && isFarFromMedian(c.amountUyu, stats.median);
   };
   const farCount = matching.filter(isFar).length;
+  // Confiabilidad del dato: describe los precios que coinciden, no cambia ninguna estadística.
+  const reliability = fromRadar && stats
+    ? assessMarketData(matching.flatMap((i) => { const c = convertToUyu(i.price, i.currency, rate); return c.status === "ok" ? [c.amountUyu] : []; }))
+    : null;
   const quoted = (terms: string[]) => terms.map((t) => `«${t}»`).join(", ");
 
   return (
@@ -124,6 +129,20 @@ export function MarketSummary({
             </p>
           )}
         </div>
+
+        {reliability && (
+          <span
+            data-reliability={reliability.level}
+            title={reliability.reasons.length > 0 ? `Porque ${reliability.reasons.join(" y ")}.` : "Varios precios y parecidos entre sí."}
+            className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[11px] font-black uppercase tracking-wider ${
+              reliability.level === "solid"
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+            }`}
+          >
+            {reliability.label}
+          </span>
+        )}
 
         {stats && stats.outliersRemoved != null && stats.outliersRemoved > 0 && (
           <span className="inline-flex items-center gap-1 rounded border border-zinc-300 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
@@ -231,6 +250,14 @@ export function MarketSummary({
             </div>
           )}
 
+          {reliability && reliability.sampleSize >= 3 && (
+            <p className="text-xs text-zinc-600 dark:text-zinc-400" data-reliability-range>
+              <span className="font-bold text-zinc-900 dark:text-zinc-100">{reliability.label}:</span> la mitad de los productos que
+              coinciden se vende entre <span className="num font-bold">{formatUyu(reliability.p25)}</span> y{" "}
+              <span className="num font-bold">{formatUyu(reliability.p75)}</span>
+              {reliability.reasons.length > 0 ? ` (${reliability.reasons.join("; ")})` : ""}.
+            </p>
+          )}
           {smallSample && (
             <div
               role="status"

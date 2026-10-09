@@ -22,6 +22,8 @@ import { batchResultsToCsv, signedUyu, UNPRICED_LABEL, type BatchItemInput, type
 import { createDirectModel, createMlModel } from "@/lib/finance/channels";
 import { analyzeAll } from "@/lib/finance/engine";
 import { breakEvenExchangeRate } from "@/lib/finance/sensitivity";
+import { assessMarketData, type MarketReliability } from "@/lib/mlu/reliability";
+import { priceToUyu } from "@/lib/mlu/statistics";
 import { saveAuditToCloud } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 import type { AnalysisInputs } from "@/lib/finance/types";
@@ -161,6 +163,7 @@ export function BatchAuditor({
       let marketPriceUyu = Math.round(costUyu * 1.5);
       let sampleSize = 0;
       let marketError: string | undefined;
+      let reliability: MarketReliability | null = null;
 
       try {
         const res = await apiFetch(
@@ -170,6 +173,10 @@ export function BatchAuditor({
         if (data?.ok && data.stats && data.stats.median > 0) {
           marketPriceUyu = Math.round(data.stats.median);
           sampleSize = data.stats.sampleSize;
+          // Mismos precios con los que el servidor armó la mediana: los productos que coinciden, en pesos.
+          reliability = assessMarketData(
+            (data.items ?? []).filter((it) => it.match?.matches).map((it) => priceToUyu(it.price, it.currency, exchangeRate))
+          );
         } else if (data && !data.ok && "message" in data && data.message) {
           marketError = data.message;
         } else if (!res.ok) {
@@ -235,6 +242,8 @@ export function BatchAuditor({
         roi: winningResult.roi,
         status,
         marketError,
+        reliabilityLabel: reliability?.label ?? null,
+        reliabilityReasons: reliability?.reasons ?? [],
         breakEvenRate: breakEven?.rate ?? null,
         rateCushionPct: breakEven?.deltaPct ?? null,
         // Sin dato de mercado no se pasa al simulador un precio provisorio como si fuera de venta.
@@ -607,6 +616,14 @@ export function BatchAuditor({
                               {formatUyu(r.marketPriceUyu)}
                             </span>
                             <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} {r.sampleSize === 1 ? "producto que coincide" : "productos que coinciden"}</span>
+                            {r.reliabilityLabel && (
+                              <span
+                                title={r.reliabilityReasons?.length ? `Porque ${r.reliabilityReasons.join(" y ")}.` : undefined}
+                                className={`block text-[11px] font-bold ${r.reliabilityLabel === "Dato sólido" ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}
+                              >
+                                {r.reliabilityLabel}
+                              </span>
+                            )}
                           </>
                         )}
                       </td>

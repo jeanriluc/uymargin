@@ -109,7 +109,7 @@ assert(unpricedRow[col("Viabilidad")] === "Sin dato de mercado" && unpricedRow[c
 // Columnas nuevas al final: no cambian el orden ni el contenido de las anteriores.
 assert(
   BATCH_CSV_HEADERS.slice(0, 14).join("|") === "SKU|Producto|Costo Original|Moneda|Costo UYU|Precio Mediana MLU ($U)|Muestras MLU|Canal Ganador|Margen ML (%)|Ganancia ML ($U)|Margen Tienda (%)|Ganancia Tienda ($U)|ROI (%)|Viabilidad" &&
-    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)",
+    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)|Confiabilidad del dato",
   "CSV del Lote: las 14 columnas de antes quedan igual y se agregan al final «Dólar de quiebre» y «Colchón»"
 );
 const withBreakEven = batchCsvRow({ ...priced, breakEvenRate: 76.634, rateCushionPct: 89.22 });
@@ -121,6 +121,11 @@ assert(pricedRow[col("Dólar de quiebre ($U)")] === "" && pricedRow[col("Colchó
 assert(
   batchCsvRow({ ...unpriced, breakEvenRate: 50, rateCushionPct: 20 })[col("Dólar de quiebre ($U)")] === "" && unpricedRow[col("Colchón (%)")] === "",
   "Fila sin dato de mercado: dólar de quiebre y colchón vacíos"
+);
+assert(
+  batchCsvRow({ ...priced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "Dato flojo" &&
+    pricedRow[col("Confiabilidad del dato")] === "" && batchCsvRow({ ...unpriced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "",
+  "CSV del Lote: la confiabilidad del dato va en la última columna; vacía si no hay dato de mercado"
 );
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");
