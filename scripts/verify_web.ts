@@ -282,6 +282,9 @@ async function main() {
   assert(fetched.length === WEB_LIMITS.maxSources, `Como mucho se resuelven ${WEB_LIMITS.maxSources} fuentes por búsqueda`);
 
   console.log("--- Herramienta no disponible ---");
+  // Respuesta real de Gemini (9/10/2026) a una clave sin facturación que pide la búsqueda de Google con gemini-3.8-flash.
+  const REAL_NO_BILLING = '{"error":{"code":429,"message":"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. ","status":"RESOURCE_EXHAUSTED"}}';
+  assert(isSearchUnavailable({ name: "ApiError", status: 429, message: REAL_NO_BILLING }), "El error real de una clave sin facturación (429 RESOURCE_EXHAUSTED) se reconoce");
   assert(isSearchUnavailable({ status: 403, message: "PERMISSION_DENIED" }), "403: la clave no puede usar la búsqueda");
   assert(isSearchUnavailable({ status: 429, message: "Quota exceeded for metric ... free_tier_requests, limit: 0" }) && isSearchUnavailable({ status: 429, message: "Please enable billing" }), "429 que habla del plan gratuito o de facturación");
   assert(isSearchUnavailable({ status: 400, message: "Google Search grounding is not supported for this API key. Enable billing." }) && isSearchUnavailable({ status: 400, message: "google_search tool is not available on the free tier" }), "400 que dice que la búsqueda no está disponible");
