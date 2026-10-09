@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { apiFetch } from "@/lib/api";
 import { AlertTriangle, ExternalLink, Loader2, PackageSearch, SlidersHorizontal, Store, Truck } from "lucide-react";
 import { PriceWithEquivalent } from "@/components/ui/PriceWithEquivalent";
 import { convertToUyu, type ExchangeRate } from "@/lib/currency";
@@ -174,7 +175,7 @@ export function ExactOffersSection({
     setChoosingId(candidate.productId);
     setChooseError(null);
     try {
-      const res = await fetch("/api/analyze-url", {
+      const res = await apiFetch("/api/analyze-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: candidate.permalink, rate: rate?.rate, exactOnly: true }),

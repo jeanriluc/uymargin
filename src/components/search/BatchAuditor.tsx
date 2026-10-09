@@ -19,6 +19,7 @@ import {
 import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { analyzeAll } from "@/lib/finance/engine";
 import { saveAuditToCloud } from "@/lib/supabase";
+import { apiFetch } from "@/lib/api";
 import type { AnalysisInputs } from "@/lib/finance/types";
 import type { MluSearchResponse } from "@/lib/mlu/types";
 import { normalizeCurrency } from "@/lib/currency";
@@ -63,14 +64,12 @@ interface BatchAuditorProps {
   baseInputs: AnalysisInputs;
   exchangeRate: number;
   onSimulateProduct: (inputs: Partial<AnalysisInputs>) => void;
-  onOpenCloudSettings?: () => void;
 }
 
 export function BatchAuditor({
   baseInputs,
   exchangeRate,
   onSimulateProduct,
-  onOpenCloudSettings,
 }: BatchAuditorProps) {
   const [rawText, setRawText] = useState("");
   const [items, setItems] = useState<BatchItemInput[]>(SAMPLE_CATALOG);
@@ -188,7 +187,7 @@ export function BatchAuditor({
       let marketError: string | undefined;
 
       try {
-        const res = await fetch(
+        const res = await apiFetch(
           `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`
         );
         const data: MluSearchResponse | null = await res.json().catch(() => null);

@@ -15,7 +15,7 @@ Simula el margen neto por unidad después de impuestos (DGI), comisiones y logí
   - *Por enlace:* analiza una publicación de catálogo (`mercadolibre.com.uy/.../p/MLU...`) y lista otros vendedores del mismo producto.
   - *Lote CSV:* carga un catálogo (SKU, nombre, costo, moneda) y lo ordena por rentabilidad.
 - **Guardar y exportar:** historial en el navegador, exportación a CSV, impresión, resumen para copiar o enviar por WhatsApp.
-- **Nube (opcional):** guarda auditorías de "Por enlace" y "Lote CSV" en un proyecto propio de Supabase.
+- **Nube:** guarda auditorías de "Por enlace" y "Lote CSV" en Supabase, a través del servidor. Son compartidas entre los usuarios con acceso.
 - **Tema:** claro por defecto, con opción de oscuro desde el botón del encabezado. La elección se recuerda.
 - **Copiloto (opcional):** un asistente con Gemini que comenta un resultado ya calculado. No calcula ni reemplaza las cifras.
 
@@ -76,16 +76,23 @@ Todas son opcionales para la calculadora básica. Sin ellas, la función asociad
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Credenciales de una aplicación de Mercado Libre. Necesarias para el radar y "Por enlace" |
 | `ML_ACCESS_TOKEN` | Alternativa a las dos anteriores: un token de acceso ya emitido |
 | `GEMINI_API_KEY` | Copiloto |
-| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para guardar en la nube. También se pueden cargar desde la interfaz (ícono de engranaje), que las guarda en el navegador |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para el login (clave pública; queda en el JavaScript del navegador) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secreta, solo servidor.** Valida sesiones, guarda auditorías y cuenta el límite de uso |
+| `ALLOWED_EMAILS` | **Solo servidor.** Correos que pueden usar la app, separados por comas |
+| `AUTH_DISABLED`, `VITE_AUTH_DISABLED` | Solo desarrollo local: saltean el login. Se ignoran en producción y en Vercel |
 | `NODE_ENV` | `production` para servir la interfaz compilada |
 
-La tabla que necesita Supabase se crea con el script SQL que muestra la propia app en la configuración de la nube. Ese script deja la tabla abierta a cualquiera que tenga la clave pública: revisá las políticas antes de usarlo con datos reales (detalle en el registro de auditoría interno (no publicado)).
+Todas las rutas `/api/*` exigen sesión (enlace mágico de Supabase Auth) y un correo de `ALLOWED_EMAILS`. El navegador no escribe en Supabase: las auditorías pasan por `/api/audits`. Los pasos de configuración y el SQL a aplicar están en [`docs/acceso-supabase.md`](docs/acceso-supabase.md) y `supabase/migrations/`.
 
 ## Estructura
 
 ```
 server/app.ts             App Express con las rutas /api/* (cotización, radar, enlace, copiloto); no abre puertos
 server/local.ts           Arranque local: Vite (desarrollo) o dist/ (producción) + app.listen
+server/auth.ts            Control de acceso de /api/*: token de Supabase + ALLOWED_EMAILS
+server/rateLimit.ts       Límite de uso por usuario (por minuto y por día)
+server/cloud.ts           Supabase del servidor: sesiones, auditorías y contador del límite
+supabase/migrations/      SQL a aplicar a mano en Supabase
 api/                      Funciones de Vercel: cada archivo exporta el app de server/app.ts
 vercel.json               Configuración de Vercel (framework, rewrite de la SPA, maxDuration)
 src/
@@ -96,12 +103,14 @@ src/
   lib/currency.ts         Moneda original de cada precio, conversión a pesos y reglas de la cotización
   lib/bcu.ts              Pedidos y lectura de respuestas del servicio de cotizaciones del BCU
   lib/storage/            Historial y borrador de la simulación en el navegador
-  lib/supabase.ts         Cliente de Supabase (se carga solo cuando se usa la nube)
+  lib/supabase.ts         Cliente de Supabase para la sesión y llamadas a /api/audits
+  lib/api.ts              fetch de /api/* con el token de la sesión
   lib/mlu/                Tipos y estadísticas de precios de Mercado Libre
   lib/tracking/           Seguimiento de competidores (sin acceso desde la interfaz)
   components/calculator/  Costo, precio, resultado, tarjetas de canal, packs
   components/search/      Radar, Por enlace, Lote CSV
-  components/cloud/       Configuración y auditorías guardadas en Supabase
+  components/cloud/       Auditorías guardadas en la nube
+  components/auth/        Pantalla de ingreso y control de sesión
   components/ai/          Copiloto
   components/layout/      Encabezado
   components/ui/          Campos numéricos, selectores, ayudas
@@ -144,7 +153,10 @@ Se cargan en el panel de Vercel (Project → Settings → Environment Variables)
 |---|---|---|
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Secreta de servidor | Radar y "Por enlace". Alternativa: `ML_ACCESS_TOKEN` (también secreta) |
 | `GEMINI_API_KEY` | Secreta de servidor | Copiloto |
-| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | **Embebidas en el bundle del navegador** (prefijo `VITE_`, se resuelven en el build) | Cualquiera que abra la página puede leerlas. Solo la clave pública (anon/publishable); jamás una secreta. Cambiarlas exige un nuevo deploy |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para el login (clave pública; queda en el JavaScript del navegador) |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secreta, solo servidor.** Valida sesiones, guarda auditorías y cuenta el límite de uso |
+| `ALLOWED_EMAILS` | **Solo servidor.** Correos que pueden usar la app, separados por comas |
+| `AUTH_DISABLED`, `VITE_AUTH_DISABLED` | Solo desarrollo local: saltean el login. Se ignoran en producción y en Vercel |
 | `PORT`, `HOST` | Solo ejecución local | Vercel no las usa |
 
 Los previews por rama usan las variables del entorno *Preview*: cargalas también ahí si querés que funcionen el radar, el copiloto o la nube.
