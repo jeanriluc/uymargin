@@ -31,7 +31,8 @@ import {
 import { createDirectModel, createMlModel } from "@/lib/finance/channels";
 import { analyzeAll } from "@/lib/finance/engine";
 import { breakEvenExchangeRate } from "@/lib/finance/sensitivity";
-import { assessMarketData, type MarketReliability } from "@/lib/mlu/reliability";
+import { broadenQuery } from "@/lib/mlu/broaden";
+import { asBroadened, assessMarketData, type MarketReliability } from "@/lib/mlu/reliability";
 import { priceToUyu } from "@/lib/mlu/statistics";
 import { saveAuditToCloud } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
@@ -159,6 +160,8 @@ export function BatchAuditor({
   };
 
   // "Cancelar" corta la corrida después de la consulta en curso; lo ya consultado se conserva.
+  // Opción apagada por defecto: si una fila no tiene precios, probar una vez con el nombre más corto.
+  const [broadenWhenEmpty, setBroadenWhenEmpty] = useState(false);
   const cancelRef = useRef(false);
   const [cancelNote, setCancelNote] = useState<string | null>(null);
 
@@ -179,6 +182,34 @@ export function BatchAuditor({
     const previousSkus = new Set(previous.map((r) => r.sku));
     let halted = false;
 
+    const hasPrice = (d: MluSearchResponse | null) => !!(d?.ok && d.stats && d.stats.median > 0);
+    /** Una consulta al radar, respetando el límite de uso. Lanza BatchHalted si hay que frenar el lote. */
+    const consult = async (name: string, i: number, total: number) => {
+      const searchUrl = `/api/search-mlu?q=${encodeURIComponent(name)}&rate=${exchangeRate}`;
+      let res = await apiFetch(searchUrl);
+      // Límite de uso: con el tope por minuto se espera y se repite la consulta una vez; con el diario se frena el lote.
+      const limit = rateLimitDecision(res.status, res.headers.get("Retry-After"));
+      if (limit.action === "stop") {
+        setCancelNote(`Llegaste al límite de uso de hoy: se consultaron ${i} de ${total} productos.`);
+        halted = true;
+        throw new BatchHalted();
+      }
+      if (limit.action === "wait") {
+        setProgress({ current: i + 1, total, currentName: `${name} (esperando ${limit.seconds} s por el límite de uso)` });
+        for (let waited = 0; waited < limit.seconds && !cancelRef.current; waited++) {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (cancelRef.current) {
+          setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${total} productos.`);
+          halted = true;
+          throw new BatchHalted();
+        }
+        res = await apiFetch(searchUrl);
+      }
+      const data: MluSearchResponse | null = await res.json().catch(() => null);
+      return { res, data };
+    };
+
     for (let i = 0; i < targets.length; i++) {
       // Cancelado o frenado: las filas que faltan no se consultan, pero quedan en la tabla como
       // "sin dato" para poder retomarlas con "Reintentar" sin volver a consultar las demás.
@@ -196,32 +227,26 @@ export function BatchAuditor({
       let sampleSize = 0;
       let marketError: string | undefined;
       let reliability: MarketReliability | null = null;
+      let broadenedQuery: string | null = null;
+      let triedBroadened: string | null = null;
 
       try {
         if (halted) throw new BatchHalted();
-        const searchUrl = `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`;
-        let res = await apiFetch(searchUrl);
-        // Límite de uso: con el tope por minuto se espera y se repite la fila una vez; con el diario se frena el lote.
-        const limit = rateLimitDecision(res.status, res.headers.get("Retry-After"));
-        if (limit.action === "stop") {
-          setCancelNote(`Llegaste al límite de uso de hoy: se consultaron ${i} de ${targets.length} productos.`);
-          halted = true;
-          throw new BatchHalted();
-        }
-        if (limit.action === "wait") {
-          setProgress({ current: i + 1, total: targets.length, currentName: `${item.name} (esperando ${limit.seconds} s por el límite de uso)` });
-          for (let waited = 0; waited < limit.seconds && !cancelRef.current; waited++) {
-            await new Promise((r) => setTimeout(r, 1000));
+        let { res, data } = await consult(item.name, i, targets.length);
+        // Búsqueda ampliada (opcional): si el nombre completo no trajo precios, UNA consulta más con el nombre
+        // más corto. La fila queda marcada y su dato nunca es "sólido". Los relacionados siguen sin usarse.
+        const noPrices = !hasPrice(data) && (data?.ok === true || (data?.ok === false && data.code === "NO_RESULTS"));
+        const shorter = noPrices && broadenWhenEmpty ? broadenQuery(item.name) : null;
+        if (shorter) {
+          const second = await consult(shorter, i, targets.length);
+          if (hasPrice(second.data)) {
+            ({ res, data } = second);
+            broadenedQuery = shorter;
+          } else {
+            triedBroadened = shorter;
           }
-          if (cancelRef.current) {
-            setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
-            halted = true;
-            throw new BatchHalted();
-          }
-          res = await apiFetch(searchUrl);
         }
-        const data: MluSearchResponse | null = await res.json().catch(() => null);
-        if (data?.ok && data.stats && data.stats.median > 0) {
+        if (data?.ok && data.stats && hasPrice(data)) {
           marketPriceUyu = Math.round(data.stats.median);
           sampleSize = data.stats.sampleSize;
           // Mismos precios con los que el servidor armó la mediana: los productos que coinciden, en pesos.
@@ -247,6 +272,7 @@ export function BatchAuditor({
         } else {
           marketError = "La búsqueda no devolvió precios.";
         }
+        if (marketError && triedBroadened) marketError += ` Tampoco hubo precios con «${triedBroadened}».`;
       } catch (err) {
         if (err instanceof BatchHalted) {
           marketError = NOT_CONSULTED;
@@ -299,8 +325,12 @@ export function BatchAuditor({
         roi: winningResult.roi,
         status,
         marketError,
-        reliabilityLabel: reliability?.label ?? null,
-        reliabilityReasons: reliability?.reasons ?? [],
+        ...(() => {
+          // Un precio de búsqueda ampliada nunca es "Dato sólido" y siempre dice con qué nombre se buscó.
+          const shown = broadenedQuery && sampleSize > 0 ? asBroadened(reliability, broadenedQuery) : reliability;
+          return { reliabilityLabel: shown?.label ?? null, reliabilityReasons: shown?.reasons ?? [] };
+        })(),
+        broadenedQuery: sampleSize > 0 ? broadenedQuery : null,
         breakEvenRate: breakEven?.rate ?? null,
         rateCushionPct: breakEven?.deltaPct ?? null,
         // Sin dato de mercado no se pasa al simulador un precio provisorio como si fuera de venta.
@@ -440,6 +470,21 @@ export function BatchAuditor({
             para poder auditar el catálogo.
           </div>
         )}
+
+        <label className="flex items-start gap-2 text-xs text-zinc-700 dark:text-zinc-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={broadenWhenEmpty}
+            onChange={(e) => setBroadenWhenEmpty(e.target.checked)}
+            disabled={isProcessing}
+            className="mt-0.5 size-4 shrink-0 accent-black dark:accent-white"
+          />
+          <span>
+            <span className="font-bold">Ampliar la búsqueda si no hay precios.</span> Si un producto no tiene precios con su nombre
+            completo, se prueba una vez con un nombre más corto (sin la medida). Esas filas quedan marcadas «Búsqueda ampliada» y su
+            dato nunca cuenta como sólido. Usa una consulta extra por fila sin precios.
+          </span>
+        </label>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <div className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
@@ -694,6 +739,11 @@ export function BatchAuditor({
                               {formatUyu(r.marketPriceUyu)}
                             </span>
                             <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} {r.sampleSize === 1 ? "producto que coincide" : "productos que coinciden"}</span>
+                            {r.broadenedQuery && (
+                              <span className="block text-[11px] font-bold text-indigo-700 dark:text-indigo-300" data-broadened>
+                                Búsqueda ampliada: «{r.broadenedQuery}»
+                              </span>
+                            )}
                             {r.reliabilityLabel && (
                               <span
                                 title={r.reliabilityReasons?.length ? `Porque ${r.reliabilityReasons.join(" y ")}.` : undefined}

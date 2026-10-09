@@ -107,3 +107,18 @@ export function assessMarketData(pricesUyu: number[], usedCount = 0): MarketReli
   const level: ReliabilityLevel = few ? "few" : reasons.length === 0 ? "solid" : "weak";
   return { level, label: RELIABILITY_LABELS[level], sampleSize: sorted.length, median, p25, p75, spread, min, max, range, farCount, usedCount: used, reasons };
 }
+
+/** Motivo que lleva todo dato obtenido con una búsqueda ampliada (nombre más corto que el del catálogo). */
+export function broadenedReason(usedQuery: string): string {
+  return `se buscó «${usedQuery}» porque el nombre completo no tenía resultados`;
+}
+
+/**
+ * Un precio que salió de una búsqueda ampliada puede ser de otra variante del producto:
+ * nunca es "Dato sólido" (como mucho "Dato flojo") y siempre lleva el motivo con el nombre que se usó.
+ * `reliability` null = la respuesta no trajo los precios para evaluar; igual queda como flojo.
+ */
+export function asBroadened(reliability: MarketReliability | null, usedQuery: string): Pick<MarketReliability, "level" | "label" | "reasons"> {
+  const level: ReliabilityLevel = reliability?.level === "few" ? "few" : "weak";
+  return { level, label: RELIABILITY_LABELS[level], reasons: [...(reliability?.reasons ?? []), broadenedReason(usedQuery)] };
+}

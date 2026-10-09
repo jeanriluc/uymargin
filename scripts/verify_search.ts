@@ -1,6 +1,6 @@
 // Confiabilidad del dato de mercado (Radar y Lote). Sin red: solo lógica sobre listas de precios.
 import { broadenQuery } from "../src/lib/mlu/broaden";
-import { assessMarketData, RELIABILITY_LABELS, RELIABILITY_RULES } from "../src/lib/mlu/reliability";
+import { asBroadened, assessMarketData, broadenedReason, RELIABILITY_LABELS, RELIABILITY_RULES } from "../src/lib/mlu/reliability";
 import { computeMarketStats } from "../src/lib/mlu/statistics";
 
 let passedTests = 0;
@@ -142,6 +142,17 @@ assert(
   "No rompe códigos de modelo (F9-5, A54, 5G, M170)"
 );
 assert(broadenQuery("Termo Stanley Classic 1 litro negro") === "Termo Stanley Classic negro" && broadenQuery("Termo Stanley Classic negro") === "Termo Stanley Classic" && broadenQuery("Termo Stanley Classic") === null, "Se acorta de a un paso: primero la medida, después la palabra genérica, y ahí termina");
+
+const solidBroadened = asBroadened(realSolid, "Termo Stanley Classic");
+assert(
+  realSolid.level === "solid" && solidBroadened.level === "weak" && solidBroadened.label === "Dato flojo" &&
+    solidBroadened.reasons.join() === "se buscó «Termo Stanley Classic» porque el nombre completo no tenía resultados",
+  "Búsqueda ampliada: un dato que sería sólido baja a Dato flojo, con el motivo y el nombre usado"
+);
+const weakBroadened = asBroadened(olla, "Olla Xion");
+assert(weakBroadened.level === "weak" && weakBroadened.reasons.length === olla.reasons.length + 1 && weakBroadened.reasons.at(-1) === broadenedReason("Olla Xion"), "Búsqueda ampliada: conserva los motivos que ya tenía y suma el suyo");
+assert(asBroadened(single, "Termo Stanley").level === "few" && asBroadened(null, "Termo Stanley").level === "weak", "Búsqueda ampliada: Pocas muestras sigue siendo Pocas muestras; sin precios para evaluar queda flojo, nunca sólido");
+assert(realSolid.level === "solid" && realSolid.reasons.length === 0, "Marcar como ampliada no modifica la evaluación original");
 
 console.log("\n=================================================");
 console.log(`RESULTADO: ${passedTests}/${totalTests} casos de confiabilidad del dato de mercado`);

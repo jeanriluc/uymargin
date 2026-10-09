@@ -119,7 +119,7 @@ assert(unpricedRow[col("Viabilidad")] === "Sin dato de mercado" && unpricedRow[c
 // Columnas nuevas al final: no cambian el orden ni el contenido de las anteriores.
 assert(
   BATCH_CSV_HEADERS.slice(0, 14).join("|") === "SKU|Producto|Costo Original|Moneda|Costo UYU|Precio Mediana MLU ($U)|Muestras MLU|Canal Ganador|Margen ML (%)|Ganancia ML ($U)|Margen Tienda (%)|Ganancia Tienda ($U)|ROI (%)|Viabilidad" &&
-    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)|Confiabilidad del dato",
+    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)|Confiabilidad del dato|Búsqueda ampliada",
   "CSV del Lote: las 14 columnas de antes quedan igual y se agregan al final «Dólar de quiebre» y «Colchón»"
 );
 const withBreakEven = batchCsvRow({ ...priced, breakEvenRate: 76.634, rateCushionPct: 89.22 });
@@ -174,6 +174,12 @@ assert(
 assert(
   batchSource.includes("if (halted && previousSkus.has(item.sku)) continue;") && batchSource.includes("marketError = NOT_CONSULTED") && !/\n\s+break;\n/.test(batchSource.slice(batchSource.indexOf("const runBatch"), batchSource.indexOf("const handleExportCsv"))),
   "Al cancelar o frenar por el límite, las filas que faltan quedan sin dato (o con su resultado anterior) y se pueden retomar"
+);
+assert(
+  batchCsvRow({ ...priced, broadenedQuery: "Termo Stanley Classic" })[col("Búsqueda ampliada")] === '"Termo Stanley Classic"' &&
+    pricedRow[col("Búsqueda ampliada")] === "" && batchCsvRow({ ...unpriced, broadenedQuery: "Termo" })[col("Búsqueda ampliada")] === "" &&
+    same14(batchCsvRow({ ...priced, broadenedQuery: "Termo Stanley Classic" }), pricedRow),
+  "CSV del Lote: «Búsqueda ampliada» va en la última columna con el nombre usado; vacía si no se amplió o no hay dato"
 );
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");
