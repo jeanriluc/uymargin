@@ -131,7 +131,7 @@ page.on("request", async (req) => {
     if (webMode === "garbage") return json({ ok: true, results: "muchos" });
     if (webMode === "empty") return json({ ok: true, query: body?.query ?? "", results: [], searchQueries: [], cached: false });
     if (webMode === "onlyOthers") return json({ ok: true, query: body?.query ?? "", results: [SELLERS[4]], searchQueries: [], cached: false });
-    return json({ ok: true, query: body?.query ?? "", results: SELLERS, searchQueries: [`"${body?.query ?? ""}" comprar Uruguay`], cached: false });
+    return json({ ok: true, query: body?.query ?? "", results: SELLERS, searchQueries: [`${body?.query ?? ""} comprar Uruguay`], cached: false });
   }
   if (url.pathname !== "/api/search-mlu") return req.continue();
   const q = url.searchParams.get("q") || "";
@@ -273,7 +273,7 @@ await sleep(200);
 c = await cards();
 assert(c.filter((x) => x.group === "sin-confirmar").every((x) => x.shown && x.uruguay === "Uruguay: no confirmado"), "Al abrirlo se ven, marcados «no confirmado»");
 const searched = await links(`${WEB} [data-web-results] p a`);
-assert(searched.length === 1 && searched[0].text === '"Termo Stanley Classic" comprar Uruguay' && searched[0].href.startsWith("https://www.google.com/search?q=") && searched[0].rel === "noopener noreferrer" && searched[0].target === "_blank", "Muestra lo que se buscó en Google, como enlace a esa búsqueda");
+assert(searched.length === 1 && searched[0].text === "Termo Stanley Classic comprar Uruguay" && searched[0].href.startsWith("https://www.google.com/search?q=") && searched[0].rel === "noopener noreferrer" && searched[0].target === "_blank", "Muestra lo que se buscó en Google, como enlace a esa búsqueda");
 assert((await overflow()).length === 0, "Resultados web a 1280 px: sin desborde horizontal");
 await shot("r12-web-resultados-1280", 1280);
 await page.setViewport({ width: 390, height: 844 });
