@@ -3,7 +3,17 @@
 // lo cubre scripts/e2e_tabs.mjs, que necesita la app corriendo y Chrome.
 import { readFileSync } from "node:fs";
 import { SEARCH_TABS, searchPanelState, type SearchTab } from "../src/lib/searchTabs";
-import { batchCsvRow, batchResultsToCsv, BATCH_CSV_HEADERS, signedUyu, type BatchItemResult } from "../src/lib/export/batchCsv";
+import {
+  batchCsvRow,
+  batchResultsToCsv,
+  BATCH_CSV_HEADERS,
+  BATCH_MAX_WAIT_SECONDS,
+  mergeBatchResults,
+  rateLimitDecision,
+  retryTargets,
+  signedUyu,
+  type BatchItemResult,
+} from "../src/lib/export/batchCsv";
 import { createDefaultInputs } from "../src/lib/finance/constants";
 
 let passedTests = 0;
@@ -109,7 +119,7 @@ assert(unpricedRow[col("Viabilidad")] === "Sin dato de mercado" && unpricedRow[c
 // Columnas nuevas al final: no cambian el orden ni el contenido de las anteriores.
 assert(
   BATCH_CSV_HEADERS.slice(0, 14).join("|") === "SKU|Producto|Costo Original|Moneda|Costo UYU|Precio Mediana MLU ($U)|Muestras MLU|Canal Ganador|Margen ML (%)|Ganancia ML ($U)|Margen Tienda (%)|Ganancia Tienda ($U)|ROI (%)|Viabilidad" &&
-    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)",
+    BATCH_CSV_HEADERS.slice(14).join("|") === "Dólar de quiebre ($U)|Colchón (%)|Confiabilidad del dato",
   "CSV del Lote: las 14 columnas de antes quedan igual y se agregan al final «Dólar de quiebre» y «Colchón»"
 );
 const withBreakEven = batchCsvRow({ ...priced, breakEvenRate: 76.634, rateCushionPct: 89.22 });
@@ -121,6 +131,49 @@ assert(pricedRow[col("Dólar de quiebre ($U)")] === "" && pricedRow[col("Colchó
 assert(
   batchCsvRow({ ...unpriced, breakEvenRate: 50, rateCushionPct: 20 })[col("Dólar de quiebre ($U)")] === "" && unpricedRow[col("Colchón (%)")] === "",
   "Fila sin dato de mercado: dólar de quiebre y colchón vacíos"
+);
+assert(
+  batchCsvRow({ ...priced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "Dato flojo" &&
+    pricedRow[col("Confiabilidad del dato")] === "" && batchCsvRow({ ...unpriced, reliabilityLabel: "Dato flojo" })[col("Confiabilidad del dato")] === "",
+  "CSV del Lote: la confiabilidad del dato va en la última columna; vacía si no hay dato de mercado"
+);
+// Reintento y cancelación del Lote
+const pricedLow: BatchItemResult = { ...priced, sku: "D-4", mlMargin: 12, status: "tight" };
+const failedB: BatchItemResult = { ...unpriced, sku: "B-2", marketError: "Mercado Libre no respondió (HTTP 429)." };
+const failedC: BatchItemResult = { ...unpriced, sku: "C-3", name: "Otro sin precio" };
+const firstRun = mergeBatchResults([], [failedB, pricedLow, priced, failedC]);
+assert(firstRun.map((r) => r.sku).join() === "A-1,D-4,B-2,C-3", "Lote: se ordena por margen y las filas sin dato van al final");
+const targets = retryTargets(firstRun);
+assert(
+  targets.length === 2 && targets.map((t) => t.sku).join() === "B-2,C-3" && targets[0].cost === failedB.cost && targets[0].currency === failedB.currency,
+  "Reintentar: solo se vuelven a consultar las filas sin dato de mercado, con su costo y moneda"
+);
+const recoveredB: BatchItemResult = { ...priced, sku: "B-2", mlMargin: 20, status: "good" };
+const afterRetry = mergeBatchResults(firstRun, [recoveredB, failedC]);
+assert(
+  afterRetry.length === 4 && afterRetry.map((r) => r.sku).join() === "A-1,B-2,D-4,C-3" && afterRetry[0] === priced && afterRetry[2] === pricedLow,
+  "Reintentar: la fila recuperada entra al ranking y las que ya tenían precio no se tocan"
+);
+const cancelledRetry = mergeBatchResults(firstRun, [recoveredB]);
+assert(
+  cancelledRetry.length === 4 && cancelledRetry.find((r) => r.sku === "C-3") === failedC,
+  "Cancelar a mitad de un reintento: la fila que no se llegó a consultar conserva su resultado anterior"
+);
+assert(mergeBatchResults([], [priced]).length === 1 && retryTargets([priced, pricedLow]).length === 0, "Corrida cancelada: queda lo consultado; sin filas fallidas no hay nada para reintentar");
+assert(rateLimitDecision(200, null).action === "continue" && rateLimitDecision(502, "30").action === "continue", "Límite de uso: si no es un 429, el Lote sigue normalmente");
+const waitMinute = rateLimitDecision(429, "27");
+assert(waitMinute.action === "wait" && waitMinute.seconds === 27, "429 con Retry-After de 27 s (tope por minuto): espera 27 s y repite la fila");
+assert(rateLimitDecision(429, "65").action === "wait" && rateLimitDecision(429, "66").action === "stop" && rateLimitDecision(429, "40000").action === "stop", `429 con espera mayor a ${BATCH_MAX_WAIT_SECONDS} s (tope diario): frena el lote`);
+const noHeader = rateLimitDecision(429, null);
+assert(noHeader.action === "wait" && noHeader.seconds === 5 && rateLimitDecision(429, "abc").action === "wait", "429 sin Retry-After válido: espera corta de 5 s");
+const batchSource = readFileSync(new URL("../src/components/search/BatchAuditor.tsx", import.meta.url), "utf8");
+assert(
+  batchSource.includes("if (cancelRef.current)") && batchSource.includes("handleRetryUnpriced") && batchSource.includes("mergeBatchResults(previous, batchResults)"),
+  "El Lote tiene botón Cancelar y reintento de filas sin dato"
+);
+assert(
+  batchSource.includes("if (halted && previousSkus.has(item.sku)) continue;") && batchSource.includes("marketError = NOT_CONSULTED") && !/\n\s+break;\n/.test(batchSource.slice(batchSource.indexOf("const runBatch"), batchSource.indexOf("const handleExportCsv"))),
+  "Al cancelar o frenar por el límite, las filas que faltan quedan sin dato (o con su resultado anterior) y se pueden retomar"
 );
 const csv = batchResultsToCsv([priced, unpriced]);
 assert(csv.startsWith("﻿") && csv.split("\n").length === 3 && !csv.includes("-292") && !csv.includes("−292"), "El CSV no incluye la ganancia calculada sobre el precio provisorio");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   FileSpreadsheet,
   Upload,
@@ -18,10 +18,21 @@ import {
 } from "lucide-react";
 import { formatUyu, formatUsd, formatPct, formatRate } from "@/lib/format";
 import { VIABILITY_LABELS } from "@/lib/finance/constants";
-import { batchResultsToCsv, signedUyu, UNPRICED_LABEL, type BatchItemInput, type BatchItemResult } from "@/lib/export/batchCsv";
+import {
+  batchResultsToCsv,
+  mergeBatchResults,
+  rateLimitDecision,
+  retryTargets,
+  signedUyu,
+  UNPRICED_LABEL,
+  type BatchItemInput,
+  type BatchItemResult,
+} from "@/lib/export/batchCsv";
 import { createDirectModel, createMlModel } from "@/lib/finance/channels";
 import { analyzeAll } from "@/lib/finance/engine";
 import { breakEvenExchangeRate } from "@/lib/finance/sensitivity";
+import { assessMarketData, type MarketReliability } from "@/lib/mlu/reliability";
+import { priceToUyu } from "@/lib/mlu/statistics";
 import { saveAuditToCloud } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
 import type { AnalysisInputs } from "@/lib/finance/types";
@@ -35,6 +46,10 @@ const SAMPLE_CATALOG: BatchItemInput[] = [
   { sku: "TRAM-24", name: "Set cubiertos Tramontina 24 piezas inox", cost: 13.5, currency: "USD" },
   { sku: "XIA-RGB", name: "Lampara inteligente Xiaomi Smart LED", cost: 8.9, currency: "USD" },
 ];
+
+/** Corta la consulta de la fila en curso cuando el lote se canceló o se frenó por el límite de uso. */
+class BatchHalted extends Error {}
+const NOT_CONSULTED = "No se llegó a consultar. Usá «Reintentar» para retomarla.";
 
 interface BatchAuditorProps {
   baseInputs: AnalysisInputs;
@@ -143,33 +158,78 @@ export function BatchAuditor({
     );
   };
 
+  // "Cancelar" corta la corrida después de la consulta en curso; lo ya consultado se conserva.
+  const cancelRef = useRef(false);
+  const [cancelNote, setCancelNote] = useState<string | null>(null);
+
+  const handleRunBatch = () => runBatch(items, []);
+  // Vuelve a consultar solo las filas que quedaron sin dato de mercado; las demás no se tocan.
+  const handleRetryUnpriced = () => runBatch(retryTargets(results), results);
+
   // Run Batch Simulation
-  const handleRunBatch = async () => {
-    if (items.length === 0 || usdRowsWithoutRate) return;
+  const runBatch = async (targets: BatchItemInput[], previous: BatchItemResult[]) => {
+    if (targets.length === 0 || usdRowsWithoutRate || isProcessing) return;
+    cancelRef.current = false;
+    setCancelNote(null);
     setIsProcessing(true);
-    setResults([]);
+    if (previous.length === 0) setResults([]);
     setSavedToCloudCount(null);
 
     const batchResults: BatchItemResult[] = [];
+    const previousSkus = new Set(previous.map((r) => r.sku));
+    let halted = false;
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      setProgress({ current: i + 1, total: items.length, currentName: item.name });
+    for (let i = 0; i < targets.length; i++) {
+      // Cancelado o frenado: las filas que faltan no se consultan, pero quedan en la tabla como
+      // "sin dato" para poder retomarlas con "Reintentar" sin volver a consultar las demás.
+      if (!halted && cancelRef.current) {
+        halted = true;
+        setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
+      }
+      const item = targets[i];
+      if (halted && previousSkus.has(item.sku)) continue; // conserva su resultado anterior
+      if (!halted) setProgress({ current: i + 1, total: targets.length, currentName: item.name });
 
       const costUyu = item.currency === "USD" ? item.cost * exchangeRate : item.cost;
       // Placeholder so the row can be opened in the simulator; sampleSize 0 marks it as not a market price.
       let marketPriceUyu = Math.round(costUyu * 1.5);
       let sampleSize = 0;
       let marketError: string | undefined;
+      let reliability: MarketReliability | null = null;
 
       try {
-        const res = await apiFetch(
-          `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`
-        );
+        if (halted) throw new BatchHalted();
+        const searchUrl = `/api/search-mlu?q=${encodeURIComponent(item.name)}&rate=${exchangeRate}`;
+        let res = await apiFetch(searchUrl);
+        // Límite de uso: con el tope por minuto se espera y se repite la fila una vez; con el diario se frena el lote.
+        const limit = rateLimitDecision(res.status, res.headers.get("Retry-After"));
+        if (limit.action === "stop") {
+          setCancelNote(`Llegaste al límite de uso de hoy: se consultaron ${i} de ${targets.length} productos.`);
+          halted = true;
+          throw new BatchHalted();
+        }
+        if (limit.action === "wait") {
+          setProgress({ current: i + 1, total: targets.length, currentName: `${item.name} (esperando ${limit.seconds} s por el límite de uso)` });
+          for (let waited = 0; waited < limit.seconds && !cancelRef.current; waited++) {
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+          if (cancelRef.current) {
+            setCancelNote(`Auditoría cancelada: se consultaron ${i} de ${targets.length} productos.`);
+            halted = true;
+            throw new BatchHalted();
+          }
+          res = await apiFetch(searchUrl);
+        }
         const data: MluSearchResponse | null = await res.json().catch(() => null);
         if (data?.ok && data.stats && data.stats.median > 0) {
           marketPriceUyu = Math.round(data.stats.median);
           sampleSize = data.stats.sampleSize;
+          // Mismos precios con los que el servidor armó la mediana: los productos que coinciden, en pesos.
+          const matching = (data.items ?? []).filter((it) => it.match?.matches);
+          reliability = assessMarketData(
+            matching.map((it) => priceToUyu(it.price, it.currency, exchangeRate)),
+            matching.filter((it) => it.condition === "used").length
+          );
         } else if (data && !data.ok && "message" in data && data.message) {
           marketError = data.message;
         } else if (!res.ok) {
@@ -188,8 +248,12 @@ export function BatchAuditor({
           marketError = "La búsqueda no devolvió precios.";
         }
       } catch (err) {
-        console.warn("[batch-auditor] MLU search error for item:", item.name, err);
-        marketError = "No se pudo conectar con el servidor.";
+        if (err instanceof BatchHalted) {
+          marketError = NOT_CONSULTED;
+        } else {
+          console.warn("[batch-auditor] MLU search error for item:", item.name, err);
+          marketError = "No se pudo conectar con el servidor.";
+        }
       }
 
       // Financial Engine Simulation
@@ -235,6 +299,8 @@ export function BatchAuditor({
         roi: winningResult.roi,
         status,
         marketError,
+        reliabilityLabel: reliability?.label ?? null,
+        reliabilityReasons: reliability?.reasons ?? [],
         breakEvenRate: breakEven?.rate ?? null,
         rateCushionPct: breakEven?.deltaPct ?? null,
         // Sin dato de mercado no se pasa al simulador un precio provisorio como si fuera de venta.
@@ -242,16 +308,11 @@ export function BatchAuditor({
       });
 
       // Small delay between queries to respect ML rate limits
-      await new Promise((r) => setTimeout(r, 250));
+      if (!halted) await new Promise((r) => setTimeout(r, 250));
     }
 
-    // Ranking por margen neto del canal ganador; las filas sin dato de mercado van al final, fuera del ranking.
-    const winningMargin = (r: BatchItemResult) => (r.bestChannel === "ml" ? r.mlMargin : r.directMargin);
-    batchResults.sort((a, b) => {
-      if ((a.status === "unpriced") !== (b.status === "unpriced")) return a.status === "unpriced" ? 1 : -1;
-      return a.status === "unpriced" ? 0 : winningMargin(b) - winningMargin(a);
-    });
-    setResults(batchResults);
+    // Ranking por margen neto; las filas nuevas reemplazan a las anteriores del mismo SKU.
+    setResults(mergeBatchResults(previous, batchResults));
     setIsProcessing(false);
   };
 
@@ -398,6 +459,15 @@ export function BatchAuditor({
             <Play className={`size-3.5 ${isProcessing ? "animate-spin" : ""}`} />
             <span>{isProcessing ? "Auditando en vivo..." : "Auditar Catálogo Completo"}</span>
           </button>
+          {isProcessing && (
+            <button
+              type="button"
+              onClick={() => { cancelRef.current = true; }}
+              className="rounded-md border border-zinc-300 dark:border-zinc-700 px-4 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-900 dark:text-zinc-100 cursor-pointer hover:border-black dark:hover:border-white"
+            >
+              Cancelar
+            </button>
+          )}
         </div>
       </div>
 
@@ -416,6 +486,12 @@ export function BatchAuditor({
           </div>
           <span className="text-[11px] text-zinc-600 dark:text-zinc-400 truncate block mt-1">«{progress.currentName}»</span>
         </div>
+      )}
+
+      {cancelNote && !isProcessing && (
+        <p role="status" className="text-xs font-bold text-amber-800 dark:text-amber-300">
+          {cancelNote} Lo ya consultado quedó en la tabla; lo que faltó figura sin dato y se puede retomar con «Reintentar».
+        </p>
       )}
 
       {/* Results Section */}
@@ -520,7 +596,18 @@ export function BatchAuditor({
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {results.some((r) => r.status === "unpriced") && (
+                  <button
+                    type="button"
+                    onClick={handleRetryUnpriced}
+                    disabled={isProcessing}
+                    title="Vuelve a consultar solo las filas sin dato de mercado; las demás no se tocan"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-900 dark:text-amber-200 cursor-pointer transition-all disabled:opacity-50"
+                  >
+                    Reintentar {results.filter((r) => r.status === "unpriced").length} sin dato
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleExportCsv}
@@ -607,6 +694,14 @@ export function BatchAuditor({
                               {formatUyu(r.marketPriceUyu)}
                             </span>
                             <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">{r.sampleSize} {r.sampleSize === 1 ? "producto que coincide" : "productos que coinciden"}</span>
+                            {r.reliabilityLabel && (
+                              <span
+                                title={r.reliabilityReasons?.length ? `Porque ${r.reliabilityReasons.join(" y ")}.` : undefined}
+                                className={`block text-[11px] font-bold ${r.reliabilityLabel === "Dato sólido" ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}
+                              >
+                                {r.reliabilityLabel}
+                              </span>
+                            )}
                           </>
                         )}
                       </td>
