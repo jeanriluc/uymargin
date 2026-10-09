@@ -69,6 +69,7 @@ import type {
 // Loaded on demand: none of these is needed to get the first verdict.
 const UrlAnalyzer = lazy(() => import("@/components/search/UrlAnalyzer").then((m) => ({ default: m.UrlAnalyzer })));
 const BatchAuditor = lazy(() => import("@/components/search/BatchAuditor").then((m) => ({ default: m.BatchAuditor })));
+const PhotoAnalyzer = lazy(() => import("@/components/search/PhotoAnalyzer").then((m) => ({ default: m.PhotoAnalyzer })));
 const SavedAuditsDrawer = lazy(() =>
   import("@/components/cloud/SavedAuditsDrawer").then((m) => ({ default: m.SavedAuditsDrawer }))
 );
@@ -152,10 +153,13 @@ export default function App() {
   const auth = useAuth();
 
   const [searchTab, setSearchTab] = useState<SearchTab>("keyword");
-  // Los paneles de Enlace y Lote se montan al abrirlos por primera vez y después solo se ocultan.
+  // Los paneles de Enlace, Lote y Foto se montan al abrirlos por primera vez y después solo se ocultan.
   const urlPanel = searchPanelState("url", searchTab, useEverTrue(searchTab === "url"));
   const batchPanel = searchPanelState("batch", searchTab, useEverTrue(searchTab === "batch"));
+  const photoPanel = searchPanelState("photo", searchTab, useEverTrue(searchTab === "photo"));
   const keywordPanel = searchPanelState("keyword", searchTab, true);
+  // "Por foto" busca con el Radar: los resultados son los mismos y se ven en las dos pestañas.
+  const radarHidden = keywordPanel.hidden && photoPanel.hidden;
   const [savedAuditsOpen, setSavedAuditsOpen] = useState(false);
   const aiEverOpened = useEverTrue(aiAdvisorOpen);
   const auditsEverOpened = useEverTrue(savedAuditsOpen);
@@ -878,16 +882,46 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             >
               Lote CSV
             </button>
+            <button
+              type="button"
+              onClick={() => setSearchTab("photo")}
+              aria-pressed={searchTab === "photo"}
+              className={`flex-1 rounded-md px-2 py-2.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                searchTab === "photo"
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow-sm"
+                  : "text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white"
+              }`}
+            >
+              Por foto
+            </button>
           </div>
 
-          {/* Los tres paneles quedan montados; los inactivos se ocultan sin desmontarse. */}
-          <div className={keywordPanel.hidden ? "hidden" : "grid gap-6"} aria-hidden={keywordPanel.hidden || undefined}>
-            <SearchPanel
-              query={inputs.query}
-              onQueryChange={(q) => updateInputs({ query: q })}
-              onSearch={handleSearch}
-              loading={searchLoading}
-            />
+          {/* Los paneles quedan montados; los inactivos se ocultan sin desmontarse. */}
+          {/* Radar y Por foto comparten los resultados de abajo: cambia solo el cuadro con el que se busca. */}
+          <div className={radarHidden ? "hidden" : "grid gap-6"} aria-hidden={radarHidden || undefined}>
+            <div className={keywordPanel.hidden ? "hidden" : undefined} aria-hidden={keywordPanel.hidden || undefined}>
+              <SearchPanel
+                query={inputs.query}
+                onQueryChange={(q) => updateInputs({ query: q })}
+                onSearch={handleSearch}
+                loading={searchLoading}
+              />
+            </div>
+
+            {photoPanel.mounted && (
+              <div className={photoPanel.hidden ? "hidden" : undefined} aria-hidden={photoPanel.hidden || undefined}>
+                <Suspense fallback={<PanelFallback />}>
+                  <PhotoAnalyzer
+                    searchLoading={searchLoading}
+                    onSearch={(q) => {
+                      // La misma búsqueda del Radar, con el nombre que confirmó el usuario.
+                      updateInputs({ query: q });
+                      handleSearch(q);
+                    }}
+                  />
+                </Suspense>
+              </div>
+            )}
 
             {marketState.status === "success" && exactBlock !== undefined && (
               <ExactOffersSection

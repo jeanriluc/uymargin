@@ -33,7 +33,7 @@ console.log("--- Pestañas: los paneles no se desmontan ---");
 /** Lo mismo que hace App.tsx: pestaña activa + "alguna vez abierta" (useEverTrue) por panel. */
 function createTabs() {
   let active: SearchTab = "keyword";
-  const ever: Record<SearchTab, boolean> = { keyword: true, url: false, batch: false };
+  const ever: Record<SearchTab, boolean> = { keyword: true, url: false, batch: false, photo: false };
   return {
     open(tab: SearchTab) {
       active = tab;
