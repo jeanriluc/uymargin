@@ -1,3 +1,4 @@
+import { resolveStoredViability } from "@/lib/finance/engine";
 import type { AnalysisInputs, Viability } from "@/lib/finance/types";
 import type { MarketStats } from "@/lib/mlu/types";
 
@@ -31,6 +32,15 @@ function isHistoryEntry(value: unknown): value is HistoryEntry {
   return typeof v.id === "string" && typeof v.savedAt === "string" && !!v.inputs && !!v.ml && !!v.direct;
 }
 
+/** Entries saved before the four-level traffic light keep working: the level is recalculated on read. */
+function withCurrentViability(entry: HistoryEntry): HistoryEntry {
+  return {
+    ...entry,
+    ml: { ...entry.ml, viability: resolveStoredViability(entry.ml) },
+    direct: { ...entry.direct, viability: resolveStoredViability(entry.direct) },
+  };
+}
+
 function read(): HistoryEntry[] {
   if (typeof window === "undefined") return EMPTY;
   let raw: string | null = null;
@@ -43,7 +53,7 @@ function read(): HistoryEntry[] {
   cachedRaw = raw;
   try {
     const parsed: unknown = raw ? JSON.parse(raw) : [];
-    cachedValue = Array.isArray(parsed) ? parsed.filter(isHistoryEntry) : EMPTY;
+    cachedValue = Array.isArray(parsed) ? parsed.filter(isHistoryEntry).map(withCurrentViability) : EMPTY;
   } catch {
     cachedValue = EMPTY;
   }

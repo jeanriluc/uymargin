@@ -115,7 +115,7 @@ export function HistorySection({ onLoadEntry }: HistorySectionProps) {
                     {formatPct(entry.direct.netMargin)} ({formatUyu(entry.direct.netProfit)})
                   </td>
                   <td className="px-5 py-3.5 text-center">
-                    <ViabilityBadge viability={entry.ml.viability} compact />
+                    <ViabilityBadge viability={entry.ml.viability} />
                   </td>
                   <td className="px-5 py-3.5 text-right space-x-1.5">
                     <button

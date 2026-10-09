@@ -5,6 +5,7 @@ import os from "node:os";
 // Extensión .js a propósito: es lo que resuelve el runtime ESM de Node en Vercel (tsx y tsc la mapean a .ts).
 import { BCU_LAST_CLOSE, buildBcuQuoteRequest, parseBcuLastClose, parseBcuQuote } from "../src/lib/bcu.js";
 import { normalizeCurrency } from "../src/lib/currency.js";
+import { VIABILITY_CRITERIA } from "../src/lib/finance/constants.js";
 import type {
   CatalogCandidate,
   ExactMatch,
@@ -1202,6 +1203,7 @@ Tu trabajo es aconsejar al usuario con números concretos, realistas y basados e
    - Régimen DGI: ${ctxText(context?.taxRegime || "Literal E")}
    - Resultados ML: Ganancia ${ctxText(context?.ml?.netProfit, 40)}, Margen ${ctxText(context?.ml?.netMargin, 40)}, ROI ${ctxText(context?.ml?.roi, 40)}, Viabilidad ${ctxText(context?.ml?.viability, 40)}, Punto equilibrio ${ctxText(context?.ml?.breakEven, 40)}
    - Resultados Tienda Propia: Ganancia ${ctxText(context?.direct?.netProfit, 40)}, Margen ${ctxText(context?.direct?.netMargin, 40)}, ROI ${ctxText(context?.direct?.roi, 40)}, Viabilidad ${ctxText(context?.direct?.viability, 40)}, Punto equilibrio ${ctxText(context?.direct?.breakEven, 40)}
+   - Criterio del semáforo de viabilidad de la app (usá estas mismas palabras y cortes, no otros): ${VIABILITY_CRITERIA}
 
 Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, DGI) y da recomendaciones accionables para maximizar el margen líquido en mano.`;
 

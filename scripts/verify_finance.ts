@@ -1,16 +1,19 @@
 // Casos dorados del motor financiero, sin red ni Supabase.
-// La sección 1 viene de verify_all.ts sin modificar; la 2 cubre la calculadora inversa.
+// La sección 1 viene de verify_all.ts sin modificar; la 2 cubre la calculadora inversa y la 3 el semáforo de viabilidad.
 import {
   computeUnitCosts,
   analyzeAll,
   analyzeChannel,
   solveMaxMerchandiseCost,
   solveMaxMerchandiseCostAll,
+  classifyViability,
+  resolveStoredViability,
 } from "../src/lib/finance/engine";
-import type { AnalysisInputs, Money } from "../src/lib/finance/types";
+import type { AnalysisInputs, Money, Viability } from "../src/lib/finance/types";
+import { readFileSync } from "node:fs";
 import { createMlModel, createDirectModel } from "../src/lib/finance/channels";
 import { computeTaxes, vatIncluded } from "../src/lib/finance/dgi-taxes";
-import { createDefaultInputs } from "../src/lib/finance/constants";
+import { createDefaultInputs, VIABILITY_LABELS, VIABILITY_THRESHOLDS } from "../src/lib/finance/constants";
 
 console.log("=================================================");
 console.log("🚀 EJECUTANDO SUITE DE AUDITORÍA Y VERIFICACIÓN");
@@ -296,6 +299,111 @@ const legacyApplied = analyzeChannel(mlOf(regression), withCost(regression, { am
 assert(
   legacyApplied.netMargin < 20,
   `Regresión: aplicar el costo de la fórmula vieja dejaba el margen en ${legacyApplied.netMargin.toFixed(1)}%, debajo del 20% pedido`
+);
+
+// -----------------------------------------------------------------
+// Caso I: Semáforo de viabilidad único (cuatro niveles, un solo criterio)
+// -----------------------------------------------------------------
+console.log("--- 3. Semáforo de viabilidad ---");
+
+assert(
+  VIABILITY_THRESHOLDS.goodMargin === 15 && VIABILITY_THRESHOLDS.excellentMargin === 25 && VIABILITY_THRESHOLDS.excellentRoi === 40,
+  "Cortes del semáforo: margen 15% y 25%, ROI 40%"
+);
+assert(
+  VIABILITY_LABELS.loss === "Pierde plata" && VIABILITY_LABELS.tight === "Ajustado" &&
+    VIABILITY_LABELS.good === "Bueno" && VIABILITY_LABELS.excellent === "Excelente",
+  "Etiquetas: Pierde plata, Ajustado, Bueno, Excelente"
+);
+
+// Casos borde exactos: [ganancia, margen, ROI, nivel esperado]
+const borders: Array<[number, number, number, Viability, string]> = [
+  [0, 0, 0, "loss", "ganancia 0 pierde plata"],
+  [-1, -5, -10, "loss", "ganancia negativa pierde plata"],
+  [0, 30, 80, "loss", "ganancia 0 pierde plata aunque el margen venga alto"],
+  [0.01, 0.001, 0.001, "tight", "ganancia apenas positiva es ajustado"],
+  [100, 14.99, 100, "tight", "margen 14,99 es ajustado"],
+  [100, 15, 10, "good", "margen 15 es bueno"],
+  [100, 24.99, 100, "good", "margen 24,99 es bueno aunque el ROI sea alto"],
+  [100, 25, 39.99, "good", "margen 25 con ROI 39,99 es bueno"],
+  [100, 25, 40, "excellent", "margen 25 con ROI 40 es excelente"],
+  [100, 40, 39.99, "good", "margen 40 con ROI 39,99 sigue siendo bueno"],
+  [100, 14.99, 40, "tight", "ROI 40 no alcanza si el margen es 14,99"],
+];
+for (const [profit, margin, roi, expected, text] of borders) {
+  assert(classifyViability(profit, margin, roi) === expected, `Borde: ${text}`);
+}
+
+// La tarjeta principal, el badge, la barra móvil y el Lote leen ChannelResult.viability:
+// para el mismo resultado tienen que dar el mismo nivel, y ese nivel sale de classifyViability.
+const semBase: AnalysisInputs = { ...defaultInputs, cost: { amount: 1000, currency: "UYU" }, exchangeRate: 40, salePrice: 2000 };
+const expectedByMargin: Array<[number, Viability]> = [[8, "tight"], [11, "tight"], [13, "tight"], [16, "good"], [26, "excellent"]];
+for (const [margin, expected] of expectedByMargin) {
+  const model = createMlModel(semBase.ml);
+  const cost = solveMaxMerchandiseCost(model, semBase, margin)!.maxMerchandiseCost;
+  const all = analyzeAll({ ...semBase, cost: { amount: cost, currency: "UYU" } });
+  const r = all.ml;
+  assert(
+    Math.abs(r.netMargin - margin) < 0.001 && r.viability === expected && r.viability === classifyViability(r.netProfit, r.netMargin, r.roi),
+    `Margen ${margin}%: el resultado del motor es "${VIABILITY_LABELS[r.viability]}" (esperado "${VIABILITY_LABELS[expected]}")`
+  );
+}
+const losing = analyzeAll({ ...semBase, cost: { amount: 2500, currency: "UYU" } });
+assert(losing.ml.viability === "loss" && losing.direct.viability === "loss", "Con costo mayor al precio, los dos canales pierden plata");
+assert(analyzeAll({ ...semBase, salePrice: 0 }).ml.viability === "loss", "Sin precio de venta no hay ganancia: pierde plata");
+
+// Ningún componente vuelve a clasificar por su cuenta: no quedan cortes sueltos ni palabras viejas.
+const consumers = [
+  "src/components/calculator/ProfitHeroCard.tsx",
+  "src/components/calculator/StickyResultBar.tsx",
+  "src/components/calculator/ChannelCard.tsx",
+  "src/components/search/BatchAuditor.tsx",
+  "src/components/ui/ViabilityBadge.tsx",
+  "src/components/history/HistorySection.tsx",
+  "src/components/ai/AiAdvisor.tsx",
+  "src/lib/storage/csv.ts",
+  "src/lib/export/csv.ts",
+  "src/App.tsx",
+];
+for (const file of consumers) {
+  const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+  const ownCut = /(netMargin|Margin|margin)\s*(<|>)=?\s*\d/.test(source);
+  const oldWords = /"risky"|"viable"|Riesgoso|verdictTone|viability\.toUpperCase/.test(source);
+  assert(!ownCut && !oldWords, `${file}: sin cortes de margen propios ni niveles viejos`);
+}
+for (const file of ["src/components/calculator/ProfitHeroCard.tsx", "src/components/calculator/StickyResultBar.tsx", "src/components/search/BatchAuditor.tsx"]) {
+  const source = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+  assert(/\.viability\b/.test(source) && source.includes("VIABILITY_LABELS"), `${file}: usa el nivel del motor y las etiquetas comunes`);
+}
+
+// Compatibilidad con lo guardado por versiones anteriores ("excellent" | "tight" | "risky")
+assert(resolveStoredViability({ viability: "risky" }) === "tight", "Guardado viejo: \"risky\" sin números se muestra como Ajustado");
+assert(resolveStoredViability({ viability: "tight" }) === "tight", "Guardado viejo: \"tight\" sin números sigue siendo Ajustado");
+assert(resolveStoredViability({ viability: "excellent" }) === "excellent", "Guardado viejo: \"excellent\" sin números sigue siendo Excelente");
+assert(resolveStoredViability({ viability: "cualquier-cosa" }) === "tight" && resolveStoredViability({}) === "tight", "Guardado sin nivel reconocible: no rompe, se muestra como Ajustado");
+assert(
+  resolveStoredViability({ viability: "risky", netProfit: -50, netMargin: -3, roi: -5 }) === "loss",
+  "Guardado viejo con números: \"risky\" con pérdida se recalcula como Pierde plata"
+);
+assert(
+  resolveStoredViability({ viability: "risky", netProfit: 80, netMargin: 8, roi: 12 }) === "tight",
+  "Guardado viejo con números: \"risky\" con 8% de margen se recalcula como Ajustado"
+);
+assert(
+  resolveStoredViability({ viability: "tight", netProfit: 200, netMargin: 20, roi: 35 }) === "good",
+  "Guardado viejo con números: \"tight\" con 20% de margen se recalcula como Bueno"
+);
+assert(
+  resolveStoredViability({ viability: "tight", netProfit: 200, netMargin: 12, roi: 35 }) === "tight",
+  "Guardado viejo con números: \"tight\" con 12% de margen sigue siendo Ajustado"
+);
+assert(
+  resolveStoredViability({ viability: "excellent", netProfit: 300, netMargin: 30, roi: 60 }) === "excellent",
+  "Guardado viejo con números: \"excellent\" sigue siendo Excelente"
+);
+assert(
+  resolveStoredViability({ viability: "good", netProfit: 200, netMargin: Number.NaN, roi: 35 }) === "good",
+  "Guardado nuevo con números inválidos: se respeta el nivel guardado"
 );
 
 console.log("\n=================================================");

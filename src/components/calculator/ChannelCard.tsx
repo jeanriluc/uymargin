@@ -102,7 +102,7 @@ export function ChannelCard({
             </div>
           </div>
 
-          {hasPrice && <ViabilityBadge viability={r.viability} compact />}
+          {hasPrice && <ViabilityBadge viability={r.viability} />}
         </div>
 
         {/* Channel parameter toggles */}

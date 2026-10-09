@@ -15,18 +15,10 @@ import {
   Sparkles,
 } from "lucide-react";
 import { formatUyu, formatUsd, formatMoney, formatPct, formatDecimal } from "@/lib/format";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import { solveMaxMerchandiseCostAll, type MultichannelAnalysis } from "@/lib/finance/engine";
-import type { ChannelResult, AnalysisInputs } from "@/lib/finance/types";
+import type { AnalysisInputs } from "@/lib/finance/types";
 import { StepHeader } from "@/components/ui/StepHeader";
-
-export type VerdictTone = "loss" | "tight" | "good";
-
-/** Traffic-light reading of a channel result, shared by the hero and the mobile sticky bar. */
-export function verdictTone(result: ChannelResult): VerdictTone {
-  if (result.netProfit <= 0) return "loss";
-  if (result.netMargin < 15) return "tight";
-  return "good";
-}
 
 function focusField(id: string) {
   const el = document.getElementById(id);
@@ -82,7 +74,8 @@ export function ProfitHeroCard({
   // Risk badges detection
   const isLowTicket = price > 0 && price < 1200;
   const isCostUsd = inputs.cost.currency === "USD";
-  const tone = verdictTone(winningResult);
+  // Same traffic light as the badge, the mobile bar and the batch table (classifyViability).
+  const tone = winningResult.viability;
   const isTightMargin = isReady && tone === "tight";
   const isLosingMoney = isReady && tone === "loss";
   const hasNoVatCredit = inputs.tax.regime === "general" && !inputs.tax.costIncludesVat;
@@ -138,15 +131,15 @@ export function ProfitHeroCard({
               </span>
             ) : isLosingMoney ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 text-xs font-black text-red-700 dark:text-red-400 uppercase tracking-wider">
-                <ShieldAlert className="size-3.5" aria-hidden /> No Viable (Pérdida Neta)
+                <ShieldAlert className="size-3.5" aria-hidden /> {VIABILITY_LABELS.loss}
               </span>
             ) : isTightMargin ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-xs font-black text-amber-700 dark:text-amber-400 uppercase tracking-wider">
-                <AlertTriangle className="size-3.5" aria-hidden /> Margen Ajustado
+                <AlertTriangle className="size-3.5" aria-hidden /> {VIABILITY_LABELS.tight}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                <ShieldCheck className="size-3.5" aria-hidden /> Rentabilidad Positiva
+                <ShieldCheck className="size-3.5" aria-hidden /> {VIABILITY_LABELS[tone]}
               </span>
             )}
           </div>

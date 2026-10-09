@@ -32,7 +32,8 @@ import { HistorySection } from "@/components/history/HistorySection";
 import type { CloudAuditRecord } from "@/lib/supabase";
 import { exportAuditToCsv } from "@/lib/export/csv";
 
-import { createDefaultInputs } from "@/lib/finance/constants";
+import { searchPanelState, type SearchTab } from "@/lib/searchTabs";
+import { createDefaultInputs, VIABILITY_LABELS } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
 import { loadDraft, saveDraft } from "@/lib/storage/draft";
@@ -149,7 +150,11 @@ export default function App() {
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("off");
   const auth = useAuth();
 
-  const [searchTab, setSearchTab] = useState<"keyword" | "url" | "batch">("keyword");
+  const [searchTab, setSearchTab] = useState<SearchTab>("keyword");
+  // Los paneles de Enlace y Lote se montan al abrirlos por primera vez y después solo se ocultan.
+  const urlPanel = searchPanelState("url", searchTab, useEverTrue(searchTab === "url"));
+  const batchPanel = searchPanelState("batch", searchTab, useEverTrue(searchTab === "batch"));
+  const keywordPanel = searchPanelState("keyword", searchTab, true);
   const [savedAuditsOpen, setSavedAuditsOpen] = useState(false);
   const aiEverOpened = useEverTrue(aiAdvisorOpen);
   const auditsEverOpened = useEverTrue(savedAuditsOpen);
@@ -343,6 +348,26 @@ export default function App() {
     }
   };
 
+  /**
+   * Vacía el Radar (lista, estadísticas, ofertas exactas y precios manuales).
+   * Se usa cuando el producto del simulador cambia por fuera del Radar ("Simular" en Lote o Por enlace)
+   * y en "Nueva simulación": así el Radar nunca muestra resultados de otro producto.
+   * Cambiar de pestaña no llama a esto.
+   */
+  const clearRadar = () => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    setSearchLoading(false);
+    setMarketState({ status: "idle" });
+    setStats(null);
+    setMarketSource(null);
+    setUnsupportedListings([]);
+    setExactBlock(undefined);
+    setExactSelection(null);
+    setManualPrices("");
+    setStatus("idle");
+  };
+
   // Handle manual competitor prices
   const handleManualPricesChange = (text: string) => {
     setManualPrices(text);
@@ -422,14 +447,13 @@ export default function App() {
 
   const handleLoadEntry = (entry: HistoryEntry) => {
     setInputs(entry.inputs);
+    // El Radar no queda con la búsqueda anterior; después se cargan las estadísticas que guardó la entrada.
+    clearRadar();
     if (entry.market) {
       const { total, source, ...restStats } = entry.market;
       setStats(restStats);
       setMarketSource(source);
       setStatus("manual");
-    } else {
-      setStats(null);
-      setMarketSource(null);
     }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -440,7 +464,7 @@ export default function App() {
 - Precio Venta Simulado: ${formatUyu(inputs.salePrice)}
 - Ganancia Neta Mercado Libre: ${formatUyu(analysis.ml.netProfit)} (Margen: ${formatPct(analysis.ml.netMargin)})
 - Ganancia Neta Tienda Propia: ${formatUyu(analysis.direct.netProfit)} (Margen: ${formatPct(analysis.direct.netMargin)})
-- Canal más rentable: ${bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"} (${winningChannelResult.viability.toUpperCase()})
+- Canal más rentable: ${bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"} (${VIABILITY_LABELS[winningChannelResult.viability]})
 - Régimen DGI: ${inputs.tax.regime === "literal_e" ? "Literal E" : "Régimen General"}`;
 
     navigator.clipboard.writeText(summary).then(
@@ -458,7 +482,7 @@ export default function App() {
 
   const handleShareWhatsApp = () => {
     const summary = `📊 *Auditoría UyMargin* - ${inputs.productName || inputs.query || "Producto"}
-🟢 *Resultado:* Te quedan ${formatUyu(winningChannelResult.netProfit)} limpios (${formatPct(winningChannelResult.netMargin)})
+${{ loss: "🔴", tight: "🟡", good: "🟢", excellent: "🟢" }[winningChannelResult.viability]} *Resultado (${VIABILITY_LABELS[winningChannelResult.viability]}):* ${winningChannelResult.netProfit > 0 ? "Te quedan" : "Perdés"} ${formatUyu(Math.abs(winningChannelResult.netProfit))} ${winningChannelResult.netProfit > 0 ? "limpios " : ""}(${formatPct(winningChannelResult.netMargin)})
 🏆 *Canal Ganador:* ${bestChannel === "ml" ? "Mercado Libre UY" : "Tienda Propia / POS"}
 💰 *Costo Puesto:* ${formatUyu(analysis.costs.landed)} (proveedor: ${formatMoney(inputs.cost.amount, inputs.cost.currency)})
 🏷 *Precio de Venta:* ${formatUyu(inputs.salePrice)}
@@ -469,7 +493,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     window.open(url, "_blank");
   };
 
-  // Clears the product being analysed; tax regime, channel settings and exchange rate stay.
+  // Clears the product being analysed and the Radar; tax regime, channel settings and exchange rate stay.
   const handleNewSimulation = () => {
     setInputs((prev) => ({
       ...prev,
@@ -479,12 +503,8 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
       freight: { ...prev.freight, amount: 0 },
       salePrice: 0,
     }));
-    setStats(null);
-    setUnsupportedListings([]);
-    setMarketSource(null);
-    setManualPrices("");
-    setMarketState({ status: "idle" });
-    setStatus("idle");
+    // El Lote y el análisis por enlace no se tocan: son listas de trabajo aparte del producto simulado.
+    clearRadar();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -856,58 +876,68 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
             </button>
           </div>
 
-          {searchTab === "keyword" ? (
-            <div className="grid gap-6">
-              <SearchPanel
-                query={inputs.query}
-                onQueryChange={(q) => updateInputs({ query: q })}
-                onSearch={handleSearch}
-                loading={searchLoading}
-              />
+          {/* Los tres paneles quedan montados; los inactivos se ocultan sin desmontarse. */}
+          <div className={keywordPanel.hidden ? "hidden" : "grid gap-6"} aria-hidden={keywordPanel.hidden || undefined}>
+            <SearchPanel
+              query={inputs.query}
+              onQueryChange={(q) => updateInputs({ query: q })}
+              onSearch={handleSearch}
+              loading={searchLoading}
+            />
 
-              {marketState.status === "success" && exactBlock !== undefined && (
-                <ExactOffersSection
-                  exact={exactBlock}
-                  selection={exactSelection}
-                  rate={currentRate}
-                  onSimulate={(p) => updateInputs({ salePrice: p })}
-                />
-              )}
-
-              <MarketSummary
-                state={marketState}
-                stats={liveStats}
+            {marketState.status === "success" && exactBlock !== undefined && (
+              <ExactOffersSection
+                exact={exactBlock}
+                selection={exactSelection}
                 rate={currentRate}
-                unsupported={unsupportedListings}
-                source={marketSource}
-                manualPrices={manualPrices}
-                onManualPricesChange={handleManualPricesChange}
-                onSelectPrice={(p) => updateInputs({ salePrice: p })}
+                onSimulate={(p) => updateInputs({ salePrice: p })}
               />
-            </div>
-          ) : (
-            <Suspense fallback={<PanelFallback />}>
-              {searchTab === "url" ? (
-            <UrlAnalyzer
-              exchangeRate={inputs.exchangeRate}
+            )}
+
+            <MarketSummary
+              state={marketState}
+              stats={liveStats}
               rate={currentRate}
-              onSimulatePrice={(p, name) => {
-                updateInputs({ salePrice: p, productName: name, query: name });
-                scrollToSection("resultado");
-              }}
+              unsupported={unsupportedListings}
+              source={marketSource}
+              manualPrices={manualPrices}
+              onManualPricesChange={handleManualPricesChange}
+              onSelectPrice={(p) => updateInputs({ salePrice: p })}
             />
-              ) : (
-            <BatchAuditor
-              baseInputs={inputs}
-              exchangeRate={inputs.exchangeRate}
-              onSimulateProduct={(simInputs) => {
-                updateInputs(simInputs);
-                setSearchTab("keyword");
-                scrollToSection("resultado");
-              }}
-            />
-              )}
-            </Suspense>
+          </div>
+
+          {urlPanel.mounted && (
+            <div className={urlPanel.hidden ? "hidden" : undefined} aria-hidden={urlPanel.hidden || undefined}>
+              <Suspense fallback={<PanelFallback />}>
+                <UrlAnalyzer
+                  exchangeRate={inputs.exchangeRate}
+                  rate={currentRate}
+                  onSimulatePrice={(p, name) => {
+                    // No cambia de pestaña ni borra el análisis: carga el producto y vacía el Radar.
+                    updateInputs({ salePrice: p, productName: name, query: name });
+                    clearRadar();
+                    scrollToSection("resultado");
+                  }}
+                />
+              </Suspense>
+            </div>
+          )}
+
+          {batchPanel.mounted && (
+            <div className={batchPanel.hidden ? "hidden" : undefined} aria-hidden={batchPanel.hidden || undefined}>
+              <Suspense fallback={<PanelFallback />}>
+                <BatchAuditor
+                  baseInputs={inputs}
+                  exchangeRate={inputs.exchangeRate}
+                  onSimulateProduct={(simInputs) => {
+                    // No cambia de pestaña ni borra el lote: carga el producto y vacía el Radar.
+                    updateInputs(simInputs);
+                    clearRadar();
+                    scrollToSection("resultado");
+                  }}
+                />
+              </Suspense>
+            </div>
           )}
         </section>
 

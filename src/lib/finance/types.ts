@@ -79,7 +79,11 @@ export interface AnalysisInputs {
   stockTurnoverDays?: number;
 }
 
-export type Viability = "excellent" | "tight" | "risky";
+/**
+ * Traffic light shared by the whole app (see VIABILITY_THRESHOLDS and classifyViability):
+ * loss = net profit <= 0 · tight = margin below 15% · good = margin >= 15% · excellent = margin >= 25% and ROI >= 40%.
+ */
+export type Viability = "loss" | "tight" | "good" | "excellent";
 
 export interface WaterfallStep {
   key: "price" | "product" | "fees" | "shipping" | "taxes" | "net" | "reserves";
