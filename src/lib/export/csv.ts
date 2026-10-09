@@ -1,7 +1,7 @@
 import type { AnalysisInputs, ChannelResult } from "@/lib/finance/types";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import { formatMoney, formatPct } from "@/lib/format";
 
-const VIABILITY_LABEL = { excellent: "Excelente", tight: "Ajustado", risky: "Riesgoso" } as const;
 
 /** Decimal comma so Excel in es-UY reads the cell as a number. */
 function num(value: number | null | undefined): string {
@@ -43,7 +43,7 @@ export function exportAuditToCsv(
     ["Margen Neto (%)", formatPct(mlResult.netMargin), formatPct(directResult.netMargin)],
     ["Retorno sobre Inversión (ROI %)", formatPct(mlResult.roi), formatPct(directResult.roi)],
     ["Precio de Equilibrio (Break-Even UYU)", num(mlResult.breakEvenPrice), num(directResult.breakEvenPrice)],
-    ["Viabilidad Comercial", VIABILITY_LABEL[mlResult.viability], VIABILITY_LABEL[directResult.viability]],
+    ["Viabilidad Comercial", VIABILITY_LABELS[mlResult.viability], VIABILITY_LABELS[directResult.viability]],
   ];
 
   const csvContent =

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { ChevronUp } from "lucide-react";
 import { formatPct, formatUyu } from "@/lib/format";
-import type { ChannelResult } from "@/lib/finance/types";
-import { verdictTone, type VerdictTone } from "./ProfitHeroCard";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
+import type { ChannelResult, Viability } from "@/lib/finance/types";
 
 interface StickyResultBarProps {
   /** Id of the full result card; the bar hides while that card is on screen. */
@@ -11,10 +11,11 @@ interface StickyResultBarProps {
   channelLabel: string;
 }
 
-const TONE_STYLES: Record<VerdictTone, { dot: string; amount: string; phrase: string }> = {
+const TONE_STYLES: Record<Viability, { dot: string; amount: string; phrase: string }> = {
   loss: { dot: "bg-red-500", amount: "text-red-600 dark:text-red-400", phrase: "Perdés" },
   tight: { dot: "bg-amber-500", amount: "text-amber-700 dark:text-amber-400", phrase: "Te quedan" },
   good: { dot: "bg-emerald-500", amount: "text-emerald-700 dark:text-emerald-400", phrase: "Te quedan" },
+  excellent: { dot: "bg-emerald-500", amount: "text-emerald-700 dark:text-emerald-400", phrase: "Te quedan" },
 };
 
 /** Mobile-only verdict that stays in view while the user edits cost and price. */
@@ -33,13 +34,14 @@ export function StickyResultBar({ targetId, result, channelLabel }: StickyResult
 
   if (targetVisible) return null;
 
-  const tone = TONE_STYLES[verdictTone(result)];
+  const tone = TONE_STYLES[result.viability];
+  const label = VIABILITY_LABELS[result.viability];
 
   return (
     <button
       type="button"
       onClick={() => document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-      aria-label={`Ver resultado completo. ${tone.phrase} ${formatUyu(Math.abs(result.netProfit))} por unidad en ${channelLabel}`}
+      aria-label={`Ver resultado completo. ${label}. ${tone.phrase} ${formatUyu(Math.abs(result.netProfit))} por unidad en ${channelLabel}`}
       className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-zinc-200 dark:border-zinc-800 bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] text-left shadow-[0_-4px_16px_rgba(0,0,0,0.12)] cursor-pointer print:hidden"
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -50,7 +52,7 @@ export function StickyResultBar({ targetId, result, channelLabel }: StickyResult
             <span className={`num ${tone.amount}`}>{formatUyu(Math.abs(result.netProfit))}</span>
           </span>
           <span className="block truncate text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-            {formatPct(result.netMargin)} del precio · {channelLabel}
+            {label} · {formatPct(result.netMargin)} del precio · {channelLabel}
           </span>
         </span>
       </span>

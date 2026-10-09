@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import type { MultichannelAnalysis } from "@/lib/finance/engine";
 import type { AnalysisInputs } from "@/lib/finance/types";
 import { formatPct, formatUyu } from "@/lib/format";
@@ -99,14 +100,14 @@ Analizo en tiempo real tu estructura de costos, comisiones de Mercado Libre UY, 
               netProfit: formatUyu(analysis.ml.netProfit),
               netMargin: formatPct(analysis.ml.netMargin),
               roi: formatPct(analysis.ml.roi),
-              viability: analysis.ml.viability,
+              viability: VIABILITY_LABELS[analysis.ml.viability],
               breakEven: formatUyu(analysis.ml.breakEvenPrice ?? 0),
             },
             direct: {
               netProfit: formatUyu(analysis.direct.netProfit),
               netMargin: formatPct(analysis.direct.netMargin),
               roi: formatPct(analysis.direct.roi),
-              viability: analysis.direct.viability,
+              viability: VIABILITY_LABELS[analysis.direct.viability],
               breakEven: formatUyu(analysis.direct.breakEvenPrice ?? 0),
             },
           },

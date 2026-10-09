@@ -117,11 +117,40 @@ function solveMaxDecreasing(f: (x: number) => number, initialHi: number): number
   return lo;
 }
 
-export function classifyViability(netMargin: number, roi: number): Viability {
+/**
+ * The one traffic light of the app. `netMargin` and `roi` are percentages (0–100).
+ * loss: net profit <= 0 · tight: margin < 15% · good: margin >= 15% · excellent: margin >= 25% and ROI >= 40%.
+ */
+export function classifyViability(netProfit: number, netMargin: number, roi: number): Viability {
   const t = VIABILITY_THRESHOLDS;
+  if (!(netProfit > 0)) return "loss";
+  if (netMargin < t.goodMargin) return "tight";
   if (netMargin >= t.excellentMargin && roi >= t.excellentRoi) return "excellent";
-  if (netMargin >= t.tightMargin) return "tight";
-  return "risky";
+  return "good";
+}
+
+/**
+ * Viability of a record saved by an older version (local history, exports).
+ * Old records carry "excellent" | "tight" | "risky" computed with other cuts, so when the
+ * numbers are there the level is recalculated with the current criteria. Without numbers the
+ * stored word is mapped: "risky" (and anything unknown) reads as "tight".
+ */
+export function resolveStoredViability(stored: {
+  viability?: unknown;
+  netProfit?: unknown;
+  netMargin?: unknown;
+  roi?: unknown;
+}): Viability {
+  const { netProfit, netMargin, roi } = stored;
+  if (
+    typeof netProfit === "number" && Number.isFinite(netProfit) &&
+    typeof netMargin === "number" && Number.isFinite(netMargin) &&
+    typeof roi === "number" && Number.isFinite(roi)
+  ) {
+    return classifyViability(netProfit, netMargin, roi);
+  }
+  const word = stored.viability;
+  return word === "loss" || word === "tight" || word === "good" || word === "excellent" ? word : "tight";
 }
 
 function pct(numerator: number, denominator: number): number {
@@ -185,7 +214,7 @@ export function analyzeChannel(model: ChannelModel, inputs: AnalysisInputs): Cha
     annualizedRoi,
     breakEvenPrice,
     targetMarginPrice,
-    viability: price > 0 ? classifyViability(netMargin, roi) : "risky",
+    viability: classifyViability(ev.netProfit, netMargin, roi),
     waterfall,
   };
 }

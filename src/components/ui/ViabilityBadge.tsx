@@ -1,25 +1,21 @@
-import { AlertTriangle, CheckCircle2, CircleAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, CircleAlert, Star } from "lucide-react";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
 import type { Viability } from "@/lib/finance/types";
 
-const CONFIG: Record<
-  Viability,
-  { label: string; short: string; badgeClass: string; Icon: typeof CheckCircle2 }
-> = {
+const CONFIG: Record<Viability, { badgeClass: string; Icon: typeof CheckCircle2 }> = {
   excellent: {
-    label: "Altamente Rentable",
-    short: "Rentable",
     badgeClass: "bg-black text-white dark:bg-white dark:text-black border-black dark:border-white font-bold tracking-tight shadow-sm",
+    Icon: Star,
+  },
+  good: {
+    badgeClass: "bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 border-zinc-900 dark:border-zinc-300 font-bold",
     Icon: CheckCircle2,
   },
   tight: {
-    label: "Margen Ajustado",
-    short: "Ajustado",
     badgeClass: "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100 border-zinc-900 dark:border-zinc-300 font-bold",
     Icon: AlertTriangle,
   },
-  risky: {
-    label: "Riesgoso / A Pérdida",
-    short: "Riesgoso",
+  loss: {
     badgeClass: "bg-transparent text-zinc-900 dark:text-zinc-100 border-zinc-900 dark:border-zinc-300 border-dashed font-bold",
     Icon: CircleAlert,
   },
@@ -27,21 +23,14 @@ const CONFIG: Record<
 
 interface ViabilityBadgeProps {
   viability: Viability;
-  compact?: boolean;
 }
 
-export function ViabilityBadge({ viability, compact = false }: ViabilityBadgeProps) {
-  const { label, short, badgeClass, Icon } = CONFIG[viability];
+export function ViabilityBadge({ viability }: ViabilityBadgeProps) {
+  const { badgeClass, Icon } = CONFIG[viability];
   return (
     <span className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-xs border rounded-md transition-colors ${badgeClass}`}>
       <Icon className="size-3.5 shrink-0" aria-hidden />
-      <span className="uppercase text-[11px] tracking-wider">{compact ? short : label}</span>
+      <span className="uppercase text-[11px] tracking-wider">{VIABILITY_LABELS[viability]}</span>
     </span>
   );
 }
-
-export const viabilityTone: Record<Viability, string> = {
-  excellent: "text-zinc-900 dark:text-zinc-100 font-black",
-  tight: "text-zinc-700 dark:text-zinc-300 font-bold",
-  risky: "text-zinc-600 dark:text-zinc-400 line-through font-bold",
-};

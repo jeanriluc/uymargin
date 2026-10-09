@@ -1,6 +1,6 @@
 import type { HistoryEntry } from "./history";
+import { VIABILITY_LABELS } from "@/lib/finance/constants";
 
-const VIABILITY_LABEL = { excellent: "Excelente", tight: "Ajustado", risky: "Riesgoso" } as const;
 const REGIME_LABEL = { literal_e: "Literal E", general: "Régimen General" } as const;
 
 function cell(value: string | number): string {
@@ -54,11 +54,11 @@ export function historyToCsv(entries: HistoryEntry[]): string {
     e.ml.netProfit,
     e.ml.netMargin,
     e.ml.roi,
-    VIABILITY_LABEL[e.ml.viability],
+    VIABILITY_LABELS[e.ml.viability],
     e.direct.netProfit,
     e.direct.netMargin,
     e.direct.roi,
-    VIABILITY_LABEL[e.direct.viability],
+    VIABILITY_LABELS[e.direct.viability],
   ]);
   return "\uFEFF" + [header, ...rows].map((r) => r.map(cell).join(";")).join("\r\n");
 }

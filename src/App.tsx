@@ -32,7 +32,7 @@ import { HistorySection } from "@/components/history/HistorySection";
 import type { CloudAuditRecord } from "@/lib/supabase";
 import { exportAuditToCsv } from "@/lib/export/csv";
 
-import { createDefaultInputs } from "@/lib/finance/constants";
+import { createDefaultInputs, VIABILITY_LABELS } from "@/lib/finance/constants";
 import { analyzeAll } from "@/lib/finance/engine";
 import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/history";
 import { loadDraft, saveDraft } from "@/lib/storage/draft";
@@ -440,7 +440,7 @@ export default function App() {
 - Precio Venta Simulado: ${formatUyu(inputs.salePrice)}
 - Ganancia Neta Mercado Libre: ${formatUyu(analysis.ml.netProfit)} (Margen: ${formatPct(analysis.ml.netMargin)})
 - Ganancia Neta Tienda Propia: ${formatUyu(analysis.direct.netProfit)} (Margen: ${formatPct(analysis.direct.netMargin)})
-- Canal más rentable: ${bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"} (${winningChannelResult.viability.toUpperCase()})
+- Canal más rentable: ${bestChannel === "ml" ? "Mercado Libre" : "Tienda Propia"} (${VIABILITY_LABELS[winningChannelResult.viability]})
 - Régimen DGI: ${inputs.tax.regime === "literal_e" ? "Literal E" : "Régimen General"}`;
 
     navigator.clipboard.writeText(summary).then(
@@ -458,7 +458,7 @@ export default function App() {
 
   const handleShareWhatsApp = () => {
     const summary = `📊 *Auditoría UyMargin* - ${inputs.productName || inputs.query || "Producto"}
-🟢 *Resultado:* Te quedan ${formatUyu(winningChannelResult.netProfit)} limpios (${formatPct(winningChannelResult.netMargin)})
+${{ loss: "🔴", tight: "🟡", good: "🟢", excellent: "🟢" }[winningChannelResult.viability]} *Resultado (${VIABILITY_LABELS[winningChannelResult.viability]}):* ${winningChannelResult.netProfit > 0 ? "Te quedan" : "Perdés"} ${formatUyu(Math.abs(winningChannelResult.netProfit))} ${winningChannelResult.netProfit > 0 ? "limpios " : ""}(${formatPct(winningChannelResult.netMargin)})
 🏆 *Canal Ganador:* ${bestChannel === "ml" ? "Mercado Libre UY" : "Tienda Propia / POS"}
 💰 *Costo Puesto:* ${formatUyu(analysis.costs.landed)} (proveedor: ${formatMoney(inputs.cost.amount, inputs.cost.currency)})
 🏷 *Precio de Venta:* ${formatUyu(inputs.salePrice)}

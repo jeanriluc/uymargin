@@ -1,4 +1,4 @@
-import type { AnalysisInputs, PaymentGateway } from "./types";
+import type { AnalysisInputs, PaymentGateway, Viability } from "./types";
 
 /** IVA tasa básica Uruguay. */
 export const IVA_RATE = 0.22;
@@ -7,11 +7,32 @@ export const DEFAULT_EXCHANGE_RATE = 40;
 
 export const TARGET_NET_MARGIN = 0.3;
 
+/**
+ * Cuts of the viability traffic light, in percentage points (0–100).
+ * Single source of truth: every screen, CSV and AI prompt reads these through classifyViability.
+ */
 export const VIABILITY_THRESHOLDS = {
+  /** Net margin from which a sale stops being "tight" and becomes "good". */
+  goodMargin: 15,
+  /** "Excellent" needs this net margin AND `excellentRoi`. */
   excellentMargin: 25,
   excellentRoi: 40,
-  tightMargin: 10,
 } as const;
+
+/** Labels shown everywhere (badge, result card, mobile bar, batch table and CSV exports). */
+export const VIABILITY_LABELS: Record<Viability, string> = {
+  loss: "Pierde plata",
+  tight: "Ajustado",
+  good: "Bueno",
+  excellent: "Excelente",
+};
+
+/** The criteria in words, for help texts and the AI prompt. */
+export const VIABILITY_CRITERIA =
+  `"${VIABILITY_LABELS.loss}": ganancia neta menor o igual a cero. ` +
+  `"${VIABILITY_LABELS.tight}": hay ganancia pero el margen neto es menor a ${VIABILITY_THRESHOLDS.goodMargin}%. ` +
+  `"${VIABILITY_LABELS.good}": margen neto de ${VIABILITY_THRESHOLDS.goodMargin}% o más. ` +
+  `"${VIABILITY_LABELS.excellent}": margen neto de ${VIABILITY_THRESHOLDS.excellentMargin}% o más y ROI de ${VIABILITY_THRESHOLDS.excellentRoi}% o más.`;
 
 export interface GatewayInfo {
   label: string;
