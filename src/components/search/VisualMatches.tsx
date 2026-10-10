@@ -205,15 +205,17 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
   const of = (group: VisualGroup) => results.filter((m) => m.group === group);
   const ml = of("ml_uy");
   const stores = of("uy_stores");
-  const abroad = of("abroad");
+  const unconfirmed = of("unconfirmed");
   const others = of("others");
+  // Sitios del exterior: no se muestran como grupo, quedan detrás de una línea que los despliega.
+  const hidden = of("foreign");
 
   return (
     <div className="flex min-w-0 flex-col gap-4" data-visual-results>
       <div className="flex flex-col gap-1">
         <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
           {uruguayCount === 0
-            ? "No encontré esta foto en sitios de Uruguay. Mirá los otros resultados acá abajo."
+            ? "No encontré esta foto en sitios de Uruguay."
             : `${uruguayCount === 1 ? "1 resultado" : `${uruguayCount} resultados`} de Uruguay para esta foto.`}
         </p>
         <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">{VISUAL_MESSAGES.notice}</p>
@@ -241,13 +243,25 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
         </section>
       )}
 
-      {abroad.length > 0 && (
-        <details data-visual-group="abroad" className="min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
-          <summary className="cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
-            {VISUAL_GROUP_LABELS.abroad}: confirmá que envían a Uruguay ({abroad.length})
+      {hidden.length > 0 && (
+        <details data-visual-group="foreign" data-hidden-foreign className="min-w-0">
+          <summary className="cursor-pointer text-[11px] text-zinc-600 dark:text-zinc-400">
+            {hidden.length === 1 ? "Se ocultó 1 resultado de otros países" : `Se ocultaron ${hidden.length} resultados de otros países`}.{" "}
+            <span className="font-bold underline underline-offset-2">Ver</span>
           </summary>
           <div className="mt-3">
-            <MatchList matches={abroad} />
+            <MatchList matches={hidden} />
+          </div>
+        </details>
+      )}
+
+      {unconfirmed.length > 0 && (
+        <details data-visual-group="unconfirmed" className="min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+          <summary className="cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
+            {VISUAL_GROUP_LABELS.unconfirmed}: no se sabe si venden en Uruguay ({unconfirmed.length})
+          </summary>
+          <div className="mt-3">
+            <MatchList matches={unconfirmed} />
           </div>
         </details>
       )}
@@ -264,7 +278,7 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
       )}
 
       {/* Solo informativo: no se busca con este texto. */}
-      {uruguayCount === 0 && abroad.length > 0 && recognizedAs && (
+      {uruguayCount === 0 && recognizedAs && (
         <p data-visual-recognized className="break-words text-xs text-zinc-700 dark:text-zinc-300">
           Google Lens lo reconoce como: <strong className="font-bold text-zinc-900 dark:text-zinc-100">{recognizedAs}</strong>
         </p>
