@@ -33,6 +33,7 @@ import {
   safeThumbnailUrl,
   toVisualMatch,
   visualPrice,
+  wantsAutoName,
   type RawLensItem,
   type VisualSummary,
 } from "../src/lib/photo/visual";
@@ -50,6 +51,8 @@ function assert(condition: boolean, message: string) {
 }
 
 const fixture = (JSON.parse(fs.readFileSync(new URL("./fixtures/apify_google_lens.json", import.meta.url), "utf8")) as { items: unknown[] }).items;
+
+const lampFixture = (JSON.parse(fs.readFileSync(new URL("./fixtures/apify_google_lens_lampara.json", import.meta.url), "utf8")) as { items: unknown[] }).items;
 
 const item = (url: string, extra: Partial<Record<"title" | "source" | "thumbnail", string>> & { price?: unknown; currency?: unknown } = {}): RawLensItem => ({
   url,
@@ -160,6 +163,27 @@ async function main() {
   assert(real.suggestedName === "Stanley Termo Classic Original", `Nombre sugerido a partir de Mercado Libre Uruguay (${real.suggestedName})`);
   assert(real.results.every((m) => m.thumbnail === null), "La muestra no trae miniaturas: no se inventa ninguna");
 
+  console.log("--- Producto que no se vende en Uruguay (muestra de la lámpara) ---");
+  const lampParsed = parseLensItems(lampFixture);
+  const lamp = buildVisualMatches(lampParsed.ok ? lampParsed.items : []);
+  const lampSites = (g: string) => lamp.results.filter((m) => m.group === g).map((m) => m.site).join();
+  assert(lampParsed.ok && lamp.results.length === 8, "La muestra de la lámpara se lee entera: 8 resultados");
+  assert(lampSites("abroad") === "walmart.com,amazon.com,amazon.es,etsy.com,1stdibs.com,vntg.com,temu.com" && lampSites("others") === "instagram.com", `Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs, VNTG y Temu son «Otros países»; Instagram, «Otros resultados» (${lampSites("abroad")})`);
+  assert(lampSites("ml_uy") === "" && lampSites("uy_stores") === "" && lamp.uruguayCount === 0 && lamp.mlCount === 0, "Ningún resultado de Uruguay");
+  assert(lamp.suggestedName === "", "Sin resultados de Uruguay no se propone un nombre para buscar: eso queda para la IA");
+  assert(lamp.recognizedAs === "Artemide Nessino Table Lamp Orange", `«Lens lo reconoce como»: el título limpio más repetido entre todas las tiendas (${lamp.recognizedAs})`);
+  assert(!/amazon|walmart|etsy|1stdibs|vntg|temu/i.test(lamp.recognizedAs), "Ese texto no lleva el nombre de ninguna tienda");
+  assert(lamp.results.every((m) => m.price === null), "El precio de Walmart viene con moneda «$», que no dice de qué país es: no se muestra");
+  assert(wantsAutoName(lamp) && wantsAutoName({ uruguayCount: 0 }) && wantsAutoName({ uruguayCount: 2 }) && !wantsAutoName({ uruguayCount: 3 }) && !wantsAutoName(real), "Con menos de 3 resultados de Uruguay (incluso 0) el nombre se le pide solo a la IA; con 3 o más, no");
+  assert(wantsAutoName({ code: "VISUAL_SEARCH_NO_MATCHES" }), "También cuando la búsqueda terminó sin ninguna coincidencia");
+  for (const code of ["VISUAL_SEARCH_TIMEOUT", "VISUAL_SEARCH_UNAVAILABLE", "VISUAL_SEARCH_NO_CREDIT", "VISUAL_SEARCH_NOT_CONFIGURED", "RATE_LIMITED", null]) {
+    assert(!wantsAutoName({ code }), `Con ${code ?? "un error sin código"} la IA no corre sola: queda el botón`);
+  }
+  assert(real.recognizedAs.length > 0 && !/mercado\s*libre/i.test(real.recognizedAs), "Con la muestra del termo también se calcula, aunque la pantalla solo lo muestra si no hay nada de Uruguay");
+  assert(buildVisualMatches([item("https://www.instagram.com/p/a/", { title: "Mirá esto" }), item("https://www.idealo.de/x", { title: "Lampe ab 59 €" })]).recognizedAs === "", "Redes y comparadores no cuentan para decir qué producto es");
+  assert(cleanListingTitle("Amazon.com: Artemide Nessino Table Lamp Orange") === "Artemide Nessino Table Lamp Orange" && cleanListingTitle("Artemide Nessino Lámpara de mesa naranja : Amazon.es: Iluminación") === "Artemide Nessino Lámpara de mesa naranja", "Saca «Amazon.com:» del principio y «: Amazon.es: …» del final");
+  assert(cleanListingTitle("Mushroom Table Lamp Orange - Walmart.com", "Walmart") === "Mushroom Table Lamp Orange" && cleanListingTitle("Vintage Artemide Nesso Table Lamp - Etsy", "Etsy") === "Vintage Artemide Nesso Table Lamp" && cleanListingTitle("Artemide Nesso | 1stDibs") === "Artemide Nesso", "Saca «- Walmart.com», «- Etsy» y «| 1stDibs»");
+
   console.log("--- Duplicados, límite por dominio y orden ---");
   const repeated = buildVisualMatches([
     item("https://tienda.com.uy/a"),
@@ -254,7 +278,9 @@ async function main() {
   assert(sentBody.search_type === "visual_matches" && sentBody.max_results === 50 && sentBody.country === "uy" && sentBody.language === "es", "search_type visual_matches (no «products»), 50 resultados, país uy, idioma es");
   assert(Array.isArray(sentBody.image_base64) && sentBody.image_base64.length === 1 && sentBody.image_base64[0] === JPEG.toString("base64") && !sentBody.image_base64[0].startsWith("data:"), "La imagen va en base64, sin el prefijo data:");
   assert(JSON.stringify(lensInput("QUJD")) === '{"image_base64":["QUJD"],"search_type":"visual_matches","max_results":50,"country":"uy","language":"es"}', "lensInput arma el mismo pedido que se probó a mano");
-  assert(VISUAL_SEARCH_TIMEOUT_MS === 45_000, "Espera máxima de 45 segundos");
+  assert(VISUAL_SEARCH_TIMEOUT_MS === 55_000, "Espera máxima de 55 segundos (el actor tarda ≈ 40 s con la foto en base64)");
+  const vercel = JSON.parse(fs.readFileSync(new URL("../vercel.json", import.meta.url), "utf8")) as { functions: Record<string, { maxDuration: number }> };
+  assert(vercel.functions["api/visual-search.ts"].maxDuration * 1000 > VISUAL_SEARCH_TIMEOUT_MS && vercel.functions["api/visual-search.ts"].maxDuration === 60, "Esa espera cabe en los 60 s que Vercel le da a la función");
   const failure = async (r: typeof reply) => {
     reply = r;
     const before = fetchCalls.length;
@@ -273,13 +299,21 @@ async function main() {
   assert(f402.code === "VISUAL_SEARCH_NO_CREDIT" && f403.code === "VISUAL_SEARCH_NO_CREDIT", "402 o un tipo de error de límite de uso: VISUAL_SEARCH_NO_CREDIT");
   const f500 = await failure({ status: 500, body: { error: { type: "internal" } } });
   const f408 = await failure({ status: 408, body: null });
-  assert(f500.code === "VISUAL_SEARCH_UNAVAILABLE" && f408.code === "VISUAL_SEARCH_UNAVAILABLE" && f500.calls === 1, "500 o 408: VISUAL_SEARCH_UNAVAILABLE, sin reintento");
+  const f504 = await failure({ status: 504, body: { error: { type: "run-timeout-exceeded" } } });
+  assert(f500.code === "VISUAL_SEARCH_UNAVAILABLE" && f500.calls === 1, "500: VISUAL_SEARCH_UNAVAILABLE, sin reintento");
+  assert(f408.code === "VISUAL_SEARCH_TIMEOUT" && f504.code === "VISUAL_SEARCH_TIMEOUT" && f408.calls === 1, "408 o 504 de Apify: VISUAL_SEARCH_TIMEOUT, sin reintento");
   const fErr = await failure({ status: 201, body: [{ resultType: "error", errorMessage: `Algo falló con ${TOKEN}` }] });
   assert(fErr.code === "VISUAL_SEARCH_UNAVAILABLE" && fErr.detail === "item de error" && fErr.calls === 1, "Corrida SUCCEEDED con un item de error: servicio no disponible, sin reintento y sin copiar el mensaje");
   const fShape = await failure({ status: 200, body: { runId: "x" } });
   assert(fShape.code === "VISUAL_SEARCH_UNAVAILABLE" && fShape.detail === "otra forma", "Respuesta con otra forma: servicio no disponible");
   const fHang = await failure("hang");
-  assert(fHang.code === "VISUAL_SEARCH_UNAVAILABLE" && fHang.detail === "tiempo agotado" && fHang.calls === 1, "Si Apify no responde se corta por tiempo, sin reintento");
+  assert(fHang.code === "VISUAL_SEARCH_TIMEOUT" && fHang.detail === "tiempo agotado" && fHang.calls === 1, "Si Apify no responde a tiempo se corta con VISUAL_SEARCH_TIMEOUT, sin reintento");
+  const slowStart = Date.now();
+  const slowLens = createApifyLens({ token: TOKEN, fetch: (_u, init) => new Promise((resolve, reject) => {
+    const answer = setTimeout(() => resolve({ status: 201, body: fixture } as never), 80);
+    init.signal.addEventListener("abort", () => { clearTimeout(answer); reject(new Error("aborted")); });
+  }).then((r) => ({ status: (r as { status: number }).status, json: async () => (r as { body: unknown }).body })), timeoutMs: 400 });
+  assert((await slowLens(JPEG)).length === 10 && Date.now() - slowStart < 400, "Una respuesta lenta que llega antes del límite no se corta");
   const fNet = await failure("network");
   assert(fNet.code === "VISUAL_SEARCH_UNAVAILABLE" && fNet.detail === "error de red" && fNet.calls === 1, "Error de red: servicio no disponible, sin reintento");
   assert([f401, f402, f403, f500, fErr, fShape, fHang, fNet].every((f) => !f.detail.includes(TOKEN) && f.detail.length < 40), "El detalle para el log es corto y nunca lleva el token ni el mensaje del actor");
@@ -306,15 +340,13 @@ async function main() {
   assert(/^[0-9a-f]{64}$/.test(imageHash(JPEG)) && imageHash(JPEG) === imageHash(Buffer.from(JPEG)) && imageHash(JPEG) !== imageHash(jpeg("b")), "La clave es el SHA-256 de los bytes: igual para la misma foto, distinta para otra");
   let clock = 1_000_000;
   const cache = createVisualCache({ ttlMs: 1000, maxEntries: 3, now: () => clock });
-  const summary = (name: string): VisualSummary => ({ results: [], suggestedName: name, mlCount: 0, uruguayCount: 0 });
+  const summary = (name: string): VisualSummary => ({ results: [], suggestedName: name, mlCount: 0, uruguayCount: 0, recognizedAs: "" });
   cache.set("h1", summary("uno"));
   assert((cache.get("h1") as VisualSummary).suggestedName === "uno" && cache.get("h2") === null, "Devuelve lo guardado para ese hash y nada para otro");
-  cache.set("vacía", "sin coincidencias");
-  assert(cache.get("vacía") === "sin coincidencias", "También recuerda que una foto no tuvo coincidencias");
   clock += 999;
   assert(cache.get("h1") !== null, "Sigue vigente justo antes de vencer");
   clock += 1;
-  assert(cache.get("h1") === null && cache.get("vacía") === null && cache.size() === 0, "Vencida: no se devuelve y se borra");
+  assert(cache.get("h1") === null && cache.size() === 0, "Vencida: no se devuelve y se borra");
   for (const h of ["a", "b", "c", "d"]) cache.set(h, summary(h));
   assert(cache.size() === 3 && cache.get("a") === null && cache.get("d") !== null, "Con el tope de entradas sale la más vieja");
   assert(VISUAL_CACHE.ttlMs === 30 * 60 * 1000 && VISUAL_CACHE.maxEntries === 50, "Por defecto: 30 minutos y 50 entradas");
@@ -379,6 +411,11 @@ async function main() {
     reply = { status: 201, body: [] };
     await step("noMatches", () => post(jpeg("sin-coincidencias"), "image/jpeg"));
     await step("noMatchesAgain", () => post(jpeg("sin-coincidencias"), "image/jpeg"));
+    reply = { status: 201, body: fixture };
+    await step("noMatchesThenFound", () => post(jpeg("sin-coincidencias"), "image/jpeg"));
+    reply = { status: 201, body: lampFixture };
+    await step("lamp", () => post(jpeg("lampara"), "image/jpeg"));
+    await step("lampAgain", () => post(jpeg("lampara"), "image/jpeg"));
     reply = { status: 201, body: [{ url: "http://tienda.com.uy/inseguro" }, { url: "javascript:alert(1)" }] };
     await step("onlyUnsafe", () => post(jpeg("solo-inseguros"), "image/jpeg"));
     reply = { status: 201, body: [{ resultType: "error", errorMessage: `Invalid input: ${TOKEN} ${MARKER}` }] };
@@ -392,6 +429,8 @@ async function main() {
     await step("down", () => post(jpeg("caido"), "image/jpeg"));
     reply = "hang";
     await step("timeout", () => post(jpeg("colgado"), "image/jpeg"));
+    reply = { status: 201, body: fixture };
+    await step("timeoutThenFound", () => post(jpeg("colgado"), "image/jpeg"));
     reply = "network";
     await step("network", () => post(jpeg("sin-red"), "image/jpeg"));
 
@@ -419,22 +458,30 @@ async function main() {
 
   const ok = r.ok.data;
   assert(r.ok.status === 200 && ok.ok === true && ok.cached === false && ok.results.length === 10 && callsAt.ok === 1, "Foto válida: 200 con los resultados, con una sola llamada a Apify");
-  assert(Object.keys(ok).sort().join() === "cached,mlCount,ok,results,suggestedName,uruguayCount", "La respuesta trae ok, results, suggestedName, mlCount, uruguayCount y cached");
+  assert(Object.keys(ok).sort().join() === "cached,mlCount,ok,recognizedAs,results,suggestedName,uruguayCount", "La respuesta trae ok, results, suggestedName, recognizedAs, mlCount, uruguayCount y cached");
   assert(Object.keys(ok.results[0]).sort().join() === "group,price,site,source,thumbnail,title,url,uruguay", "Cada resultado trae solo los campos que usa la pantalla");
   assert(ok.suggestedName === "Stanley Termo Classic Original" && ok.mlCount === 2 && ok.uruguayCount === 5, "Trae el nombre sugerido y las cantidades de Uruguay");
   assert(r.cached.status === 200 && r.cached.data.cached === true && callsAt.cached === 0 && JSON.stringify(r.cached.data.results) === JSON.stringify(ok.results), "La misma foto otra vez sale de la memoria: no se vuelve a pagar");
   assert(r.otherPhoto.status === 200 && r.otherPhoto.data.cached === false && callsAt.otherPhoto === 1 && r.png.status === 200, "Otra foto (o un PNG) sí hace su búsqueda");
   assert(r.noMatches.status === 404 && r.noMatches.data.code === "VISUAL_SEARCH_NO_MATCHES" && r.noMatches.data.message === VISUAL_MESSAGES.noMatches && callsAt.noMatches === 1, "Sin coincidencias: VISUAL_SEARCH_NO_MATCHES con su mensaje");
-  assert(r.noMatchesAgain.status === 404 && r.noMatchesAgain.data.code === "VISUAL_SEARCH_NO_MATCHES" && callsAt.noMatchesAgain === 0, "«Sin coincidencias» también se recuerda: repetir esa foto no vuelve a pagar");
+  assert(r.noMatches.data.message === "Google Lens no encontró coincidencias para esa foto.", "El mensaje de 0 resultados es «Google Lens no encontró coincidencias para esa foto»");
+  assert(r.noMatchesAgain.status === 404 && r.noMatchesAgain.data.code === "VISUAL_SEARCH_NO_MATCHES" && callsAt.noMatchesAgain === 1, "Una respuesta con 0 resultados NO se guarda en la memoria: repetir la foto vuelve a consultar");
+  assert(r.noMatchesThenFound.status === 200 && r.noMatchesThenFound.data.cached === false && r.noMatchesThenFound.data.results.length === 10, "Y si después aparecen resultados para esa foto, se muestran");
+  assert(r.lamp.status === 200 && r.lamp.data.uruguayCount === 0 && r.lamp.data.suggestedName === "" && r.lamp.data.recognizedAs === "Artemide Nessino Table Lamp Orange" && r.lamp.data.results.length === 8, "La lámpara: 200 con 8 resultados del exterior, sin nombre sugerido y con «reconocido como»");
+  assert(r.lampAgain.data.cached === true && callsAt.lampAgain === 0, "Una respuesta con resultados (aunque ninguno sea de Uruguay) sí se guarda");
   assert(r.onlyUnsafe.status === 404 && r.onlyUnsafe.data.code === "VISUAL_SEARCH_NO_MATCHES", "Si lo único que vuelve son enlaces inseguros, es «sin coincidencias»");
   assert(r.errorItem.status === 502 && r.errorItem.data.code === "VISUAL_SEARCH_UNAVAILABLE" && r.errorItem.data.message === VISUAL_MESSAGES.unavailable && callsAt.errorItem === 1, "Item de error del actor: VISUAL_SEARCH_UNAVAILABLE, una sola llamada");
   assert(callsAt.errorItemAgain === 1, "Un error no se guarda en la memoria");
   assert(r.badToken.status === 503 && r.badToken.data.code === "VISUAL_SEARCH_NOT_CONFIGURED" && r.badToken.data.message === VISUAL_MESSAGES.notConfigured, "Token inválido (401): VISUAL_SEARCH_NOT_CONFIGURED");
   assert(r.noToken.status === 503 && r.noToken.data.code === "VISUAL_SEARCH_NOT_CONFIGURED" && callsAt.noToken === 0, "Sin APIFY_TOKEN: VISUAL_SEARCH_NOT_CONFIGURED, sin llamar a nadie");
   assert(r.noCredit.status === 503 && r.noCredit.data.code === "VISUAL_SEARCH_NO_CREDIT" && r.noCredit.data.message === VISUAL_MESSAGES.noCredit, "Sin crédito (402): VISUAL_SEARCH_NO_CREDIT con su mensaje");
-  for (const k of ["down", "timeout", "network"]) {
-    assert(r[k].status === 502 && r[k].data.code === "VISUAL_SEARCH_UNAVAILABLE" && callsAt[k] === 1, `Apify falla («${k}»): VISUAL_SEARCH_UNAVAILABLE, sin reintentar por su cuenta`);
+  for (const k of ["down", "network"]) {
+    assert(r[k].status === 502 && r[k].data.code === "VISUAL_SEARCH_UNAVAILABLE" && r[k].data.message === "La búsqueda visual no respondió en este momento." && callsAt[k] === 1, `Apify falla («${k}»): VISUAL_SEARCH_UNAVAILABLE, sin reintentar por su cuenta`);
   }
+  assert(r.timeout.status === 504 && r.timeout.data.code === "VISUAL_SEARCH_TIMEOUT" && r.timeout.data.message === "La búsqueda visual tardó demasiado." && callsAt.timeout === 1, "Se corta por tiempo: VISUAL_SEARCH_TIMEOUT con «La búsqueda visual tardó demasiado», sin reintentar por su cuenta");
+  assert(r.timeoutThenFound.status === 200 && r.timeoutThenFound.data.cached === false && callsAt.timeoutThenFound === 1, "Un corte por tiempo tampoco se guarda: el reintento consulta de nuevo");
+  const three = [r.timeout, r.down, r.noMatches].map((x) => `${x.status} ${x.data.code} ${x.data.message}`);
+  assert(new Set(three).size === 3 && new Set([r.timeout, r.down, r.noMatches].map((x) => x.data.message)).size === 3, "Tiempo agotado, servicio caído y 0 resultados tienen cada uno su código y su mensaje");
   assert(r.gif.status === 415 && r.gif.data.code === "UNSUPPORTED_IMAGE" && r.noType.status === 415 && r.jsonBody.status === 415, "Tipo que no es JPG, PNG ni WebP (o sin tipo, o JSON): 415");
   assert(r.fake.status === 400 && r.fake.data.code === "NOT_AN_IMAGE", "Dice ser JPEG pero los bytes no lo son: 400 (se mira la firma de bytes)");
   assert(r.empty.status === 400 && r.empty.data.code === "INVALID_IMAGE", "Cuerpo vacío: 400");
@@ -445,7 +492,7 @@ async function main() {
   for (const k of Object.keys(r)) {
     if (r[k].status !== 200) assert(r[k].data?.ok === false && typeof r[k].data.message === "string" && r[k].data.message === r[k].data.error, `Error «${k}»: JSON con ok:false y el mismo texto en message y error`);
   }
-  assert(Object.keys(r).filter((k) => r[k].status !== 200).every((k) => !/apify|lens|token|HTTP \d|invalid|x402|internal|discontinued/i.test(r[k].data.message)), "Ningún mensaje de error nombra al proveedor, al token ni copia el mensaje crudo");
+  assert(Object.keys(r).filter((k) => r[k].status !== 200).every((k) => !/apify|token|HTTP \d|invalid|x402|internal|discontinued/i.test(r[k].data.message)), "Ningún mensaje de error nombra a Apify, al token ni copia el mensaje crudo");
 
   const base64 = JPEG.toString("base64");
   const leaked = (text: string) => text.includes(MARKER) || text.includes(base64.slice(0, 60)) || text.includes(JPEG.toString("hex").slice(0, 60));
