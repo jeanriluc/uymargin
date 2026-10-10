@@ -25,7 +25,11 @@ import {
   classifyUruguay,
   cleanWebQuery,
   googleSearchUrl,
+  FOREIGN_BRANDS,
+  FOREIGN_SITES,
+  FOREIGN_SUFFIXES,
   googleShoppingUrl,
+  isForeignSite,
   isInternationalStore,
   isMainSeller,
   isNonStore,
@@ -272,6 +276,35 @@ async function main() {
   assert(!isInternationalStore("amazon.com.uy") && classifyUruguay("amazon.com.uy", false).uruguay === "confirmado", "Un .uy manda aunque lleve el nombre de una tienda global");
   assert(classifyUruguay("tiendaejemplo.com", true).uruguay === "probable" && !classifyUruguay("tiendaejemplo.com", true).international, "Sitio que no es .uy y cuyo resultado nombra a Uruguay: «probable», nunca «confirmado»");
   assert(classifyUruguay("tiendaejemplo.com", false).uruguay === "no_confirmado", "Sitio que no es .uy y no nombra a Uruguay: «no confirmado»");
+
+  console.log("--- Sitios del exterior que no se muestran ---");
+  const asked = [".com.mx", ".mx", ".cl", ".com.ar", ".ar", ".com.br", ".br", ".bn", ".es", ".us", ".it", ".fr", ".com.co", ".com.pe", ".com.py", ".com.ve", ".de", ".uk", ".co.uk", ".pt", ".ca", ".au", ".in", ".cn", ".jp"];
+  assert(asked.every((suffix) => FOREIGN_SUFFIXES.includes(suffix)), "La lista tiene todas las terminaciones pedidas");
+  for (const suffix of FOREIGN_SUFFIXES) {
+    assert(isForeignSite(`tienda${suffix}`) && isForeignSite(`www.ofertas.tienda${suffix}`.replace(/^www\./, "")), `Terminación ${suffix}: se oculta el dominio y sus subdominios`);
+  }
+  for (const site of ["etsy.com", "ebay.com", "walmart.com", "wayfair.com", "temu.com", "aliexpress.com", "alibaba.com", "1stdibs.com", "falabella.com", "mercadolibre.com.ar", "mercadolibre.com.mx", "mercadolibre.cl", "mercadolibre.com.br", "amazon.com", "idealo.de"]) {
+    assert(isForeignSite(site) && isForeignSite(`es.${site}`) && isForeignSite(`articulo.tienda.${site}`), `${site}: se oculta, también con subdominio`);
+  }
+  for (const site of ["amazon.es", "amazon.com.mx", "amazon.co.uk", "amazon.nl", "ebay.es", "ebay.co.uk", "ebay.nl", "idealo.es", "idealo.at", "www.amazon.com".replace("www.", "smile.")]) {
+    assert(isForeignSite(site), `${site}: amazon.*, ebay.* e idealo.* se ocultan con cualquier terminación`);
+  }
+  assert(FOREIGN_SITES.includes("etsy.com") && FOREIGN_BRANDS.join() === "amazon,ebay,idealo", "La lista de sitios y la de marcas están exportadas, en un solo lugar");
+  for (const site of ["mercadolibre.com.uy", "articulo.mercadolibre.com.uy", "listado.mercadolibre.com.uy", "tienda.com.uy", "stanley1913.uy", "amazon.uy", "ebay.com.uy", "etsy.com.uy", "walmart.uy", "idealo.uy", "falabella.com.uy", "tienda.es.uy"]) {
+    assert(!isForeignSite(site), `${site}: un .uy nunca se oculta`);
+  }
+  for (const site of ["tienda.com", "vntg.com", "yerbascalzada.com", "matesuru.com", "tienda.co", "tienda.io", "tienda.net", "instagram.com", "amazonas.com", "miebay.com", "walmart.com.tienda.net", "notetsy.com", "tiendaes.com", "tienda.nl"]) {
+    assert(!isForeignSite(site), `${site}: no está en la lista, no se oculta`);
+  }
+  const mixedList = buildWebSellers([
+    { url: "https://tienda.com.uy/termo", title: "Termo", description: "" },
+    { url: "https://www.mercadolibre.com.ar/termo", title: "Termo - envíos a Uruguay", description: "" },
+    { url: "https://www.amazon.com/termo", title: "Termo", description: "" },
+    { url: "https://tienda.com/termo", title: "Termo", description: "" },
+  ]);
+  assert(mixedList.filter((x) => isForeignSite(x.site)).map((x) => x.site).join() === "mercadolibre.com.ar,amazon.com" && mixedList.filter((x) => !isForeignSite(x.site)).map((x) => x.site).join() === "tienda.com.uy,tienda.com", "En «En la web (Uruguay)» la misma lista separa lo que se oculta de lo que se muestra");
+  const realList = buildWebSellers(parseSearchItems(JSON.parse(fs.readFileSync(new URL("./fixtures/apify_google_search.json", import.meta.url), "utf8"))) ?? []);
+  assert(realList.length === 9 && realList.every((x) => !isForeignSite(x.site)), "De las 9 tiendas de la respuesta real (todas .uy) no se oculta ninguna");
 
   console.log("--- Sitios que no son tiendas ---");
   for (const host of ["es.wikipedia.org", "youtube.com", "m.youtube.com", "youtu.be", "facebook.com", "instagram.com", "tiktok.com", "reddit.com", "pinterest.com", "ar.pinterest.com", "pinterest.es", "x.com", "elpais.com.uy", "elobservador.com.uy", "infobae.com", "tienda.blogspot.com", "blog.tiendaejemplo.com.uy", "noticias.ejemplo.uy"]) {
