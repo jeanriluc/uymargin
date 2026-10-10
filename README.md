@@ -76,7 +76,7 @@ Todas son opcionales para la calculadora básica. Sin ellas, la función asociad
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Credenciales de una aplicación de Mercado Libre. Necesarias para el radar y "Por enlace" |
 | `ML_ACCESS_TOKEN` | Alternativa a las dos anteriores: un token de acceso ya emitido |
 | `GEMINI_API_KEY` | Copiloto e identificación de producto por foto |
-| `APIFY_TOKEN` | **Secreta, solo servidor.** Búsqueda "En la web (Uruguay)" de la pestaña Por foto (Apify). Sin ella quedan solo los botones de Google |
+| `APIFY_TOKEN` | **Secreta, solo servidor.** Búsqueda visual (Google Lens) y búsqueda "En la web (Uruguay)" de la pestaña Por foto (Apify). Sin ella quedan la identificación con IA y los botones de Google |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para el login (clave pública; queda en el JavaScript del navegador) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Secreta, solo servidor.** Valida sesiones, guarda auditorías y cuenta el límite de uso |
 | `ALLOWED_EMAILS` | **Solo servidor.** Correos que pueden usar la app, separados por comas |
@@ -154,7 +154,7 @@ Se cargan en el panel de Vercel (Project → Settings → Environment Variables)
 |---|---|---|
 | `ML_CLIENT_ID`, `ML_CLIENT_SECRET` | Secreta de servidor | Radar y "Por enlace". Alternativa: `ML_ACCESS_TOKEN` (también secreta) |
 | `GEMINI_API_KEY` | Secreta de servidor | Copiloto e identificación de producto por foto |
-| `APIFY_TOKEN` | Secreta de servidor | Búsqueda "En la web (Uruguay)" de Por foto. Cada búsqueda consume crédito de Apify |
+| `APIFY_TOKEN` | Secreta de servidor | Búsqueda visual y búsqueda "En la web (Uruguay)" de Por foto. Cada búsqueda consume crédito de Apify (≈ US$ 0,015 por foto) |
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` | Proyecto de Supabase para el login (clave pública; queda en el JavaScript del navegador) |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Secreta, solo servidor.** Valida sesiones, guarda auditorías y cuenta el límite de uso |
 | `ALLOWED_EMAILS` | **Solo servidor.** Correos que pueden usar la app, separados por comas |
