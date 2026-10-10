@@ -28,6 +28,7 @@ import {
   isForeignDomain,
   isVisualNonStore,
   mostRepeatedTitle,
+  parseAmount,
   parseLensItems,
   parseVisualResponse,
   safeThumbnailUrl,
@@ -101,11 +102,62 @@ async function main() {
   for (const [p, c] of [[100, ""], [100, null], [100, "$"], [100, "ARS"], [100, "€"], [100, "BRL"], [100, 858]] as const) {
     assert(visualPrice(p, c) === null, `Moneda ${JSON.stringify(c)}: no se muestra precio`);
   }
-  for (const p of ["3722", "3.722", null, undefined, NaN, Infinity, 0, -5, 2e9, {}, [3722]]) {
+  for (const p of ["", "gratis", "consultar", null, undefined, NaN, Infinity, 0, -5, 2e9, {}, [3722]]) {
     assert(visualPrice(p, "UYU") === null, `Precio ${typeof p === "number" ? String(p) : JSON.stringify(p)}: no es un número usable, no se muestra`);
   }
-  assert(formatVisualPrice({ amount: 3722, currency: "UYU" }) === "$U 3.722" && formatVisualPrice({ amount: 75, currency: "USD" }) === "US$ 75", "Formato: «$U 3.722» y «US$ 75»");
-  assert(formatVisualPrice({ amount: 1234567.5, currency: "UYU" }) === "$U 1.234.567,50" && formatVisualPrice({ amount: 59.95, currency: "USD" }) === "US$ 59,95", "Formato con miles y decimales");
+  assert(formatVisualPrice({ amount: 3722, currency: "UYU" }) === "$ 3.722" && formatVisualPrice({ amount: 75, currency: "USD" }) === "US$ 75", "Formato: «$ 3.722» y «US$ 75»");
+  assert(formatVisualPrice({ amount: 1234567.5, currency: "UYU" }) === "$ 1.234.567,50" && formatVisualPrice({ amount: 59.95, currency: "USD" }) === "US$ 59,95", "Formato con miles y decimales");
+  console.log("--- Monedas: Uruguay publica en pesos y en dólares ---");
+  const shown = (price: unknown, currency: unknown, host = "") => {
+    const p = visualPrice(price, currency, host);
+    return p ? formatVisualPrice(p) : null;
+  };
+  for (const code of ["USD", "US$", "U$S", "u$s", "U$D", "US$.", " usd ", "U$S."]) {
+    assert(shown(75, code) === "US$ 75", `Moneda «${code}»: dólares, se muestra «US$ 75»`);
+  }
+  for (const code of ["UYU", "$U", "$ U", "UYU$", " uyu ", "$u"]) {
+    assert(shown(3722, code) === "$ 3.722", `Moneda «${code}»: pesos uruguayos, se muestra «$ 3.722»`);
+  }
+  for (const text of ["US$ 75", "US$75", "75 US$", "U$S 75", "75 U$S", "USD 75", "u$s 75"]) {
+    assert(shown(text, null) === "US$ 75" && shown(text, "") === "US$ 75", `Precio como texto «${text}», sin moneda en su campo: dólares`);
+  }
+  assert(shown("$U 3.722", null) === "$ 3.722" && shown("3.722 UYU", "") === "$ 3.722", "Precio como texto con «$U» o «UYU»: pesos uruguayos");
+  assert(shown("U$S 1.299", null) === "US$ 1.299" && shown("USD 1,299.50", null) === "US$ 1.299,50" && shown("3.722,50", "UYU") === "$ 3.722,50" && shown("59,95", "US$") === "US$ 59,95" && shown("3722", "UYU") === "$ 3.722", "El número escrito como texto se lee con punto o coma de miles y de decimales");
+  assert(parseAmount("1.234.567") === 1234567 && parseAmount("59.95") === 59.95 && parseAmount("12") === 12 && parseAmount("sin precio") === null, "parseAmount: miles repetidos, decimales, enteros y texto sin número");
+  for (const host of ["tienda.com.uy", "stanley1913.uy", "articulo.mercadolibre.com.uy", "mercadolibre.com.uy"]) {
+    assert(shown(3722, "$", host) === "$ 3.722" && shown("$ 3.722", null, host) === "$ 3.722", `Un «$» suelto en ${host}: pesos uruguayos`);
+  }
+  for (const host of ["walmart.com", "tienda.com", "mercadolibre.com.ar", "falabella.cl", "amazon.com", "mercadolibre.com.uy.imitador.com", ""]) {
+    assert(shown(34, "$", host) === null && shown("$ 34", null, host) === null, `Un «$» suelto en ${host || "un sitio sin dominio"}: ambiguo, no se muestra`);
+  }
+  assert(shown(75, "US$", "tienda.com.uy") === "US$ 75" && shown("US$ 75", "$", "tienda.com.uy") === "US$ 75", "En un .uy, un precio en dólares sigue siendo en dólares: la moneda explícita manda sobre el «$»");
+  assert(shown("US$ 75", "UYU") === "$ 75", "Si el campo de moneda es claro, manda sobre lo escrito junto al número");
+  for (const bad of [".", "", " ", "..", "ARS", "AR$", "CLP", "R$", "BRL", "€", "EUR", "MXN", "£", null, undefined, 858, {}]) {
+    assert(shown(100, bad, "tienda.com.uy") === null, `Moneda inválida ${JSON.stringify(bad)}: no se muestra, ni siquiera en un .uy`);
+  }
+  // Una tienda .com en dólares: el precio se muestra, pero no la vuelve uruguaya.
+  const usdStore = toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo IdeaPad 15", price: 899, currency: "U$S" }));
+  assert(usdStore?.group === "abroad" && usdStore.uruguay === null && usdStore.price !== null && formatVisualPrice(usdStore.price) === "US$ 899", "Tienda .com en dólares y sin mención de Uruguay: «Otros países o sin confirmar», con su precio en US$");
+  for (const title of ["Notebook Lenovo IdeaPad 15 - Envíos a todo Uruguay", "Notebook Lenovo en Montevideo", "Notebook Lenovo | Envíos a todo el país", "Notebook Lenovo. Envío a todo el país", "Notebook Lenovo - envios a todo el pais"]) {
+    const m = toVisualMatch(item("https://tiendatech.com/notebook", { title, price: 899, currency: "U$S" }));
+    assert(m?.group === "uy_stores" && m.uruguay === "probable" && m.price?.currency === "USD", `Tienda .com en dólares con «${title.slice(16)}»: Tiendas de Uruguay, «probable», precio en US$`);
+  }
+  assert(toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo", price: 35990, currency: "$U" }))?.group === "uy_stores", "El precio en pesos uruguayos sigue siendo una señal de Uruguay");
+  assert(toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo", price: 35990, currency: "$" }))?.group === "abroad", "Un «$» suelto en una .com no es señal de Uruguay (ni se muestra)");
+  for (const url of ["https://tienda.com.ar/notebook", "https://www.mercadolibre.com.ar/notebook", "https://tienda.cl/notebook", "https://tienda.com.br/notebook"]) {
+    const m = toVisualMatch(item(url, { title: "Notebook Lenovo - Envíos a todo el país, Montevideo, Uruguay", price: 35990, currency: "UYU" }));
+    assert(m?.group === "abroad" && m.uruguay === null, `${new URL(url).hostname}: un dominio de otro país nunca entra al grupo de Uruguay, diga lo que diga`);
+  }
+  const twoCurrencies = buildVisualMatches([
+    item("https://pesos.com.uy/a", { price: 3722, currency: "$" }),
+    item("https://dolares.com.uy/a", { price: 75, currency: "U$S" }),
+    item("https://articulo.mercadolibre.com.uy/MLU-1", { price: "US$ 80", currency: null }),
+    item("https://articulo.mercadolibre.com.uy/MLU-2", { price: 3500, currency: "$" }),
+  ]);
+  assert(twoCurrencies.results.map((m) => (m.price ? formatVisualPrice(m.price) : "-")).join(" | ") === "US$ 80 | $ 3.500 | $ 3.722 | US$ 75", "Con precios en las dos monedas en la misma lista, cada uno se muestra tal cual, con su moneda");
+  assert(twoCurrencies.results.every((m) => m.price !== null && Object.keys(m.price).sort().join() === "amount,currency") && twoCurrencies.results[0].price?.amount === 80 && twoCurrencies.results[2].price?.amount === 3722, "No se convierte nada: el monto es el que vino");
+  assert(lampFixture.length === 8 && buildVisualMatches((parseLensItems(lampFixture) as { items: RawLensItem[] }).items).results.find((m) => m.site === "walmart.com")?.price === null, "Walmart con «$» sigue sin mostrar precio");
+
   assert(/precio informado por Google, confirmar en la tienda/.test(VISUAL_MESSAGES.priceNote), "El rótulo del precio dice que lo informa Google y que hay que confirmarlo");
 
   console.log("--- Clasificación ---");
@@ -156,7 +208,7 @@ async function main() {
     const m = real.results.find((x) => x.site === site);
     return m?.price ? formatVisualPrice(m.price) : null;
   };
-  assert(priceOf("stanley1913.uy") === "$U 3.722" && priceOf("matesuru.com") === "$U 2.850" && priceOf("electroventas.com.uy") === "$U 3.205" && priceOf("stanley1913.com.ve") === "US$ 75", "Precios en UYU y en US$ se muestran");
+  assert(priceOf("stanley1913.uy") === "$ 3.722" && priceOf("matesuru.com") === "$ 2.850" && priceOf("electroventas.com.uy") === "$ 3.205" && priceOf("stanley1913.com.ve") === "US$ 75", "Precios en UYU y en US$ se muestran");
   assert(priceOf("yerbascalzada.com") === null && priceOf("mercadolibre.com.uy") === null && priceOf("instagram.com") === null, "Yerbas Calzada (moneda «.») y los que vienen sin precio no muestran nada");
   assert(real.results.find((m) => m.site === "matesuru.com")?.uruguay === "probable" && real.results.find((m) => m.site === "stanley1913.uy")?.uruguay === "confirmado", "Matesuru (.com con precio en pesos) queda «probable»; el .uy, «confirmado»");
   assert(real.uruguayCount === 5, "Cuenta 5 resultados de Uruguay");
