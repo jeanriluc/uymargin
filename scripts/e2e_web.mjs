@@ -2,7 +2,8 @@
 // No corre dentro de `npm test` (necesita la app levantada y Chrome). Uso:
 //   AUTH_DISABLED=true VITE_AUTH_DISABLED=true PORT=3917 npx tsx server/local.ts
 //   node scripts/e2e_web.mjs [carpeta-para-capturas]     (APP_URL y CHROME_PATH son opcionales)
-// /api/identify-product, /api/web-sellers y /api/search-mlu se simulan acá: no se llama a Gemini, a Apify ni a Mercado Libre.
+// /api/visual-search, /api/identify-product, /api/web-sellers y /api/search-mlu se simulan acá: no se llama a Gemini, a Apify ni a Mercado Libre.
+// La búsqueda visual siempre falla en esta prueba: el nombre sale de la IA, como en la ronda 12.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -87,6 +88,7 @@ const SELLERS = [
   seller("es.wikipedia.org", { url: "https://es.wikipedia.org/wiki/Stanley", title: "Stanley - Wikipedia", uruguay: "no_confirmado", kind: "other" }),
 ];
 const identify = [];
+const visualCalls = [];
 let mode = "ok";
 let delayMs = 0;
 const IDENTIFIED = {
@@ -106,6 +108,11 @@ page.on("request", async (req) => {
   const url = new URL(req.url());
   const json = (body, status = 200, headers = {}) => req.respond({ status, contentType: "application/json", headers, body: JSON.stringify(body) }).catch(() => {});
   if (url.pathname === "/api/exchange-rate") return json({ ok: true, rate: 40.5, referenceDate: "2026-10-08", fetchedAt: new Date().toISOString(), stale: false });
+  if (url.pathname === "/api/visual-search") {
+    // En esta prueba la búsqueda visual siempre falla: así se llega al botón secundario de la IA.
+    visualCalls.push(req.method());
+    return json({ ok: false, code: "VISUAL_SEARCH_NOT_CONFIGURED", message: "La búsqueda visual no está configurada en el servidor.", error: "La búsqueda visual no está configurada en el servidor." }, 503);
+  }
   if (url.pathname === "/api/identify-product") {
     identify.push({ method: req.method(), type: req.headers()["content-type"], hasBody: req.hasPostData() });
     if (delayMs) await sleep(delayMs);
@@ -157,6 +164,14 @@ const upload = async (p) => {
   const input = await page.$('#mercado input[data-photo-input="file"]');
   await input.uploadFile(p);
 };
+/** La búsqueda visual (simulada) falla y recién ahí se pide el nombre a la IA, que es el botón secundario. */
+const identifyWithAi = async () => {
+  if (await visible("#mercado [data-visual-search]")) {
+    await click("Buscar dónde se vende");
+    await page.waitForSelector("#mercado [data-ai-identify]", { timeout: 10000 });
+  }
+  return click("Identificar nombre con IA");
+};
 const NAME = "#photo-name-input";
 /** Reemplaza el nombre escribiendo, como lo haría el usuario. */
 const retype = async (text) => {
@@ -188,11 +203,11 @@ await page.waitForSelector('#mercado input[data-photo-input="file"]', { timeout:
 await upload(PHOTO);
 await page.waitForSelector("#mercado img[data-photo-preview]", { timeout: 15000 });
 assert((await page.$("#mercado [role='tablist']")) === null, "Antes de identificar el producto no hay vistas: primero se confirma el nombre");
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForSelector(NAME, { timeout: 10000 });
 
-// --- Dos vistas accesibles; «Mercado Libre» es la de siempre ---
-assert((await tabState()) === "Mercado Libre:true:0 | En la web (Uruguay):false:-1", `Hay dos vistas con role=tab; arranca en «Mercado Libre» (${await tabState()})`);
+// --- Dos vistas accesibles; «Según la foto» es la de siempre ---
+assert((await tabState()) === "Según la foto:true:0 | En la web (Uruguay):false:-1", `Hay dos vistas con role=tab; arranca en «Según la foto» (${await tabState()})`);
 assert(
   await page.evaluate(() => {
     const list = document.querySelector("#mercado [role='tablist']");
@@ -200,15 +215,15 @@ assert(
   }),
   "Cada pestaña está unida a su panel (aria-controls / aria-labelledby) y la lista tiene nombre"
 );
-assert((await visible("#mercado [data-web-search]")) === false && /^Buscar en Mercado Libre$/i.test(await textOf("#mercado [data-photo-result] button[type='submit']")) && (await panelHidden("photo-panel-web")), "En «Mercado Libre» el botón es el de siempre y la vista web está oculta");
-assert(/Los resultados aparecen acá abajo, igual que en el Radar/.test(await textOf("#mercado #photo-panel-ml")), "La vista «Mercado Libre» conserva su texto");
+assert((await visible("#mercado [data-web-search]")) === false && /^Analizar en Radar$/i.test(await textOf("#mercado [data-photo-result] button[type='submit']")) && (await panelHidden("photo-panel-web")), "En «Según la foto» el botón es el de siempre y la vista web está oculta");
+assert(/muestra los precios reales acá abajo, igual que en el Radar/.test(await textOf("#mercado #photo-panel-foto")), "La vista «Según la foto» conserva su texto");
 
 // --- Abrir la vista web: nada se busca solo ---
 await click("^En la web \\(Uruguay\\)$");
 await sleep(200);
-assert((await tabState()) === "Mercado Libre:false:-1 | En la web (Uruguay):true:0" && (await panelHidden("photo-panel-ml")) && !(await panelHidden("photo-panel-web")), "Al elegir «En la web (Uruguay)» cambia la vista y se oculta la otra");
+assert((await tabState()) === "Según la foto:false:-1 | En la web (Uruguay):true:0" && (await panelHidden("photo-panel-foto")) && !(await panelHidden("photo-panel-web")), "Al elegir «En la web (Uruguay)» cambia la vista y se oculta la otra");
 assert(webCalls.length === 0 && queries.length === 0, "Abrir la vista no busca nada: ni en la web ni en Mercado Libre");
-assert(/^Buscar en la web de Uruguay$/i.test(await textOf("#mercado [data-web-search]")) && !/Mercado Libre/i.test(await textOf("#mercado [data-photo-result] button[type='submit']")), "El botón pasa a ser «Buscar en la web de Uruguay»");
+assert(/^Buscar en la web de Uruguay$/i.test(await textOf("#mercado [data-web-search]")) && !/Radar/i.test(await textOf("#mercado [data-photo-result] button[type='submit']")), "El botón pasa a ser «Buscar en la web de Uruguay»");
 assert(/Son resultados de Google Uruguay y pueden ser productos parecidos\. Confirmá precio y stock en cada tienda\./.test(await textOf(WEB)), "Aclara que son resultados de Google Uruguay y que hay que confirmar precio y stock en la tienda");
 
 // --- Botones de Google: siempre visibles y con la búsqueda bien armada ---
@@ -230,7 +245,7 @@ await retype("Termo Stanley Classic");
 await page.focus("#photo-tab-web");
 await page.keyboard.press("ArrowLeft");
 await sleep(200);
-assert((await tabState()).startsWith("Mercado Libre:true:0") && (await page.evaluate(() => document.activeElement?.id)) === "photo-tab-ml", "Con la flecha izquierda se pasa a «Mercado Libre» y el foco acompaña");
+assert((await tabState()).startsWith("Según la foto:true:0") && (await page.evaluate(() => document.activeElement?.id)) === "photo-tab-foto", "Con la flecha izquierda se pasa a «Según la foto» y el foco acompaña");
 await page.keyboard.press("ArrowRight");
 await sleep(200);
 assert((await page.evaluate(() => document.activeElement?.id)) === "photo-tab-web" && webCalls.length === 0, "Con la flecha derecha se vuelve; moverse entre vistas no busca");
@@ -287,14 +302,14 @@ await sleep(300);
 
 // --- La vista conserva su estado ---
 const webCount = webCalls.length;
-await click("^Mercado Libre$");
+await click("^Según la foto$");
 await sleep(200);
-assert((await panelHidden("photo-panel-web")) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7, "Al pasar a «Mercado Libre» los resultados web quedan montados y ocultos");
+assert((await panelHidden("photo-panel-web")) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7, "Al pasar a «Según la foto» los resultados web quedan montados y ocultos");
 await click("^Lote CSV$");
 await sleep(500);
 await click("^Por foto$");
 await sleep(300);
-assert((await tabState()).startsWith("Mercado Libre:true:0") && (await page.$eval(NAME, (el) => el.value)) === "Termo Stanley Classic", "Ir a Lote CSV y volver conserva la vista elegida y el nombre");
+assert((await tabState()).startsWith("Según la foto:true:0") && (await page.$eval(NAME, (el) => el.value)) === "Termo Stanley Classic", "Ir a Lote CSV y volver conserva la vista elegida y el nombre");
 await click("^En la web \\(Uruguay\\)$");
 await sleep(200);
 c = await cards();
@@ -337,15 +352,15 @@ await webCase("ok", "Termo Stanley Classic");
 assert((await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 7 && (await page.$(`${WEB} [data-web-error]`)) === null, "Después de un error se puede buscar de nuevo y el aviso se va");
 
 // --- Sugerencia cuando Mercado Libre no lo encuentra ---
-await click("^Mercado Libre$");
+await click("^Según la foto$");
 await sleep(200);
 assert((await page.$("#mercado [data-web-suggestion]")) === null, "Sin haber buscado en Mercado Libre no hay sugerencia");
 await retype("Termo Stanley Classic");
-await click("Buscar en Mercado Libre");
+await click("Analizar en Radar");
 await page.waitForSelector("#mercado [data-reliability]", { timeout: 15000 }).catch(() => null);
 assert((await page.$("#mercado [data-web-suggestion]")) === null, "Si Mercado Libre tiene precios, no se sugiere la web");
 await retype("Termo Stanley Classic 1 litro");
-await click("Buscar en Mercado Libre");
+await click("Analizar en Radar");
 await page.waitForSelector("#mercado [data-web-suggestion]", { timeout: 15000 }).catch(() => null);
 const suggestion = await textOf("#mercado [data-web-suggestion]");
 assert(/Mercado Libre no tiene precios para «Termo Stanley Classic 1 litro»/.test(suggestion) && /Probá en la web de Uruguay/i.test(suggestion), `Si Mercado Libre no lo encuentra, aparece la sugerencia «Probá en la web de Uruguay» (${suggestion.slice(0, 60)}…)`);
@@ -361,9 +376,9 @@ await page.click('#mercado button[aria-label="Quitar la foto"]');
 await sleep(200);
 await upload(PHOTO);
 await page.waitForSelector("#mercado img[data-photo-preview]", { timeout: 15000 });
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForSelector(NAME, { timeout: 10000 });
-assert((await tabState()).startsWith("Mercado Libre:true:0") && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 0, "Con una foto nueva se arranca de cero: vista «Mercado Libre» y sin resultados web viejos");
+assert((await tabState()).startsWith("Según la foto:true:0") && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 0, "Con una foto nueva se arranca de cero: vista «Según la foto» y sin resultados web viejos");
 
 await page.setViewport({ width: 390, height: 844 });
 await click("^En la web \\(Uruguay\\)$");

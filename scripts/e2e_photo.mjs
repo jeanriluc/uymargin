@@ -2,7 +2,8 @@
 // No corre dentro de `npm test` (necesita la app levantada y Chrome). Uso:
 //   AUTH_DISABLED=true VITE_AUTH_DISABLED=true PORT=3917 npx tsx server/local.ts
 //   node scripts/e2e_photo.mjs [carpeta-para-capturas]     (APP_URL y CHROME_PATH son opcionales)
-// /api/identify-product y /api/search-mlu se simulan acá: no se llama a Gemini ni a Mercado Libre.
+// /api/visual-search, /api/identify-product y /api/search-mlu se simulan acá: no se llama a Apify, a Gemini ni a Mercado Libre.
+// La búsqueda visual (ronda 13) se prueba en scripts/e2e_visual.mjs; acá siempre falla, para llegar a la identificación con IA.
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -76,6 +77,7 @@ page.on("console", (m) => {
 
 const queries = [];
 const identify = [];
+const visualCalls = [];
 let mode = "ok";
 let delayMs = 0;
 const IDENTIFIED = {
@@ -95,6 +97,11 @@ page.on("request", async (req) => {
   const url = new URL(req.url());
   const json = (body, status = 200, headers = {}) => req.respond({ status, contentType: "application/json", headers, body: JSON.stringify(body) }).catch(() => {});
   if (url.pathname === "/api/exchange-rate") return json({ ok: true, rate: 40.5, referenceDate: "2026-10-08", fetchedAt: new Date().toISOString(), stale: false });
+  if (url.pathname === "/api/visual-search") {
+    // En esta prueba la búsqueda visual siempre falla: así se llega al botón secundario de la IA.
+    visualCalls.push(req.method());
+    return json({ ok: false, code: "VISUAL_SEARCH_NOT_CONFIGURED", message: "La búsqueda visual no está configurada en el servidor.", error: "La búsqueda visual no está configurada en el servidor." }, 503);
+  }
   if (url.pathname === "/api/identify-product") {
     identify.push({ method: req.method(), type: req.headers()["content-type"], hasBody: req.hasPostData() });
     if (delayMs) await sleep(delayMs);
@@ -131,6 +138,14 @@ const upload = async (p) => {
   const input = await page.$('#mercado input[data-photo-input="file"]');
   await input.uploadFile(p);
 };
+/** La búsqueda visual (simulada) falla y recién ahí se pide el nombre a la IA, que es el botón secundario. */
+const identifyWithAi = async () => {
+  if (await visible("#mercado [data-visual-search]")) {
+    await click("Buscar dónde se vende");
+    await page.waitForSelector("#mercado [data-ai-identify]", { timeout: 10000 });
+  }
+  return click("Identificar nombre con IA");
+};
 const NAME = "#photo-name-input";
 /** Reemplaza el nombre escribiendo, como lo haría el usuario. */
 const retype = async (text) => {
@@ -154,7 +169,7 @@ const shot = async (name, width) => {
 assert((await page.$('#mercado input[data-photo-input="file"]')) === null, "Antes de abrirla, el panel «Por foto» no está cargado (lazy)");
 assert(await click("^Por foto$"), "Hay una pestaña «Por foto» junto a Radar MLU, Por enlace y Lote CSV");
 await page.waitForSelector('#mercado input[data-photo-input="file"]', { timeout: 15000 });
-assert(/La IA puede equivocarse con productos genéricos\. Revisá el nombre antes de buscar\./.test(await textOf("#mercado")), "Muestra el aviso de que la IA puede equivocarse");
+assert(/La búsqueda visual y la IA pueden equivocarse con productos genéricos\. Revisá el nombre antes de buscar\./.test(await textOf("#mercado")), "Muestra el aviso de que la búsqueda visual y la IA pueden equivocarse");
 assert(!/probabilidad de rentabilidad/i.test(await textOf("#mercado")), "No promete ninguna «probabilidad de rentabilidad»");
 assert(await visible('#mercado input[aria-label^="Producto o modelo"]') === false, "En «Por foto» no se ve el cuadro de texto del Radar");
 
@@ -164,20 +179,21 @@ await page.waitForSelector("#mercado img[data-photo-preview]", { timeout: 15000 
 const preview = await page.$eval("#mercado img[data-photo-preview]", (img) => img.decode().then(() => ({ w: img.naturalWidth, h: img.naturalHeight, alt: img.alt })));
 assert(preview.w === 1024 && preview.h === 768, `La foto de 1600×1200 se achica a 1024×768 antes de enviarse (${preview.w}×${preview.h})`);
 assert(preview.alt.length > 0 && (await visible('#mercado button[aria-label="Quitar la foto"]')), "Vista previa con texto alternativo y botón para quitarla");
-assert(identify.length === 0 && queries.length === 0, "Elegir la foto no gasta una llamada a la IA ni busca");
+assert(identify.length === 0 && queries.length === 0 && visualCalls.length === 0, "Elegir la foto no gasta una búsqueda visual, ni una llamada a la IA, ni busca");
+assert((await page.$("#mercado [data-ai-identify]")) === null, "Antes de la búsqueda visual no se ofrece la identificación con IA: es el paso secundario");
 
 // --- Analizando… y cancelar ---
 delayMs = 1500;
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForFunction(() => /Analizando…/.test(document.querySelector("#mercado").innerText), { timeout: 5000 }).catch(() => null);
 assert(/Analizando…/.test(await textOf("#mercado [role='status']")) && (await click("^Cancelar$")), "Mientras analiza muestra «Analizando…» (role=status) y deja cancelar");
 await sleep(1800);
-assert((await page.$(NAME)) === null && /Cancelaste el análisis/.test(await textOf("#mercado [role='status']")), "Cancelado: no aparece ningún resultado aunque la respuesta llegue después");
+assert((await page.$eval(NAME, (el) => el.value)) === "" && (await page.$("#mercado [data-photo-confidence]")) === null && /Cancelaste el análisis/.test(await textOf("#mercado [role='status']")), "Cancelado: no aparece ningún nombre aunque la respuesta llegue después");
 assert(await visible("#mercado img[data-photo-preview]"), "Cancelar no quita la foto");
 delayMs = 0;
 
 // --- Resultado: nombre editable, alternativas y confianza ---
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForSelector(NAME, { timeout: 10000 });
 const sent = identify.at(-1);
 assert(sent.method === "POST" && sent.type === "image/jpeg" && sent.hasBody, `La foto viaja como JPEG en el cuerpo del pedido (${sent.type})`);
@@ -200,9 +216,9 @@ assert(queries.length === 0, "Elegir un alternativo tampoco busca");
 // --- Editar el nombre y buscar: mismo Radar, misma búsqueda ampliada ---
 const aiCalls = identify.length;
 await retype("Termo Stanley Classic 1 litro");
-await click("Buscar en Mercado Libre");
+await click("Analizar en Radar");
 await page.waitForSelector("#mercado [data-broaden]", { timeout: 15000 }).catch(() => null);
-assert(queries.join("|") === "Termo Stanley Classic 1 litro", "«Buscar en Mercado Libre» consulta con el nombre que quedó en el campo");
+assert(queries.join("|") === "Termo Stanley Classic 1 litro", "«Analizar en Radar» consulta con el nombre que quedó en el campo");
 const offer = await page.$eval("#mercado [data-broaden]", (b) => (b.offsetParent !== null ? b.innerText : null)).catch(() => null);
 assert(offer === "Probar con «Termo Stanley Classic»", `Sin precios: se ve el botón de búsqueda ampliada del Radar (${offer})`);
 await retype("Termo Stanley Classic");
@@ -257,11 +273,11 @@ await upload(PHOTO_2);
 await page.waitForSelector("#mercado img[data-photo-preview]", { timeout: 15000 });
 const p2 = await page.$eval("#mercado img[data-photo-preview]", (img) => img.decode().then(() => `${img.naturalWidth}x${img.naturalHeight}`));
 assert(p2 === "600x900", `Una foto chica (600×900) no se agranda (${p2})`);
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForSelector("#mercado [data-photo-no-product]", { timeout: 10000 }).catch(() => null);
 const noProduct = await textOf("#mercado [data-photo-no-product]");
 assert(/No encontré un producto claro en la foto/.test(noProduct) && /Solo se ve un paisaje/.test(noProduct) && /Subir otra foto/i.test(noProduct), "isProduct false: mensaje claro, el motivo y botón para subir otra");
-assert((await page.$(NAME)) === null && !(await visible("#mercado button[type='submit']")), "Sin producto no hay nombre ni botón de buscar");
+assert((await page.$eval(NAME, (el) => el.value)) === "" && (await page.$eval("#mercado [data-radar-search]", (b) => b.disabled)), "Sin producto el nombre queda vacío y el botón de buscar, deshabilitado");
 const queriesBefore = queries.length;
 
 // --- Errores del servidor ---
@@ -269,10 +285,10 @@ const errorCase = async (m, re, label) => {
   mode = m;
   await upload(PHOTO);
   await page.waitForSelector("#mercado img[data-photo-preview]", { timeout: 15000 });
-  await click("Identificar producto");
+  await identifyWithAi();
   await page.waitForSelector("#mercado [data-photo-error]", { timeout: 10000 }).catch(() => null);
   const alert = await textOf("#mercado [data-photo-error]");
-  assert(re.test(alert) && (await page.$(NAME)) === null, `${label} (${alert.slice(0, 70)}…)`);
+  assert(re.test(alert) && (await page.$eval(NAME, (el) => el.value)) === "", `${label} (${alert.slice(0, 70)}…)`);
   assert(await visible("#mercado img[data-photo-preview]"), `${label.split(":")[0]}: la foto queda cargada para reintentar`);
 };
 await errorCase("provider", /La IA no pudo analizar la foto en este momento/, "Error del proveedor: aviso claro con role=alert");
@@ -282,7 +298,7 @@ await errorCase("rate", /Llegaste al límite de 5 usos por minuto/, "Límite de 
 await errorCase("tooLarge", /La foto es demasiado pesada/, "El servidor rechaza por tamaño (413): aviso claro");
 await errorCase("garbage", /respuesta que no se pudo leer/, "Respuesta con forma inesperada: no se muestra, se avisa");
 mode = "ok";
-await click("Identificar producto");
+await identifyWithAi();
 await page.waitForSelector(NAME, { timeout: 10000 }).catch(() => null);
 assert((await page.$eval(NAME, (el) => el.value).catch(() => null)) === IDENTIFIED.name && !(await visible("#mercado [data-photo-error]")), "Después de un error se puede reintentar con la misma foto y el aviso se va");
 
