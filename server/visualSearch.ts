@@ -22,8 +22,11 @@ import { NO_CREDIT_TYPES, type FetchLike } from "./webSellers.js";
  */
 
 export const APIFY_LENS_URL = "https://api.apify.com/v2/acts/johnvc~google-lens-api/run-sync-get-dataset-items";
-/** Espera máxima por búsqueda. La función de Vercel tiene 60 s (vercel.json). */
-export const VISUAL_SEARCH_TIMEOUT_MS = 45_000;
+/**
+ * Espera máxima por búsqueda. Con la foto en base64 el actor tarda ≈ 40 s, y una corrida que se corta se
+ * cobra igual: por eso se espera casi todo lo que deja la función de Vercel (60 s, vercel.json).
+ */
+export const VISUAL_SEARCH_TIMEOUT_MS = 55_000;
 
 /** Memoria de respuestas, por hash de la foto. */
 export const VISUAL_CACHE = { ttlMs: 30 * 60 * 1000, maxEntries: 50 } as const;
@@ -74,7 +77,9 @@ export function createApifyLens(options: { token: string; fetch: FetchLike; time
       status = res.status;
       data = await res.json().catch(() => null);
     } catch {
-      throw new VisualSearchError("VISUAL_SEARCH_UNAVAILABLE", controller.signal.aborted ? "tiempo agotado" : "error de red");
+      // Cortarse por tiempo no es lo mismo que un servicio caído: la pantalla lo dice distinto.
+      if (controller.signal.aborted) throw new VisualSearchError("VISUAL_SEARCH_TIMEOUT", "tiempo agotado");
+      throw new VisualSearchError("VISUAL_SEARCH_UNAVAILABLE", "error de red");
     } finally {
       clearTimeout(timer);
     }
@@ -88,6 +93,8 @@ export function createApifyLens(options: { token: string; fetch: FetchLike; time
     const errorType = String((data as { error?: { type?: unknown } } | null)?.error?.type ?? "");
     if (status === 401) throw new VisualSearchError("VISUAL_SEARCH_NOT_CONFIGURED", "HTTP 401");
     if (status === 402 || NO_CREDIT_TYPES.test(errorType)) throw new VisualSearchError("VISUAL_SEARCH_NO_CREDIT", `HTTP ${status}`);
+    // 408 y 504: Apify avisa que la corrida no terminó a tiempo.
+    if (status === 408 || status === 504) throw new VisualSearchError("VISUAL_SEARCH_TIMEOUT", `HTTP ${status}`);
     throw new VisualSearchError("VISUAL_SEARCH_UNAVAILABLE", `HTTP ${status}`);
   };
 }
@@ -96,8 +103,8 @@ export function createApifyLens(options: { token: string; fetch: FetchLike; time
 // Memoria de respuestas
 // ------------------------------------------------------------------
 
-/** Lo que se pagó y se puede repetir gratis: una lista de resultados o "sin coincidencias". */
-type CachedAnswer = VisualSummary | "sin coincidencias";
+/** Solo se guardan respuestas con resultados: ni "sin coincidencias" ni errores. */
+type CachedAnswer = VisualSummary;
 
 export interface VisualCache {
   get(hash: string): CachedAnswer | null;
@@ -149,6 +156,7 @@ const ERROR_RESPONSES: Record<VisualSearchErrorCode, { status: number; message: 
   VISUAL_SEARCH_NOT_CONFIGURED: { status: 503, message: VISUAL_MESSAGES.notConfigured },
   VISUAL_SEARCH_NO_CREDIT: { status: 503, message: VISUAL_MESSAGES.noCredit },
   VISUAL_SEARCH_UNAVAILABLE: { status: 502, message: VISUAL_MESSAGES.unavailable },
+  VISUAL_SEARCH_TIMEOUT: { status: 504, message: VISUAL_MESSAGES.timeout },
   VISUAL_SEARCH_NO_MATCHES: { status: 404, message: VISUAL_MESSAGES.noMatches },
 };
 
@@ -172,7 +180,6 @@ export function createVisualSearchRoute(options: {
     if (!sniffImageType(bytes)) return fail(res, 400, "NOT_AN_IMAGE", PHOTO_MESSAGES.type);
     const hash = imageHash(bytes);
     const hit = cache.get(hash);
-    if (hit === "sin coincidencias") return failWith(res, "VISUAL_SEARCH_NO_MATCHES");
     if (hit) return res.json({ ok: true, ...hit, cached: true });
     res.locals.visual = { bytes, hash };
     return next();
@@ -187,10 +194,8 @@ export function createVisualSearchRoute(options: {
       const value = buildVisualMatches(await lens(bytes));
       // Solo la cantidad: ni la foto, ni su hash, ni los sitios quedan en el log.
       console.info(`[api/visual-search] resultados: ${value.results.length}`);
-      if (value.results.length === 0) {
-        cache.set(hash, "sin coincidencias");
-        return failWith(res, "VISUAL_SEARCH_NO_MATCHES");
-      }
+      // Sin resultados no se guarda nada: otra foto del mismo producto, o un reintento, puede dar distinto.
+      if (value.results.length === 0) return failWith(res, "VISUAL_SEARCH_NO_MATCHES");
       cache.set(hash, value);
       return res.json({ ok: true, ...value, cached: false });
     } catch (err) {
