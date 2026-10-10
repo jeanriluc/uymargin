@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent, type Keybo
 import { AlertCircle, Camera, Globe, ImagePlus, Loader2, ScanSearch, Search, Sparkles, X } from "lucide-react";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
-import { NameSearchResults, WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
-import { VisualMatchesPanel, needsAiFallback, needsAutoName, useVisualSearch } from "@/components/search/VisualMatches";
+import { NameSearchResults, WebSellersPanel, useWebSellers, webCandidates } from "@/components/search/WebSellers";
+import { VisualMatchesPanel, needsAiFallback, needsAutoName, useVisualSearch, visualCandidates } from "@/components/search/VisualMatches";
+import { useSiteVerification } from "@/components/search/SiteVerification";
 import { VISUAL_MESSAGES, shouldAutoSearchByName } from "@/lib/photo/visual";
 import {
   CONFIDENCE_PHRASES,
@@ -95,6 +96,11 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
   const web = useWebSellers();
   const visual = useVisualSearch();
   const visualStatus = visual.state.status;
+  // Cada lista de resultados nueva se verifica una vez: ¿los sitios están activos y son de Uruguay?
+  const visualData = visual.state.status === "done" ? visual.state.data : null;
+  const visualVerification = useSiteVerification(visualData, visualData ? visualCandidates(visualData) : []);
+  const webData = web.state.status === "done" ? web.state.data : null;
+  const webVerification = useSiteVerification(webData, webData ? webCandidates(webData) : []);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -567,13 +573,14 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                     </div>
                   )}
 
-                  <VisualMatchesPanel name={name} state={visual.state} onRetry={() => void findSellers()} />
+                  <VisualMatchesPanel name={name} state={visual.state} onRetry={() => void findSellers()} verification={visualVerification} />
 
                   {autoWebName && (
                     <NameSearchResults
                       name={autoWebName}
                       state={web.state}
                       canSearch={name.trim().length >= 2}
+                      verification={webVerification}
                       onSearch={() => void web.search(name.trim())}
                     />
                   )}
@@ -616,7 +623,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                 </div>
 
                 <div role="tabpanel" id="photo-panel-web" aria-labelledby="photo-tab-web" hidden={view !== "web"} className="min-w-0">
-                  <WebSellersPanel name={name} state={web.state} onCancel={web.cancel} onRetry={(query) => void web.search(query)} />
+                  <WebSellersPanel name={name} state={web.state} onCancel={web.cancel} onRetry={(query) => void web.search(query)} verification={webVerification} />
                 </div>
               </form>
             )}

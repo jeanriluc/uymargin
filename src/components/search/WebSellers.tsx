@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ExternalLink, Globe, Loader2, ShoppingCart } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import {
+  NO_VERIFICATION,
+  SiteStatus,
+  VerificationNote,
+  isDead,
+  verifiedUruguay,
+  type Verification,
+  type VerifyCandidate,
+} from "@/components/search/SiteVerification";
+import {
   URUGUAY_LABELS,
   WEB_LIMITS,
   WEB_MESSAGES,
@@ -9,6 +18,7 @@ import {
   googleShoppingUrl,
   isForeignSite,
   isMainSeller,
+  isVerifiableSeller,
   webQueryKey,
   parseWebSellersResponse,
   type UruguayStatus,
@@ -106,7 +116,21 @@ function HiddenForeign({ sellers }: { sellers: WebSeller[] }) {
   );
 }
 
-function SellerCard({ seller }: { seller: WebSeller }) {
+/** ¿Va en la lista de tiendas de Uruguay? Por el dominio y el texto de Google, o porque la verificación encontró indicios en su página. */
+function isUruguaySeller(seller: WebSeller, verification: Verification): boolean {
+  return isMainSeller(seller) || (isVerifiableSeller(seller) && verifiedUruguay(verification, seller.url) !== null);
+}
+
+/** Qué resultados se mandan a verificar, en orden: primero las tiendas de Uruguay, después las sin confirmar. */
+export function webCandidates(data: WebSellersResponse): VerifyCandidate[] {
+  const stores = data.results.filter(isVerifiableSeller);
+  return [...stores.filter(isMainSeller), ...stores.filter((s) => !isMainSeller(s))];
+}
+
+function SellerCard({ seller, verification = NO_VERIFICATION }: { seller: WebSeller; verification?: Verification }) {
+  // Lo que encontró la verificación en la página manda sobre lo que se dedujo del dominio.
+  const verified = isVerifiableSeller(seller) ? verifiedUruguay(verification, seller.url) : null;
+  const uruguay: UruguayStatus = verified === "confirmado" ? "confirmado" : seller.uruguay !== "no_confirmado" ? seller.uruguay : (verified ?? "no_confirmado");
   return (
     <li
       data-web-seller={seller.site}
@@ -116,13 +140,14 @@ function SellerCard({ seller }: { seller: WebSeller }) {
         <span className="min-w-0 break-all text-xs font-black text-zinc-900 dark:text-zinc-100">{seller.site}</span>
         {/* A lo que no es una tienda no se le pone el indicador de Uruguay: no vende. */}
         {seller.kind === "store" && (
-          <span data-web-uruguay={seller.uruguay} className={`rounded border px-2 py-0.5 text-[11px] font-bold ${URUGUAY_STYLES[seller.uruguay]}`}>
-            {URUGUAY_LABELS[seller.uruguay]}
+          <span data-web-uruguay={uruguay} className={`rounded border px-2 py-0.5 text-[11px] font-bold ${URUGUAY_STYLES[uruguay]}`}>
+            {URUGUAY_LABELS[uruguay]}
           </span>
         )}
       </div>
       <p className="break-words text-sm font-semibold text-zinc-800 dark:text-zinc-200">{seller.title}</p>
       {seller.why && <p className="break-words text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">{seller.why}</p>}
+      <SiteStatus verification={verification} url={seller.url} />
       <div className="mt-1 flex justify-end">
         <a
           href={seller.url}
@@ -178,15 +203,17 @@ interface NameSearchResultsProps {
   /** Lanza a mano la búsqueda por nombre, con lo que haya en el campo. */
   onSearch: () => void;
   canSearch: boolean;
+  verification: Verification;
 }
 
 /**
  * Búsqueda por nombre que se lanzó sola porque la foto trajo poco de Uruguay. Muestra, en la misma vista de
  * la foto, solo las tiendas de Uruguay; el resto está en «En la web (Uruguay)». Nunca reintenta por su cuenta.
  */
-export function NameSearchResults({ name, state, onSearch, canSearch }: NameSearchResultsProps) {
+export function NameSearchResults({ name, state, onSearch, canSearch, verification }: NameSearchResultsProps) {
   if (!isSearchFor(state, name)) return null;
-  const main = state.status === "done" ? state.data.results.filter((s) => !isForeignSite(s.site) && isMainSeller(s)) : [];
+  // Tiendas de Uruguay que siguen en pie: las caídas y las del exterior no van acá.
+  const main = state.status === "done" ? state.data.results.filter((s) => !isForeignSite(s.site) && !isDead(verification, s.url) && isUruguaySeller(s, verification)) : [];
   const rest = state.status === "done" ? state.data.results.length - main.length : 0;
   return (
     <section data-auto-web className="flex min-w-0 flex-col gap-2">
@@ -221,10 +248,11 @@ export function NameSearchResults({ name, state, onSearch, canSearch }: NameSear
           {main.length > 0 && (
             <ul className="grid min-w-0 gap-2.5 lg:grid-cols-2">
               {main.map((seller) => (
-                <SellerCard key={seller.url} seller={seller} />
+                <SellerCard key={seller.url} seller={seller} verification={verification} />
               ))}
             </ul>
           )}
+          <VerificationNote verification={verification} />
         </>
       )}
     </section>
@@ -238,17 +266,22 @@ interface WebSellersPanelProps {
   onCancel: () => void;
   /** Repite la última búsqueda que falló. */
   onRetry: (query: string) => void;
+  /** Verificación de los sitios de esta lista (ronda 14). */
+  verification: Verification;
 }
 
 /** Vista "En la web (Uruguay)". El botón que lanza la búsqueda está junto al nombre, en PhotoAnalyzer. */
-export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPanelProps) {
+export function WebSellersPanel({ name, state, onCancel, onRetry, verification }: WebSellersPanelProps) {
   const all = state.status === "done" ? state.data.results : [];
   // Los sitios del exterior (lista de sellers.ts) no se muestran: quedan detrás de "Se ocultaron N".
   const hidden = all.filter((s) => isForeignSite(s.site));
-  const results = all.filter((s) => !isForeignSite(s.site));
-  const main = results.filter(isMainSeller);
+  // Las páginas caídas salen de sus grupos y van a "No disponibles".
+  const dead = all.filter((s) => !isForeignSite(s.site) && isDead(verification, s.url));
+  const results = all.filter((s) => !isForeignSite(s.site) && !isDead(verification, s.url));
+  // Una tienda sin confirmar sube a la lista principal si en su página hay indicios de Uruguay.
+  const main = results.filter((s) => isUruguaySeller(s, verification));
   // Tiendas que no se pudo ubicar en Uruguay, y aparte lo que no es una tienda.
-  const unconfirmed = results.filter((s) => s.kind === "store" && !isMainSeller(s));
+  const unconfirmed = results.filter((s) => s.kind === "store" && !isUruguaySeller(s, verification));
   const nonStores = results.filter((s) => s.kind === "other");
 
   return (
@@ -311,10 +344,12 @@ export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPa
           {main.length > 0 && (
             <ul className="grid min-w-0 gap-2.5 lg:grid-cols-2" aria-label="Tiendas de Uruguay">
               {main.map((seller) => (
-                <SellerCard key={seller.url} seller={seller} />
+                <SellerCard key={seller.url} seller={seller} verification={verification} />
               ))}
             </ul>
           )}
+
+          <VerificationNote verification={verification} />
 
           <HiddenForeign sellers={hidden} />
 
@@ -325,7 +360,20 @@ export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPa
               </summary>
               <ul className="mt-3 grid min-w-0 gap-2.5 lg:grid-cols-2">
                 {unconfirmed.map((seller) => (
-                  <SellerCard key={seller.url} seller={seller} />
+                  <SellerCard key={seller.url} seller={seller} verification={verification} />
+                ))}
+              </ul>
+            </details>
+          )}
+
+          {dead.length > 0 && (
+            <details data-unavailable className="min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+              <summary className="cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                No disponibles: la página ya no existe o está caída ({dead.length})
+              </summary>
+              <ul className="mt-3 grid min-w-0 gap-2.5 lg:grid-cols-2">
+                {dead.map((seller) => (
+                  <SellerCard key={seller.url} seller={seller} verification={verification} />
                 ))}
               </ul>
             </details>
