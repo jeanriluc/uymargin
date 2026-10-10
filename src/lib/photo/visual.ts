@@ -121,24 +121,76 @@ export interface VisualPrice {
   currency: "UYU" | "USD";
 }
 
+/** Lo que dice un texto de moneda, sin espacios ni puntos y en mayúsculas ("US$." → "US$", "$ U" → "$U"). */
+type CurrencyReading = "USD" | "UYU" | "$" | null;
+
+function readCurrency(value: unknown): CurrencyReading {
+  if (typeof value !== "string") return null;
+  const code = value.replace(/[\s.]+/g, "").toUpperCase();
+  if (code === "USD" || code === "US$" || code === "U$S" || code === "U$D") return "USD";
+  if (code === "UYU" || code === "$U" || code === "UYU$") return "UYU";
+  // Un "$" suelto puede ser peso uruguayo, argentino o chileno, o dólar: lo decide quien sabe de qué sitio es.
+  return code === "$" ? "$" : null;
+}
+
+/** Moneda escrita junto al número en el texto del precio: "US$ 75", "75 U$S", "$U 3.722", "$ 990". */
+function currencyInText(text: string): CurrencyReading {
+  if (/(?:US\$|U\$S|U\$D|\bUSD\b)/i.test(text)) return "USD";
+  if (/(?:\$\s?U\b|\bUYU\b)/i.test(text)) return "UYU";
+  return text.includes("$") ? "$" : null;
+}
+
 /**
- * Precio que se puede mostrar, o null. Solo pasa un número con moneda UYU, US$ o USD: cualquier otra cosa
- * (texto, moneda vacía o rara como ".") se descarta. Es un dato de Google para mirar: nunca entra en un cálculo.
+ * Número de un precio escrito como texto. Entiende "3.722", "3.722,50", "1,299.50" y "59,95": con los dos
+ * separadores, el último es el decimal; con uno solo, es de miles si se repite o si le siguen justo 3 cifras.
  */
-export function visualPrice(price: unknown, currency: unknown): VisualPrice | null {
-  if (typeof price !== "number" || !Number.isFinite(price) || price <= 0 || price > 1e9) return null;
-  if (typeof currency !== "string") return null;
-  const code = currency.trim().toUpperCase();
-  if (code === "UYU") return { amount: price, currency: "UYU" };
-  if (code === "USD" || code === "US$") return { amount: price, currency: "USD" };
+export function parseAmount(text: string): number | null {
+  const digits = text.match(/\d[\d.,]*/)?.[0].replace(/[.,]+$/, "");
+  if (!digits) return null;
+  const lastDot = digits.lastIndexOf(".");
+  const lastComma = digits.lastIndexOf(",");
+  let normalized: string;
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimal = lastDot > lastComma ? "." : ",";
+    normalized = digits.split(decimal === "." ? "," : ".").join("").replace(decimal, ".");
+  } else {
+    const separator = lastDot >= 0 ? "." : lastComma >= 0 ? "," : "";
+    const parts = separator ? digits.split(separator) : [digits];
+    const thousands = parts.length > 2 || (parts.length === 2 && parts[1].length === 3);
+    normalized = thousands ? parts.join("") : parts.join(".");
+  }
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+/**
+ * Precio que se puede mostrar, o null. En Uruguay se publica en pesos y en dólares, así que se reconocen
+ * las dos monedas en sus formas habituales: dólares (USD, US$, U$S, U$D) y pesos uruguayos (UYU, $U, UYU$).
+ * La moneda puede venir en su campo o escrita junto al número ("US$ 75"). Un "$" suelto solo se toma como
+ * pesos uruguayos si el sitio es .uy (incluye Mercado Libre Uruguay); en cualquier otro dominio es ambiguo
+ * y no se muestra. Monedas vacías o raras (".") se descartan. El precio se muestra en la moneda en que vino:
+ * no se convierte y nunca entra en un cálculo.
+ */
+export function visualPrice(price: unknown, currency: unknown, host = ""): VisualPrice | null {
+  const fromText = typeof price === "string" ? currencyInText(price) : null;
+  const amount = typeof price === "number" ? price : typeof price === "string" ? parseAmount(price) : null;
+  if (amount === null || !Number.isFinite(amount) || amount <= 0 || amount > 1e9) return null;
+  const fromField = readCurrency(currency);
+  // Manda la moneda explícita: primero la del campo, después la escrita junto al número.
+  const explicit = fromField === "USD" || fromField === "UYU" ? fromField : fromText === "USD" || fromText === "UYU" ? fromText : null;
+  if (explicit) return { amount, currency: explicit };
+  if ((fromField === "$" || fromText === "$") && isUruguayDomain(host)) return { amount, currency: "UYU" };
   return null;
 }
 
-/** "$U 3.722" o "US$ 75". A mano, para que dé lo mismo en el servidor, en el navegador y en los tests. */
+/**
+ * "$ 3.722" para pesos uruguayos y "US$ 75" para dólares, cada precio en su moneda. A mano, para que dé lo
+ * mismo en el servidor, en el navegador y en los tests.
+ */
 export function formatVisualPrice(price: VisualPrice): string {
   const [whole, decimals] = (Math.round(price.amount * 100) / 100).toString().split(".");
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${price.currency === "UYU" ? "$U" : "US$"} ${grouped}${decimals ? `,${decimals.padEnd(2, "0")}` : ""}`;
+  return `${price.currency === "UYU" ? "$" : "US$"} ${grouped}${decimals ? `,${decimals.padEnd(2, "0")}` : ""}`;
 }
 
 // ------------------------------------------------------------------
@@ -180,8 +232,9 @@ export function isForeignDomain(host: string): boolean {
   return /^(?:com|net|org|edu|gov|gob)$/.test(labels[labels.length - 2] ?? "");
 }
 
+/** ¿El resultado nombra a Uruguay? "Uruguay", "Montevideo", "envíos a todo el país" o una ruta /uy/. */
 function mentionsUruguay(text: string, url: string): boolean {
-  if (/\buruguay[oa]?s?\b|\bmontevideo\b/i.test(text)) return true;
+  if (/\buruguay[oa]?s?\b|\bmontevideo\b|\benv[ií]os?\s+a\s+todo\s+el\s+pa[ií]s\b/i.test(text)) return true;
   try {
     return /\/uy(?:\/|$)/i.test(new URL(url).pathname);
   } catch {
@@ -192,7 +245,9 @@ function mentionsUruguay(text: string, url: string): boolean {
 /**
  * Grupo de un resultado. El dominio manda: solo un .uy queda "confirmado". Una tienda .com entra a
  * "Tiendas de Uruguay" como "probable" si Google informa el precio en pesos uruguayos o el resultado nombra
- * a Uruguay. Un dominio que imita a otro va a "Otros resultados" y no se le cree nada.
+ * a Uruguay, a Montevideo o dice "envíos a todo el país". Un precio en dólares no dice nada por sí solo: se
+ * publica en dólares en todos lados. Un dominio de otro país nunca entra, diga lo que diga. Un dominio que
+ * imita a otro va a "Otros resultados" y no se le cree nada.
  */
 export function classifyVisual(
   host: string,
@@ -241,7 +296,7 @@ export function toVisualMatch(raw: RawLensItem): VisualMatch | null {
   if (!site) return null;
   const title = clean(raw.title, VISUAL_LIMITS.titleMax) || site;
   const source = clean(raw.source, VISUAL_LIMITS.sourceMax);
-  const price = visualPrice(raw.price, raw.currency);
+  const price = visualPrice(raw.price, raw.currency, site);
   const { group, uruguay } = classifyVisual(site, url, { uyuPrice: price?.currency === "UYU", text: `${title} ${source}` });
   return {
     site,
@@ -422,8 +477,9 @@ export function parseVisualResponse(data: unknown): VisualSearchResponse | null 
       title: clean(e.title, VISUAL_LIMITS.titleMax),
       source: clean(e.source, VISUAL_LIMITS.sourceMax),
       thumbnail: typeof e.thumbnail === "string" ? e.thumbnail : "",
-      price: price?.amount,
-      currency: price?.currency,
+      // El servidor ya manda el monto como número y la moneda resuelta: acá no se interpreta ningún texto.
+      price: typeof price?.amount === "number" ? price.amount : null,
+      currency: price?.currency === "UYU" || price?.currency === "USD" ? price.currency : null,
     });
     if (match) results.push(match);
   }
