@@ -38,7 +38,10 @@ export const VISUAL_MESSAGES = {
   notConfigured: "La búsqueda visual no está configurada en el servidor.",
   noCredit: "Se agotó el crédito del servicio de búsqueda visual.",
   unavailable: "La búsqueda visual no respondió en este momento.",
-  noMatches: "La búsqueda visual no encontró coincidencias para esa foto. Probá con otra foto, más de frente y con el producto solo.",
+  timeout: "La búsqueda visual tardó demasiado.",
+  noMatches: "Google Lens no encontró coincidencias para esa foto.",
+  searching: "Buscando… puede tardar hasta 1 minuto",
+  aiName: "Nombre sugerido por IA a partir de la foto",
   network: "Error de red al enviar la foto. Revisá la conexión y probá de nuevo.",
 } as const;
 
@@ -47,6 +50,7 @@ export type VisualSearchErrorCode =
   | "VISUAL_SEARCH_NOT_CONFIGURED"
   | "VISUAL_SEARCH_NO_CREDIT"
   | "VISUAL_SEARCH_UNAVAILABLE"
+  | "VISUAL_SEARCH_TIMEOUT"
   | "VISUAL_SEARCH_NO_MATCHES";
 
 /** Texto en una línea, sin caracteres de control y acotado. */
@@ -261,10 +265,19 @@ export function cleanListingTitle(title: string, source = ""): string {
     .replace(/\b(?:(?:hasta\s+|en\s+)+\d{1,2}\s+)?cuotas\s+sin\s+inter[eé]s\b/gi, " ")
     .replace(/\benv[ií]o\s+gratis\b/gi, " ")
     .replace(/\b\d{1,2}\s*%\s*off\b/gi, " ");
+  // "Amazon.com: Producto" y "Producto : Amazon.es: Categoría".
+  text = text.replace(/^\s*amazon\.[a-z.]{2,6}\s*:\s*/i, "").replace(/\s*:\s*amazon\.[a-z.]{2,6}\b.*$/i, " ");
   // "Producto – Tienda": el tramo final después de una raya o barra es el nombre del sitio.
   text = text.replace(/\s+[–—|]\s+[^–—|]*$/, " ");
+  // "Producto - Tienda" o "Producto - Tienda.com", solo si coincide con el nombre del sitio.
   const tail = source.trim().toLowerCase();
-  if (tail && text.trim().toLowerCase().endsWith(` - ${tail}`)) text = text.trim().slice(0, -(tail.length + 3));
+  const lower = text.trim().toLowerCase();
+  for (const ending of tail ? [` - ${tail}.com`, ` - ${tail}`] : []) {
+    if (lower.endsWith(ending)) {
+      text = text.trim().slice(0, -ending.length);
+      break;
+    }
+  }
   return text
     .replace(/\s+/g, " ")
     .replace(/^[\s|\-–—·.,:]+|[\s|\-–—·,:]+$/g, "")
@@ -317,6 +330,11 @@ export interface VisualSummary {
   mlCount: number;
   /** Resultados de Uruguay encontrados, sumando Mercado Libre y tiendas (antes de limitar por dominio). */
   uruguayCount: number;
+  /**
+   * Cómo reconoce Lens el producto: el título más repetido entre las tiendas de cualquier país. Es solo para
+   * mostrar cuando no hay nada de Uruguay; nunca se usa para buscar. Vacío si no hay de dónde sacarlo.
+   */
+  recognizedAs: string;
 }
 
 const GROUP_ORDER: Record<VisualGroup, number> = { ml_uy: 0, uy_stores: 1, abroad: 2, others: 3 };
@@ -332,11 +350,14 @@ export function buildVisualMatches(raw: RawLensItem[]): VisualSummary {
   const shown: VisualMatch[] = [];
   const mlTitles: string[] = [];
   const storeTitles: string[] = [];
+  const allTitles: string[] = [];
   let uruguayCount = 0;
   for (const item of raw) {
     const match = toVisualMatch(item);
     if (!match || seenUrls.has(match.url)) continue;
     seenUrls.add(match.url);
+    // Redes, comparadores e imitadores no dicen qué producto es: sus títulos no cuentan.
+    if (match.group !== "others") allTitles.push(cleanListingTitle(match.title, match.source));
     if (match.group === "ml_uy" || match.group === "uy_stores") {
       uruguayCount++;
       (match.group === "ml_uy" ? mlTitles : storeTitles).push(cleanListingTitle(match.title, match.source));
@@ -359,7 +380,17 @@ export function buildVisualMatches(raw: RawLensItem[]): VisualSummary {
     .map(({ match }) => match);
   // El nombre sale de Mercado Libre Uruguay; si no hay publicaciones, de las tiendas de Uruguay.
   const suggestedName = mostRepeatedTitle(mlTitles) || mostRepeatedTitle(storeTitles);
-  return { results, suggestedName, mlCount: mlTitles.length, uruguayCount };
+  return { results, suggestedName, mlCount: mlTitles.length, uruguayCount, recognizedAs: mostRepeatedTitle(allTitles) };
+}
+
+/**
+ * ¿Hay que pedirle el nombre a la IA sin esperar al usuario? Cuando la búsqueda terminó y encontró menos de
+ * VISUAL_LIMITS.minUruguayResults resultados de Uruguay, incluso ninguno. Si falló por otro motivo (tiempo,
+ * crédito, servicio caído) no: ahí queda el botón.
+ */
+export function wantsAutoName(outcome: { uruguayCount: number } | { code: string | null }): boolean {
+  if ("uruguayCount" in outcome) return outcome.uruguayCount < VISUAL_LIMITS.minUruguayResults;
+  return outcome.code === "VISUAL_SEARCH_NO_MATCHES";
 }
 
 export interface VisualSearchResponse extends VisualSummary {
@@ -403,6 +434,7 @@ export function parseVisualResponse(data: unknown): VisualSearchResponse | null 
     suggestedName: clean(d.suggestedName, PHOTO_NAME_MAX),
     mlCount: count(d.mlCount, results.filter((m) => m.group === "ml_uy").length),
     uruguayCount: count(d.uruguayCount, inUruguay),
+    recognizedAs: clean(d.recognizedAs, PHOTO_NAME_MAX),
     cached: d.cached === true,
   };
 }
