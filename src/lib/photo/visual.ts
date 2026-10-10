@@ -5,6 +5,7 @@
  * el servidor, la pantalla y los tests.
  */
 import {
+  isForeignSite,
   isInternationalStore,
   isNonStore,
   isUruguayDomain,
@@ -197,14 +198,18 @@ export function formatVisualPrice(price: VisualPrice): string {
 // Clasificación
 // ------------------------------------------------------------------
 
-/** Dónde se muestra cada resultado. */
-export type VisualGroup = "ml_uy" | "uy_stores" | "abroad" | "others";
+/**
+ * Dónde se muestra cada resultado. "foreign" son los sitios del exterior (lista de sellers.ts): no se
+ * muestran como grupo, quedan detrás de "Se ocultaron N resultados de otros países".
+ */
+export type VisualGroup = "ml_uy" | "uy_stores" | "unconfirmed" | "others" | "foreign";
 
 export const VISUAL_GROUP_LABELS: Record<VisualGroup, string> = {
   ml_uy: "Mercado Libre Uruguay",
   uy_stores: "Tiendas de Uruguay",
-  abroad: "Otros países o sin confirmar",
-  others: "Otros resultados: redes, comparadores y sitios que no son tiendas",
+  unconfirmed: "Sin confirmar",
+  others: "Otros resultados: redes y sitios que no son tiendas",
+  foreign: "Resultados de otros países",
 };
 
 const ML_UY_DOMAIN = "mercadolibre.com.uy";
@@ -254,12 +259,16 @@ export function classifyVisual(
   url: string,
   signals: { uyuPrice: boolean; text: string }
 ): { group: VisualGroup; uruguay: "confirmado" | "probable" | null } {
-  if (looksLikeImitation(host) || isVisualNonStore(host, url)) return { group: "others", uruguay: null };
+  if (looksLikeImitation(host)) return { group: "others", uruguay: null };
+  // Lo del exterior se oculta antes que nada, sea tienda, comparador o blog. Un .uy nunca cae acá.
+  if (isForeignSite(host)) return { group: "foreign", uruguay: null };
+  if (isVisualNonStore(host, url)) return { group: "others", uruguay: null };
   if (siteDomain(host) === ML_UY_DOMAIN) return { group: "ml_uy", uruguay: "confirmado" };
   if (isUruguayDomain(host)) return { group: "uy_stores", uruguay: "confirmado" };
-  if (isInternationalStore(host) || isForeignDomain(host)) return { group: "abroad", uruguay: null };
+  // Otro país que no está en la lista (por ejemplo .nl): no se oculta, pero tampoco se da por uruguayo.
+  if (isInternationalStore(host) || isForeignDomain(host)) return { group: "unconfirmed", uruguay: null };
   if (signals.uyuPrice || mentionsUruguay(signals.text, url)) return { group: "uy_stores", uruguay: "probable" };
-  return { group: "abroad", uruguay: null };
+  return { group: "unconfirmed", uruguay: null };
 }
 
 /** Miniaturas: solo las que sirve Google. Cualquier otro origen se omite, así el navegador no le pide nada a un sitio desconocido. */
@@ -392,7 +401,7 @@ export interface VisualSummary {
   recognizedAs: string;
 }
 
-const GROUP_ORDER: Record<VisualGroup, number> = { ml_uy: 0, uy_stores: 1, abroad: 2, others: 3 };
+const GROUP_ORDER: Record<VisualGroup, number> = { ml_uy: 0, uy_stores: 1, unconfirmed: 2, others: 3, foreign: 4 };
 
 /**
  * Lista final a partir de los items del actor. Los enlaces que no son seguros se descartan, no se repite
@@ -446,6 +455,27 @@ export function buildVisualMatches(raw: RawLensItem[]): VisualSummary {
 export function wantsAutoName(outcome: { uruguayCount: number } | { code: string | null }): boolean {
   if ("uruguayCount" in outcome) return outcome.uruguayCount < VISUAL_LIMITS.minUruguayResults;
   return outcome.code === "VISUAL_SEARCH_NO_MATCHES";
+}
+
+/**
+ * ¿Se lanza sola la búsqueda por nombre (la de "En la web (Uruguay)") después de que la IA propuso un nombre?
+ * Solo cuando la IA corrió sola, propuso un nombre, ese nombre es el que quedó en el campo (si el usuario
+ * escribió otro, no) y todavía no se lanzó para esta foto: un solo intento, porque cada búsqueda se paga.
+ */
+export function shouldAutoSearchByName(state: {
+  /** La IA corrió sola (no por el botón). */
+  automatic: boolean;
+  aiName: string;
+  /** Lo que hay en el campo de nombre en ese momento. */
+  currentName: string;
+  /** El nombre que había propuesto la búsqueda visual: se puede reemplazar. */
+  visualName: string;
+  alreadyLaunched: boolean;
+}): boolean {
+  if (!state.automatic || state.alreadyLaunched) return false;
+  if (state.aiName.trim().length < 2) return false;
+  const current = state.currentName.trim();
+  return current === "" || current === state.visualName.trim() || current === state.aiName.trim();
 }
 
 export interface VisualSearchResponse extends VisualSummary {
