@@ -267,7 +267,7 @@ await page.waitForSelector(`${WEB} [data-web-results]`, { timeout: 10000 }).catc
 const call = webCalls.at(-1);
 assert(webCalls.length === callsBefore + 1 && call.method === "POST" && /application\/json/.test(call.type) && JSON.stringify(call.body) === '{"query":"Termo Stanley Classic"}', `Se manda un POST con la consulta y nada más (${JSON.stringify(call.body)})`);
 assert(queries.length === 0, "Buscar en la web no dispara una búsqueda en Mercado Libre");
-const cards = () => page.$$eval(`${WEB} [data-web-seller]`, (els) => els.map((el) => ({ site: el.getAttribute("data-web-seller"), shown: el.checkVisibility(), uruguay: el.querySelector("[data-web-uruguay]")?.innerText.trim() ?? null, text: el.innerText.replace(/\s+/g, " ").trim(), link: el.querySelector("a")?.href ?? null, group: el.closest("details")?.hasAttribute("data-web-non-stores") ? "otros" : el.closest("details") ? "sin-confirmar" : "principal" })));
+const cards = () => page.$$eval(`${WEB} [data-web-seller]`, (els) => els.map((el) => ({ site: el.getAttribute("data-web-seller"), shown: el.checkVisibility(), uruguay: el.querySelector("[data-web-uruguay]")?.innerText.trim() ?? null, text: el.innerText.replace(/\s+/g, " ").trim(), link: el.querySelector("a")?.href ?? null, group: el.closest("details")?.hasAttribute("data-hidden-foreign") ? "ocultos" : el.closest("details")?.hasAttribute("data-web-non-stores") ? "otros" : el.closest("details") ? "sin-confirmar" : "principal" })));
 let c = await cards();
 const mainCards = c.filter((x) => x.group === "principal");
 assert(mainCards.map((x) => x.site).join() === "ferreteria.com.uy,ferreteria.com.uy,tiendaejemplo.com" && mainCards.every((x) => x.shown), `Lista principal: las tiendas de Uruguay confirmadas y probables, hasta dos por dominio (${mainCards.map((x) => x.site).join()})`);
@@ -279,8 +279,16 @@ assert(siteLinks.length === 7 && siteLinks.every((a) => a.target === "_blank" &&
 assert(!c.some((x) => x.site === "enlacemalo.com.uy") && !(await page.evaluate((s) => document.querySelector(s).innerHTML.includes("javascript:"), WEB)), "Un resultado con enlace javascript: que llegara del servidor no se muestra");
 
 const others = c.filter((x) => x.group === "sin-confirmar");
-assert(others.map((x) => x.site).join() === "es.aliexpress.com,dudosa.com" && others.every((x) => !x.shown) && (await page.$eval(`${WEB} details[data-web-others]`, (d) => !d.open)), "Internacionales y sin confirmar van en un bloque aparte, cerrado por defecto");
-assert(/Internacionales y sin confirmar: confirmá que envían a Uruguay \(2\)/.test(await textOf(`${WEB} details[data-web-others] summary`)), "El bloque dice que hay que confirmar que envían a Uruguay");
+assert(others.map((x) => x.site).join() === "dudosa.com" && others.every((x) => !x.shown) && (await page.$eval(`${WEB} details[data-web-others]`, (d) => !d.open)), "Las tiendas sin confirmar van en un bloque aparte, cerrado por defecto");
+assert(/^Sin confirmar: confirmá que envían a Uruguay \(1\)$/.test(await textOf(`${WEB} details[data-web-others] summary`)), "El bloque dice que hay que confirmar que envían a Uruguay");
+const hiddenCards = c.filter((x) => x.group === "ocultos");
+assert(hiddenCards.map((x) => x.site).join() === "es.aliexpress.com" && hiddenCards.every((x) => !x.shown) && (await page.$eval(`${WEB} details[data-hidden-foreign]`, (d) => !d.open)), "AliExpress (sitio del exterior) no se muestra: queda oculto");
+assert(/^Se ocultó 1 resultado de otros países\. Ver$/.test(await textOf(`${WEB} details[data-hidden-foreign] summary`)), "Una línea chica avisa «Se ocultó 1 resultado de otros países», con «Ver»");
+await page.click(`${WEB} details[data-hidden-foreign] summary`);
+await sleep(200);
+assert((await cards()).filter((x) => x.group === "ocultos").every((x) => x.shown), "«Ver» despliega los ocultos");
+await page.click(`${WEB} details[data-hidden-foreign] summary`);
+await sleep(200);
 const nonStores = c.filter((x) => x.group === "otros");
 assert(nonStores.map((x) => x.site).join() === "youtube.com,es.wikipedia.org" && nonStores.every((x) => !x.shown && x.uruguay === null) && /^Otros resultados: no son tiendas \(2\)$/.test(await textOf(`${WEB} details[data-web-non-stores] summary`)), "YouTube y Wikipedia van a «Otros resultados», cerrado, sin indicador de Uruguay: no se muestran como vendedores");
 await page.click(`${WEB} details[data-web-others] summary`);
@@ -327,7 +335,9 @@ await webCase("empty", "producto rarísimo");
 assert(/No encontré sitios que vendan ese producto\. Probá con un nombre más corto o usá los botones de Google\./.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && (await page.$$eval(`${WEB} [data-web-seller]`, (e) => e.length)) === 0, "Sin resultados: lo dice y sugiere acortar el nombre o usar Google");
 assert((await links(`${WEB} a[data-google]`)).length === 2, "Sin resultados, los botones de Google siguen ahí");
 await webCase("onlyOthers", "termo importado");
-assert(/No encontré tiendas de Uruguay para «termo importado»\. Mirá los otros resultados acá abajo\./.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && /^Internacionales: confirmá que envían a Uruguay \(1\)$/.test(await textOf(`${WEB} details[data-web-others] summary`)), "Solo internacionales: lo avisa y el bloque se llama «Internacionales: confirmá que envían a Uruguay»");
+assert(/^No encontré tiendas de Uruguay para «termo importado»\.$/.test(await textOf(`${WEB} [data-web-results] [role='status']`)) && (await page.$(`${WEB} details[data-web-others]`)) === null && /^Se ocultó 1 resultado de otros países\. Ver$/.test(await textOf(`${WEB} details[data-hidden-foreign] summary`)), "Solo resultados del exterior: lo avisa y quedan ocultos detrás de «Se ocultó 1 resultado de otros países»");
+await webCase("empty", "otra cosa rara");
+assert((await page.$(`${WEB} details[data-hidden-foreign]`)) === null, "Sin ocultados no se muestra la línea");
 const errorBox = () => page.$eval(`${WEB} [data-web-error]`, (el) => `${el.getAttribute("data-web-error")}|${el.getAttribute("role")}|${el.querySelector("[data-web-retry]") ? "con-reintento" : "sin-reintento"}`).catch(() => "");
 const googleStillThere = async () => (await links(`${WEB} a[data-google]`)).filter((a) => a.shown && a.href.startsWith("https://www.google.com/search?")).length === 2;
 await webCase("noCredit", "termo stanley");
