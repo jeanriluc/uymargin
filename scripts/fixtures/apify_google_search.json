@@ -1,0 +1,67 @@
+[
+  {
+    "_nota": "Resultados orgánicos de una búsqueda real hecha a mano con el actor apify/google-search-scraper: \"Stanley termo 1 litro comprar Uruguay\", país uy, idioma es. Las 9 direcciones y su orden son los reales. De cada resultado se guardan solo title, url, displayedUrl y description; los títulos y las descripciones están abreviados y escritos a mano (no son el texto literal de Google).",
+    "searchQuery": {
+      "term": "Stanley termo 1 litro comprar Uruguay",
+      "countryCode": "UY",
+      "languageCode": "es",
+      "page": 1
+    },
+    "organicResults": [
+      {
+        "title": "Stanley - Farmashop",
+        "url": "https://tienda.farmashop.com.uy/marcas/stanley.html",
+        "displayedUrl": "https://tienda.farmashop.com.uy › marcas › stanley",
+        "description": "Productos de la marca Stanley en Farmashop."
+      },
+      {
+        "title": "Combo Termo Stanley Adventure To Go 1 Lt + Mate 200 ml + Bombilla Spoon - Plan B",
+        "url": "https://www.planb.com.uy/collections/todos/products/combo-termo-stanley-adventure-to-go-1-lt-mate-200-ml-bombilla-spoon",
+        "displayedUrl": "https://www.planb.com.uy › collections › todos › products",
+        "description": "Combo de termo Stanley de 1 litro con mate y bombilla."
+      },
+      {
+        "title": "Termo STANLEY To go sin asa - Almacén Rural",
+        "url": "https://www.almacenrural.com.uy/Termo-STANLEY-To-go-sin-asa/",
+        "displayedUrl": "https://www.almacenrural.com.uy › Termo-STANLEY-To-go-sin-asa",
+        "description": "Termo Stanley To Go sin asa."
+      },
+      {
+        "title": "Termo Stanley 1L Rosa - Bagual",
+        "url": "https://www.bagual.com.uy/catalogo/termo-stanley-1l-rosa_Stanley1L_TS1LR",
+        "displayedUrl": "https://www.bagual.com.uy › catalogo",
+        "description": "Termo Stanley de 1 litro, color rosa."
+      },
+      {
+        "title": "Termo Stanley 1L Verde - Bagual",
+        "url": "https://www.bagual.com.uy/catalogo/termo-stanley-1l-verde_Stanley1L_1LV",
+        "displayedUrl": "https://www.bagual.com.uy › catalogo",
+        "description": "Termo Stanley de 1 litro, color verde."
+      },
+      {
+        "title": "Termo Stanley 1 L | MercadoLibre",
+        "url": "https://listado.mercadolibre.com.uy/termo-stanley-1-l",
+        "displayedUrl": "https://listado.mercadolibre.com.uy › termo-stanley-1-l",
+        "description": "Listado de termos Stanley de 1 litro en Mercado Libre Uruguay."
+      },
+      {
+        "title": "Termo Stanley 1 Lt - Alem",
+        "url": "https://alem.uy/product/termo-stanley-1-lt-2/",
+        "displayedUrl": "https://alem.uy › product › termo-stanley-1-lt-2",
+        "description": "Termo Stanley de 1 litro."
+      },
+      {
+        "title": "Stanley Tienda Oficial",
+        "url": "https://stanley1913.uy/inicio/",
+        "displayedUrl": "https://stanley1913.uy › inicio",
+        "description": "Tienda oficial de Stanley."
+      },
+      {
+        "title": "Termo Stanley The Legendary Classic nuevo modelo 1 litro Silver - Electroventas",
+        "url": "https://electroventas.com.uy/catalogo/termo-stanley-the-legendary-classic-nuevo-modelo-1-litro-silver_SDT15_994386",
+        "displayedUrl": "https://electroventas.com.uy › catalogo",
+        "description": "Termo Stanley The Legendary Classic de 1 litro, color silver."
+      }
+    ]
+  }
+]

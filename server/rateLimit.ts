@@ -19,6 +19,8 @@ export const RATE_RULES = {
   market: { scope: "mercado", perMinute: 60, perDay: 1500 },
   // Identificación por foto: cada uso es una llamada a la IA con una imagen, así que el tope es bajo.
   photo: { scope: "foto", perMinute: 5, perDay: 40 },
+  // Búsqueda web: cada uso es una búsqueda paga en Apify, así que es el tope más bajo.
+  web: { scope: "web", perMinute: 5, perDay: 20 },
 } as const satisfies Record<string, RateRule>;
 
 export interface RateCounts {

@@ -913,6 +913,11 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 <Suspense fallback={<PanelFallback />}>
                   <PhotoAnalyzer
                     searchLoading={searchLoading}
+                    marketEmptyFor={
+                      marketState.status === "success" && !marketState.items.some((item) => item.match?.matches)
+                        ? marketState.query
+                        : null
+                    }
                     onSearch={(q) => {
                       // La misma búsqueda del Radar, con el nombre que confirmó el usuario.
                       updateInputs({ query: q });
