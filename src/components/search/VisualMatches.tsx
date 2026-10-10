@@ -9,6 +9,7 @@ import {
   VISUAL_MESSAGES,
   formatVisualPrice,
   parseVisualResponse,
+  wantsAutoName,
   type VisualGroup,
   type VisualMatch,
   type VisualSearchResponse,
@@ -25,6 +26,15 @@ export function needsAiFallback(state: VisualState): boolean {
   return state.status === "error" || (state.status === "done" && state.data.uruguayCount < VISUAL_LIMITS.minUruguayResults);
 }
 
+/**
+ * ¿Hay que pedirle el nombre a la IA sin esperar al usuario? Cuando la búsqueda terminó y encontró menos de
+ * 3 resultados de Uruguay, incluso ninguno. Si falló por otro motivo (tiempo, crédito, servicio) queda el botón.
+ */
+export function needsAutoName(state: VisualState): boolean {
+  if (state.status === "done") return wantsAutoName(state.data);
+  return state.status === "error" && wantsAutoName({ code: state.code });
+}
+
 /** Estado de la búsqueda visual. Vive en quien lo usa, así se conserva aunque el panel esté oculto. */
 export function useVisualSearch() {
   const [state, setState] = useState<VisualState>({ status: "idle" });
@@ -32,12 +42,16 @@ export function useVisualSearch() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  /** Manda la foto. Devuelve los resultados, o null si falló, se canceló o la reemplazó otra búsqueda. */
-  async function search(photo: Blob): Promise<VisualSearchResponse | null> {
+  /** Manda la foto. Devuelve cómo terminó (con resultados o con error), o null si se canceló o la reemplazó otra búsqueda. */
+  async function search(photo: Blob): Promise<VisualState | null> {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setState({ status: "loading" });
+    const finish = (end: VisualState) => {
+      setState(end);
+      return end;
+    };
     try {
       const res = await apiFetch("/api/visual-search", {
         method: "POST",
@@ -48,25 +62,24 @@ export function useVisualSearch() {
       const data = await res.json().catch(() => null);
       if (abortRef.current !== controller) return null;
       if (!res.ok || !data?.ok) {
-        const message = typeof data?.message === "string" && data.message ? data.message : VISUAL_MESSAGES.unavailable;
-        const code = typeof data?.code === "string" ? data.code : null;
-        // Cada intento se paga: solo se ofrece repetir cuando el servicio no respondió.
-        const canRetry = code === "VISUAL_SEARCH_UNAVAILABLE" || (code === null && res.status >= 500);
-        setState({ status: "error", message, code, canRetry });
-        return null;
+        let code: string | null = typeof data?.code === "string" ? data.code : null;
+        // Si la plataforma cortó la función antes de que respondiera (504 sin cuerpo), también es "tardó demasiado".
+        if (code === null && res.status === 504) code = "VISUAL_SEARCH_TIMEOUT";
+        const fallback = code === "VISUAL_SEARCH_TIMEOUT" ? VISUAL_MESSAGES.timeout : VISUAL_MESSAGES.unavailable;
+        const message = typeof data?.message === "string" && data.message ? data.message : fallback;
+        // Cada intento se paga: solo se ofrece repetir cuando el servicio no respondió o tardó demasiado.
+        const canRetry = code === "VISUAL_SEARCH_UNAVAILABLE" || code === "VISUAL_SEARCH_TIMEOUT" || (code === null && res.status >= 500);
+        return finish({ status: "error", message, code, canRetry });
       }
       // La respuesta se valida de nuevo acá: a la pantalla solo llegan los campos esperados y enlaces https.
       const parsed = parseVisualResponse(data);
       if (!parsed || parsed.results.length === 0) {
-        setState({ status: "error", message: VISUAL_MESSAGES.unavailable, code: null, canRetry: true });
-        return null;
+        return finish({ status: "error", message: VISUAL_MESSAGES.unavailable, code: null, canRetry: true });
       }
-      setState({ status: "done", data: parsed });
-      return parsed;
+      return finish({ status: "done", data: parsed });
     } catch {
       if (abortRef.current !== controller) return null;
-      setState({ status: "error", message: VISUAL_MESSAGES.network, code: null, canRetry: true });
-      return null;
+      return finish({ status: "error", message: VISUAL_MESSAGES.network, code: null, canRetry: true });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
     }
@@ -188,7 +201,7 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
   }
   if (state.status !== "done") return null;
 
-  const { results, mlCount, uruguayCount } = state.data;
+  const { results, mlCount, uruguayCount, recognizedAs } = state.data;
   const of = (group: VisualGroup) => results.filter((m) => m.group === group);
   const ml = of("ml_uy");
   const stores = of("uy_stores");
@@ -248,6 +261,13 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
             <MatchList matches={others} />
           </div>
         </details>
+      )}
+
+      {/* Solo informativo: no se busca con este texto. */}
+      {uruguayCount === 0 && abroad.length > 0 && recognizedAs && (
+        <p data-visual-recognized className="break-words text-xs text-zinc-700 dark:text-zinc-300">
+          Google Lens lo reconoce como: <strong className="font-bold text-zinc-900 dark:text-zinc-100">{recognizedAs}</strong>
+        </p>
       )}
     </div>
   );
