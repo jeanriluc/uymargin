@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent, type Keybo
 import { AlertCircle, Camera, Globe, ImagePlus, Loader2, ScanSearch, Search, Sparkles, X } from "lucide-react";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
-import { WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
+import { NameSearchResults, WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
 import { VisualMatchesPanel, needsAiFallback, needsAutoName, useVisualSearch } from "@/components/search/VisualMatches";
-import { VISUAL_MESSAGES } from "@/lib/photo/visual";
+import { VISUAL_MESSAGES, shouldAutoSearchByName } from "@/lib/photo/visual";
 import {
   CONFIDENCE_PHRASES,
   PHOTO_LIMITS,
@@ -86,6 +86,12 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
   const [view, setView] = useState<View>("foto");
   // Último nombre que se mandó al Radar desde acá: para saber si "sin resultados" habla de esta búsqueda.
   const [lastMlSearch, setLastMlSearch] = useState<string | null>(null);
+  // Nombre con el que se lanzó sola la búsqueda por nombre para esta foto. Como mucho una vez por foto.
+  const [autoWebName, setAutoWebName] = useState<string | null>(null);
+  const autoWebTurnRef = useRef(-1);
+  // Lo que hay en el campo ahora, para decidir sin esperar a otro render.
+  const nameRef = useRef("");
+  nameRef.current = name;
   const web = useWebSellers();
   const visual = useVisualSearch();
   const visualStatus = visual.state.status;
@@ -129,6 +135,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     setNotice(null);
     setView("foto");
     setLastMlSearch(null);
+    setAutoWebName(null);
     web.reset();
     visual.reset();
   }
@@ -207,6 +214,20 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
       const aiName = parsed.value.name;
       if (!aiName) return;
       setName((current) => (replaceable === undefined || !current.trim() || current === replaceable ? aiName : current));
+      // Con el nombre de la IA se completa con una búsqueda por nombre en Google Uruguay. Un solo intento por
+      // foto, y solo si el nombre que quedó en el campo es el de la IA: si el usuario escribió otro, no.
+      const launch = shouldAutoSearchByName({
+        automatic: replaceable !== undefined,
+        aiName,
+        currentName: nameRef.current,
+        visualName: replaceable ?? "",
+        alreadyLaunched: autoWebTurnRef.current === turn,
+      });
+      if (launch) {
+        autoWebTurnRef.current = turn;
+        setAutoWebName(aiName);
+        void web.search(aiName);
+      }
     } catch {
       if (turn !== turnRef.current) return;
       if (controller.signal.aborted) return;
@@ -547,6 +568,15 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                   )}
 
                   <VisualMatchesPanel name={name} state={visual.state} onRetry={() => void findSellers()} />
+
+                  {autoWebName && (
+                    <NameSearchResults
+                      name={autoWebName}
+                      state={web.state}
+                      canSearch={name.trim().length >= 2}
+                      onSearch={() => void web.search(name.trim())}
+                    />
+                  )}
 
                   {phase === "analyzing" ? (
                     <div className="flex flex-wrap items-center gap-3">
