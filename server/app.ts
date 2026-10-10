@@ -33,6 +33,7 @@ import { createMemoryRateStore, createRateLimiter, RATE_RULES } from "./rateLimi
 import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabaseToken } from "./cloud.js";
 import { createGeminiIdentifier, createIdentifyRoute, type IdentifyModel } from "./identify.js";
 import { createApifySearcher, createWebSellersRoute, type WebSearchProvider } from "./webSellers.js";
+import { createApifyLens, createVisualSearchRoute, type LensProvider } from "./visualSearch.js";
 
 dotenv.config();
 
@@ -1302,6 +1303,26 @@ app.post(
         webSearcher = { token, search: createApifySearcher({ token, fetch: (url, init) => fetch(url, init) }) };
       }
       return webSearcher.search;
+    },
+  })
+);
+
+// ------------------------------------------------------------------
+// 3d. Búsqueda visual de una foto con Google Lens (server/visualSearch.ts). Límite de uso propio, el más bajo.
+// ------------------------------------------------------------------
+let visualLens: { token: string; lens: LensProvider } | null = null;
+app.post(
+  "/api/visual-search",
+  ...createVisualSearchRoute({
+    limiter: rateLimit(RATE_RULES.visual),
+    lens: () => {
+      // El mismo token de Apify que la búsqueda web; viaja solo en el encabezado Authorization.
+      const token = (process.env.APIFY_TOKEN || "").trim();
+      if (!token) return null;
+      if (visualLens?.token !== token) {
+        visualLens = { token, lens: createApifyLens({ token, fetch: (url, init) => fetch(url, init) }) };
+      }
+      return visualLens.lens;
     },
   })
 );

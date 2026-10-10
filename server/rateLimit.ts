@@ -21,6 +21,8 @@ export const RATE_RULES = {
   photo: { scope: "foto", perMinute: 5, perDay: 40 },
   // Búsqueda web: cada uso es una búsqueda paga en Apify, así que es el tope más bajo.
   web: { scope: "web", perMinute: 5, perDay: 20 },
+  // Búsqueda visual: cada foto es una búsqueda paga en Apify (≈ US$ 0,015), más cara que la búsqueda web.
+  visual: { scope: "visual", perMinute: 3, perDay: 15 },
 } as const satisfies Record<string, RateRule>;
 
 export interface RateCounts {
