@@ -78,6 +78,7 @@ const webCalls = [];
 const thumbRequests = [];
 let visualMode = "ok";
 let visualDelayMs = 0;
+let identifyMode = "ok";
 const THUMB = "https://encrypted-tbn0.gstatic.com/images?q=tbn:miniatura-de-prueba";
 const match = (url, title, group, extra = {}) => ({ site: new URL(url).hostname.replace(/^www\./, ""), source: "", url, title, group, uruguay: null, price: null, thumbnail: null, ...extra });
 const MATCHES = [
@@ -97,12 +98,13 @@ const MATCHES = [
   { site: "enlacemalo.com.uy", source: "", url: "javascript:alert(document.domain)", title: "Enlace malo", group: "uy_stores", uruguay: "confirmado", price: null, thumbnail: null },
   match("https://mercadolibre.com.uy.ofertas-termo.com/termo", "Oferta imperdible Mercado Libre", "ml_uy", { uruguay: "confirmado", price: { amount: 990, currency: "UYU" } }),
 ];
-const VISUAL_OK = { ok: true, results: MATCHES, suggestedName: "Stanley Termo Classic Original", mlCount: 7, uruguayCount: 10, cached: false };
+const VISUAL_OK = { ok: true, results: MATCHES, suggestedName: "Stanley Termo Classic Original", recognizedAs: "Termo Stanley Classic Legendary", mlCount: 7, uruguayCount: 10, cached: false };
 const VISUAL_ERRORS = {
   notConfigured: [503, "VISUAL_SEARCH_NOT_CONFIGURED", "La búsqueda visual no está configurada en el servidor."],
   noCredit: [503, "VISUAL_SEARCH_NO_CREDIT", "Se agotó el crédito del servicio de búsqueda visual."],
   unavailable: [502, "VISUAL_SEARCH_UNAVAILABLE", "La búsqueda visual no respondió en este momento."],
-  noMatches: [404, "VISUAL_SEARCH_NO_MATCHES", "La búsqueda visual no encontró coincidencias para esa foto. Probá con otra foto, más de frente y con el producto solo."],
+  timeout: [504, "VISUAL_SEARCH_TIMEOUT", "La búsqueda visual tardó demasiado."],
+  noMatches: [404, "VISUAL_SEARCH_NO_MATCHES", "Google Lens no encontró coincidencias para esa foto."],
   rate: [429, "RATE_LIMITED", "Llegaste al límite de 3 usos por minuto. Probá de nuevo en 40 segundos."],
 };
 const IDENTIFIED = { ok: true, isProduct: true, name: "Termo Stanley Classic 1 litro", alternatives: ["Termo Stanley"], brand: "Stanley", category: "Termos", attributes: ["verde"], confidence: "media", notes: "La marca se lee en el frente." };
@@ -129,13 +131,16 @@ page.on("request", async (req) => {
       const [status, code, message] = VISUAL_ERRORS[visualMode];
       return json({ ok: false, code, message, error: message }, status, visualMode === "rate" ? { "Retry-After": "40" } : {});
     }
+    // Lo que devuelve la plataforma si corta la función antes de que responda: un 504 que no es JSON.
+    if (visualMode === "platformTimeout") return req.respond({ status: 504, contentType: "text/plain", body: "FUNCTION_INVOCATION_TIMEOUT" }).catch(() => {});
     if (visualMode === "garbage") return json({ ok: true, results: "muchos" });
-    if (visualMode === "few") return json({ ok: true, results: [MATCHES[2], MATCHES[5], MATCHES[8]], suggestedName: "Termo STANLEY CLASSIC LEGENDARY BOTTLE 1.0 QT", mlCount: 0, uruguayCount: 1, cached: false });
-    if (visualMode === "abroadOnly") return json({ ok: true, results: [MATCHES[5], MATCHES[8]], suggestedName: "", mlCount: 0, uruguayCount: 0, cached: false });
+    if (visualMode === "few") return json({ ok: true, results: [MATCHES[2], MATCHES[5], MATCHES[8]], suggestedName: "Termo STANLEY CLASSIC LEGENDARY BOTTLE 1.0 QT", recognizedAs: "Termo Stanley Classic", mlCount: 0, uruguayCount: 1, cached: false });
+    if (visualMode === "abroadOnly") return json({ ok: true, results: [MATCHES[5], MATCHES[6], MATCHES[8]], suggestedName: "", recognizedAs: "Artemide Nessino Table Lamp", mlCount: 0, uruguayCount: 0, cached: false });
     return json(VISUAL_OK);
   }
   if (url.pathname === "/api/identify-product") {
-    identify.push(req.method());
+    identify.push({ method: req.method(), type: req.headers()["content-type"], hasBody: req.hasPostData() });
+    if (identifyMode === "fail") return json({ ok: false, code: "AI_ERROR", message: "La IA no pudo analizar la foto en este momento. Probá de nuevo en unos minutos o escribí el nombre en el Radar.", error: "x" }, 502);
     return json(IDENTIFIED);
   }
   if (url.pathname === "/api/web-sellers") {
@@ -229,8 +234,8 @@ assert((await textOf("#mercado [data-visual-privacy]")) === PRIVACY, "El aviso d
 // --- Cargando y cancelar ---
 visualDelayMs = 1500;
 await click("Buscar dónde se vende");
-await page.waitForFunction(() => /Buscando dónde se vende…/.test(document.querySelector("#mercado").innerText), { timeout: 5000 }).catch(() => null);
-assert(/Buscando dónde se vende…/.test(await textOf("#mercado [role='status']")) && (await click("^Cancelar$")), "Mientras busca muestra «Buscando dónde se vende…» (role=status) y deja cancelar");
+await page.waitForFunction(() => /Buscando… puede tardar hasta 1 minuto/.test(document.querySelector("#mercado").innerText), { timeout: 5000 }).catch(() => null);
+assert(/^Buscando… puede tardar hasta 1 minuto$/.test(await textOf("#mercado [role='status']")) && (await click("^Cancelar$")), "Mientras busca muestra «Buscando… puede tardar hasta 1 minuto» (role=status) y deja cancelar");
 await sleep(1800);
 assert((await page.$(`${FOTO} [data-visual-results]`)) === null && (await page.$(NAME)) === null && /Cancelaste la búsqueda\. La foto sigue cargada\./.test(await textOf("#mercado [role='status']")), "Cancelada: no aparecen resultados aunque la respuesta llegue después");
 assert((await visible("#mercado img[data-photo-preview]")) && (await visible("#mercado [data-visual-search]")), "Cancelar no quita la foto y deja buscar de nuevo");
@@ -272,7 +277,8 @@ assert(thumbRequests.length === 0 || thumbRequests[0].url === THUMB, "Las miniat
 await page.$eval(`${FOTO} [data-visual-match] img`, (img) => img.scrollIntoView({ block: "center" }));
 await page.waitForFunction((sel) => { const img = document.querySelector(`${sel} [data-visual-match] img`); return !!img && img.complete && img.naturalWidth > 0; }, { timeout: 8000 }, FOTO).catch(() => null);
 assert(thumbRequests.length === 1 && thumbRequests[0].url === THUMB && !thumbRequests[0].referer, `El navegador solo pidió la miniatura de Google, y sin decir desde qué página (${JSON.stringify(thumbRequests)})`);
-assert((await page.$("#mercado [data-ai-identify]")) === null && identify.length === 0, "Con suficientes resultados de Uruguay no se ofrece la IA");
+assert((await page.$("#mercado [data-ai-identify]")) === null && identify.length === 0 && (await page.$("#mercado [data-ai-name-note]")) === null, "Con 3 o más resultados de Uruguay la IA no corre ni se ofrece");
+assert((await page.$(`${FOTO} [data-visual-recognized]`)) === null, "Habiendo resultados de Uruguay no se muestra «Google Lens lo reconoce como»");
 assert((await overflow()).length === 0, "Resultados a 1280 px: sin desborde horizontal");
 await shot("r13-visual-resultados-1280", 1280);
 await page.click(`${FOTO} details[data-visual-group="abroad"] summary`);
@@ -314,25 +320,62 @@ await click("^Por foto$");
 await sleep(300);
 assert((await nameValue()) === "Termo Stanley Classic" && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 11 && visualCalls.length === callsBefore + 1, "Ir a Lote CSV y volver conserva el nombre y los resultados, sin repetir la búsqueda visual");
 
-// --- Pocos resultados de Uruguay: se ofrece la IA ---
+// --- Menos de 3 resultados de Uruguay: el nombre se le pide solo a la IA ---
+const aiNote = () => textOf("#mercado [data-ai-name-note]");
+const waitAi = () => page.waitForSelector("#mercado [data-ai-name-note]", { timeout: 10000 }).catch(() => null);
+let aiCalls = identify.length;
+let visualBefore = visualCalls.length;
 await searchPhoto("few", `${FOTO} [data-visual-results]`);
-assert(/1 resultado de Uruguay para esta foto\./.test(await textOf(`${FOTO} [data-visual-results] [role='status']`)) && (await nameValue()) === "Termo STANLEY CLASSIC LEGENDARY BOTTLE 1.0 QT", "Con una sola tienda de Uruguay, el nombre sale de esa tienda");
-assert(/^Identificar nombre con IA \(gratis\)$/i.test(await textOf("#mercado [data-ai-identify]")) && /Hay pocos resultados de Uruguay/.test(await textOf("#mercado [data-ai-offer]")), "Con menos de 3 resultados de Uruguay aparece «Identificar nombre con IA (gratis)»");
-assert(identify.length === 0, "La IA no corre sola: hay que pedirla");
-await click("Identificar nombre con IA");
-await page.waitForSelector("#mercado [data-photo-confidence]", { timeout: 10000 }).catch(() => null);
-assert(identify.length === 1 && (await nameValue()) === IDENTIFIED.name && (await textOf("#mercado [data-photo-confidence]")) === "Puede ser", "Al pedirla, la IA propone el nombre y dice su nivel de confianza");
-assert((await page.$("#mercado [data-ai-identify]")) === null && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 3, "Los resultados de la foto siguen a la vista y el botón de la IA ya no hace falta");
+await waitAi();
+assert(/1 resultado de Uruguay para esta foto\./.test(await textOf(`${FOTO} [data-visual-results] [role='status']`)), "Con una sola tienda de Uruguay lo dice");
+assert(identify.length === aiCalls + 1 && identify.at(-1).method === "POST" && identify.at(-1).type === "image/jpeg" && identify.at(-1).hasBody, "Con menos de 3 resultados de Uruguay se llama sola a /api/identify-product, con la misma foto");
+assert(visualCalls.length === visualBefore + 1, "Pedir el nombre a la IA no gasta otra búsqueda visual");
+assert((await nameValue()) === IDENTIFIED.name, `El nombre de la IA queda precargado y reemplaza al que había salido de la única tienda (${await nameValue()})`);
+assert(/^Nombre sugerido por IA a partir de la foto: «Termo Stanley Classic 1 litro»\.$/.test(await aiNote()) && (await textOf("#mercado [data-photo-confidence]")) === "Puede ser", `La pantalla aclara «Nombre sugerido por IA a partir de la foto» (${await aiNote()})`);
+assert((await page.$("#mercado [data-ai-identify]")) === null && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 3, "Los resultados de la foto siguen a la vista; con el nombre ya puesto, el botón de la IA no hace falta");
+assert((await page.$(`${FOTO} [data-visual-recognized]`)) === null, "Con algún resultado de Uruguay no se muestra «Google Lens lo reconoce como»");
+assert(queries.length === 2, "El nombre automático no dispara ninguna búsqueda en Mercado Libre");
+
+// --- Resultados solo del exterior: «Google Lens lo reconoce como» ---
+aiCalls = identify.length;
 await searchPhoto("abroadOnly", `${FOTO} [data-visual-results]`);
-assert(/No encontré esta foto en sitios de Uruguay/.test(await textOf(`${FOTO} [data-visual-results] [role='status']`)) && (await nameValue()) === "" && (await visible("#mercado [data-ai-identify]")) && (await page.$eval("#mercado [data-radar-search]", (b) => b.disabled)), "Sin resultados de Uruguay: lo dice, el nombre queda vacío, no se puede buscar en vacío y se ofrece la IA");
+await waitAi();
+assert(/No encontré esta foto en sitios de Uruguay/.test(await textOf(`${FOTO} [data-visual-results] [role='status']`)), "Sin resultados de Uruguay lo dice");
+assert((await page.$eval(`${FOTO} [data-visual-recognized]`, (el) => el.textContent.replace(/\s+/g, " ").trim()).catch(() => null)) === "Google Lens lo reconoce como: Artemide Nessino Table Lamp", "Debajo de los grupos aparece «Google Lens lo reconoce como: …»");
+assert(await page.evaluate((sel) => { const line = document.querySelector(`${sel} [data-visual-recognized]`); const groups = [...document.querySelectorAll(`${sel} [data-visual-group]`)]; return !!line && groups.length === 2 && groups.every((g) => g.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING) && line.querySelector("a, button") === null; }, FOTO), "Ese renglón va después de los grupos y es solo texto: no es un botón ni un enlace");
+assert(identify.length === aiCalls + 1 && (await nameValue()) === IDENTIFIED.name && /Nombre sugerido por IA a partir de la foto/.test(await aiNote()), "Con 0 resultados de Uruguay el nombre lo pone la IA, no el texto de Lens");
+assert(queries.length === 2 && webCalls.length === 0, "«Lo reconoce como» es informativo: no se busca nada con ese texto");
+await shot("r13-visual-exterior-1280", 1280);
+
+// --- Sin ninguna coincidencia: mensaje propio y nombre automático ---
+aiCalls = identify.length;
+await searchPhoto("noMatches", `${FOTO} [data-visual-error]`);
+await waitAi();
+const noMatchText = await textOf(`${FOTO} [data-visual-error]`);
+assert((await page.$eval(`${FOTO} [data-visual-error]`, (el) => `${el.getAttribute("data-visual-error")}|${el.getAttribute("role")}|${el.querySelector("[data-visual-retry]") ? "con-reintento" : "sin-reintento"}`)) === "VISUAL_SEARCH_NO_MATCHES|alert|sin-reintento" && /^Google Lens no encontró coincidencias para esa foto\./.test(noMatchText), `0 resultados: «Google Lens no encontró coincidencias para esa foto» (${noMatchText.slice(0, 60)}…)`);
+assert(identify.length === aiCalls + 1 && (await nameValue()) === IDENTIFIED.name && /Nombre sugerido por IA/.test(await aiNote()), "Con 0 resultados también se le pide el nombre a la IA sola");
+
+// --- Si la IA automática falla, queda el botón manual ---
+identifyMode = "fail";
+aiCalls = identify.length;
+await searchPhoto("abroadOnly", `${FOTO} [data-visual-results]`);
+await page.waitForSelector("#mercado [data-photo-error]", { timeout: 10000 }).catch(() => null);
+assert(identify.length === aiCalls + 1 && (await nameValue()) === "" && (await page.$("#mercado [data-ai-name-note]")) === null && /La IA no pudo analizar la foto/.test(await textOf("#mercado [data-photo-error]")), "Si la IA falla, el nombre queda vacío y se avisa");
+assert(/^Identificar nombre con IA \(gratis\)$/i.test(await textOf("#mercado [data-ai-identify]")) && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 3, "Queda el botón manual «Identificar nombre con IA (gratis)» y los resultados siguen ahí");
+identifyMode = "ok";
+await click("Identificar nombre con IA");
+await waitAi();
+assert(identify.length === aiCalls + 2 && (await nameValue()) === IDENTIFIED.name && !(await visible("#mercado [data-photo-error]")), "Con el botón manual se reintenta la IA y el aviso se va");
 
 // --- Errores: mensaje claro, IA y botones gratuitos de Google ---
 const errorCase = async (mode, code, re, retry, label) => {
+  const aiBeforeCase = identify.length;
   await searchPhoto(mode, `${FOTO} [data-visual-error]`);
   const text = await textOf(`${FOTO} [data-visual-error]`);
   assert((await errorBox()) === `${code}|alert|${retry ? "con-reintento" : "sin-reintento"}` && re.test(text), `${label} (${text.slice(0, 60)}…)`);
   assert((await visible("#mercado [data-ai-identify]")) && (await nameValue()) === "" && (await visible("#mercado img[data-photo-preview]")), `${label.split(":")[0]}: se ofrece «Identificar nombre con IA», el nombre queda para escribirlo y la foto sigue cargada`);
-  assert(!/apify|lens|token|HTTP|50[23]|404|stack/i.test(text), `${label.split(":")[0]}: el aviso no nombra al proveedor ni expone detalles internos`);
+  assert(!/apify|token|HTTP|50[234]|404|stack|FUNCTION_INVOCATION/i.test(text), `${label.split(":")[0]}: el aviso no nombra a Apify ni expone detalles internos`);
+  assert(identify.length === aiBeforeCase, `${label.split(":")[0]}: la IA no corre sola`);
 };
 await errorCase("notConfigured", "VISUAL_SEARCH_NOT_CONFIGURED", /La búsqueda visual no está configurada en el servidor\./, false, "Sin configurar: aviso claro, sin reintentar");
 assert(/Escribí el nombre del producto para armar la búsqueda/.test(await textOf(FOTO)) && (await page.$$eval(`${FOTO} a[data-google]`, (a) => a.length)) === 0, "Sin nombre, los botones de Google piden que lo escribas");
@@ -340,10 +383,11 @@ await retype("termo stanley");
 const freeLinks = await page.$$eval(`${FOTO} a[data-google]`, (as) => as.map((a) => ({ q: new URL(a.href).searchParams.get("q"), host: new URL(a.href).host, target: a.target, rel: a.rel, shown: a.offsetParent !== null })));
 assert(freeLinks.length === 2 && freeLinks.every((a) => a.shown && a.q === "termo stanley Uruguay" && a.host === "www.google.com" && a.target === "_blank" && a.rel === "noopener noreferrer"), "Con un nombre escrito aparecen los dos botones gratuitos de Google");
 await errorCase("noCredit", "VISUAL_SEARCH_NO_CREDIT", /Se agotó el crédito del servicio de búsqueda visual\./, false, "Sin crédito: aviso claro, sin reintentar");
-await errorCase("noMatches", "VISUAL_SEARCH_NO_MATCHES", /no encontró coincidencias para esa foto/, false, "Sin coincidencias: aviso claro, sin reintentar");
+await errorCase("timeout", "VISUAL_SEARCH_TIMEOUT", /^La búsqueda visual tardó demasiado\./, true, "Se cortó por tiempo: «La búsqueda visual tardó demasiado» con «Reintentar»");
+await errorCase("platformTimeout", "VISUAL_SEARCH_TIMEOUT", /^La búsqueda visual tardó demasiado\./, true, "La plataforma cortó la función (504 sin JSON): el mismo aviso, con «Reintentar»");
 await errorCase("rate", "RATE_LIMITED", /Llegaste al límite de 3 usos por minuto/, false, "Límite de uso: muestra el mensaje del servidor, sin invitar a reintentar");
 await errorCase("garbage", "error", /La búsqueda visual no respondió en este momento\./, true, "Respuesta con forma inesperada: no se muestra, se avisa");
-await errorCase("unavailable", "VISUAL_SEARCH_UNAVAILABLE", /La búsqueda visual no respondió en este momento\./, true, "Servicio caído o lento: aviso claro con botón «Reintentar»");
+await errorCase("unavailable", "VISUAL_SEARCH_UNAVAILABLE", /^La búsqueda visual no respondió en este momento\./, true, "Servicio caído: aviso distinto al de tiempo agotado, con botón «Reintentar»");
 await shot("r13-visual-error-1280", 1280);
 await retype("mi termo");
 const beforeRetry = visualCalls.length;
