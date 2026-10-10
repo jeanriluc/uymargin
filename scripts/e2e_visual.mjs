@@ -79,6 +79,17 @@ const thumbRequests = [];
 let visualMode = "ok";
 let visualDelayMs = 0;
 let identifyMode = "ok";
+let webMode = "ok";
+const seller = (site, extra = {}) => ({ site, url: `https://${site}/producto`, title: `Producto en ${site}`, why: "Descripción de Google.", uruguay: "confirmado", international: false, kind: "store", ...extra });
+const WEB_SELLERS = [
+  seller("ferreteria.com.uy"),
+  seller("bazar.com.uy"),
+  seller("tiendaejemplo.com", { uruguay: "probable" }),
+  seller("amazon.com", { uruguay: "no_confirmado", international: true }),
+  seller("tienda.com.ar", { uruguay: "probable" }),
+  seller("dudosa.com", { uruguay: "no_confirmado" }),
+];
+const LAMP = JSON.parse(fs.readFileSync(new URL("./fixtures/apify_google_lens_lampara.json", import.meta.url), "utf8")).items;
 const THUMB = "https://encrypted-tbn0.gstatic.com/images?q=tbn:miniatura-de-prueba";
 const match = (url, title, group, extra = {}) => ({ site: new URL(url).hostname.replace(/^www\./, ""), source: "", url, title, group, uruguay: null, price: null, thumbnail: null, ...extra });
 const MATCHES = [
@@ -135,6 +146,8 @@ page.on("request", async (req) => {
     if (visualMode === "platformTimeout") return req.respond({ status: 504, contentType: "text/plain", body: "FUNCTION_INVOCATION_TIMEOUT" }).catch(() => {});
     if (visualMode === "garbage") return json({ ok: true, results: "muchos" });
     if (visualMode === "few") return json({ ok: true, results: [MATCHES[2], MATCHES[5], MATCHES[8]], suggestedName: "Termo STANLEY CLASSIC LEGENDARY BOTTLE 1.0 QT", recognizedAs: "Termo Stanley Classic", mlCount: 0, uruguayCount: 1, cached: false });
+    // La muestra de la lámpara, con el grupo y la cantidad mal a propósito: la pantalla clasifica por el enlace.
+    if (visualMode === "lamp") return json({ ok: true, results: LAMP.map((it) => match(it.url, it.title, "uy_stores", { source: it.source, uruguay: "confirmado", price: it.price === null ? null : { amount: it.price, currency: it.currency } })), suggestedName: "", recognizedAs: "Artemide Nessino Table Lamp Orange", mlCount: 0, uruguayCount: 0, cached: false });
     if (visualMode === "abroadOnly") return json({ ok: true, results: [MATCHES[5], MATCHES[6], MATCHES[8]], suggestedName: "", recognizedAs: "Artemide Nessino Table Lamp", mlCount: 0, uruguayCount: 0, cached: false });
     return json(VISUAL_OK);
   }
@@ -144,8 +157,12 @@ page.on("request", async (req) => {
     return json(IDENTIFIED);
   }
   if (url.pathname === "/api/web-sellers") {
-    webCalls.push(req.postData());
-    return json({ ok: true, query: "x", results: [], searchQueries: [], cached: false });
+    let body = null;
+    try { body = JSON.parse(req.postData() || "null"); } catch { /* queda en null */ }
+    webCalls.push(body);
+    if (webMode === "rate") return json({ ok: false, code: "RATE_LIMITED", message: "Llegaste al límite de 5 usos por minuto. Probá de nuevo en 40 segundos.", error: "x" }, 429, { "Retry-After": "40" });
+    if (webMode === "unavailable") return json({ ok: false, code: "WEB_SEARCH_UNAVAILABLE", message: "La búsqueda web no respondió en este momento. Probá de nuevo o usá los botones de Google.", error: "x" }, 502);
+    return json({ ok: true, query: body?.query ?? "", results: WEB_SELLERS, searchQueries: [`${body?.query ?? ""} comprar Uruguay`], cached: false });
   }
   if (url.pathname !== "/api/search-mlu") return req.continue();
   const q = url.searchParams.get("q") || "";
@@ -265,11 +282,16 @@ assert(by("uy_stores").map((x) => x.site).join() === "stanley1913.uy,matesuru.co
 assert(by("uy_stores")[0].price === "$ 3.722 (precio informado por Google, confirmar en la tienda)" && by("uy_stores")[1].price === "$ 2.850 (precio informado por Google, confirmar en la tienda)", `El precio en pesos lleva el rótulo «precio informado por Google, confirmar en la tienda» (${by("uy_stores")[0].price})`);
 assert(by("uy_stores")[2].price === null && by("ml_uy").every((x) => x.price === null), "Sin precio informado no se muestra ninguno");
 assert(by("uy_stores")[0].uruguay === "Uruguay: confirmado" && by("uy_stores")[1].uruguay === "Uruguay: probable", "Un .uy dice «confirmado»; una tienda .com con precio en pesos, «probable»");
-assert(by("abroad").map((x) => x.site).join() === "mercadolibre.com.ar,stanley1913.com.ve,yerbascalzada.com" && by("abroad").every((x) => !x.shown) && (await page.$eval(`${FOTO} details[data-visual-group="abroad"]`, (d) => !d.open)), "Otros países van plegados");
-assert(/^Otros países o sin confirmar: confirmá que envían a Uruguay \(3\)$/.test(await textOf(`${FOTO} details[data-visual-group="abroad"] summary`)), "El bloque de otros países avisa que hay que confirmar el envío a Uruguay");
+const hiddenLine = () => textOf(`${FOTO} details[data-hidden-foreign] summary`);
+assert(by("foreign").map((x) => x.site).join() === "mercadolibre.com.ar,stanley1913.com.ve,idealo.de" && by("foreign").every((x) => !x.shown) && (await page.$eval(`${FOTO} details[data-hidden-foreign]`, (d) => !d.open)), "Los sitios del exterior (Mercado Libre Argentina, Stanley Venezuela, Idealo) no se muestran");
+assert((await hiddenLine()) === "Se ocultaron 3 resultados de otros países. Ver", `Una línea chica avisa cuántos se ocultaron, con «Ver» (${await hiddenLine()})`);
+assert(await page.evaluate((sel) => { const line = document.querySelector(`${sel} details[data-hidden-foreign]`); const stores = document.querySelector(`${sel} [data-visual-group="uy_stores"]`); const rest = document.querySelector(`${sel} [data-visual-group="unconfirmed"]`); return !!(stores.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING) && !!(line.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING); }, FOTO), "Esa línea va debajo de las tiendas de Uruguay");
+assert(by("unconfirmed").map((x) => x.site).join() === "yerbascalzada.com" && by("unconfirmed").every((x) => !x.shown) && /^Sin confirmar: no se sabe si venden en Uruguay \(1\)$/.test(await textOf(`${FOTO} details[data-visual-group="unconfirmed"] summary`)), "Una tienda .com sin señal de Uruguay y fuera de la lista queda en «Sin confirmar», plegado");
+assert((await page.$$eval(`${FOTO} [data-visual-group]`, (els) => els.map((e) => e.getAttribute("data-visual-group")).join())) === "ml_uy,uy_stores,foreign,unconfirmed,others", "Se ven Mercado Libre Uruguay y Tiendas de Uruguay; lo demás queda plegado u oculto");
+
 assert(c.filter((x) => x.price).map((x) => x.price.split(" (")[0]).join(" | ") === "$ 3.722 | $ 2.850 | US$ 75", "En la misma lista hay precios en pesos y en dólares, cada uno con su moneda y sin convertir");
-assert(by("abroad")[1].price === "US$ 75 (precio informado por Google, confirmar en la tienda)" && by("abroad")[2].price === null, "Precio en US$ se muestra; el de moneda inválida («.») no");
-assert(by("others").map((x) => x.site).join() === "instagram.com,idealo.de,mercadolibre.com.uy.ofertas-termo.com" && by("others").every((x) => !x.shown && x.price === null && x.uruguay === null), "Instagram, Idealo y el dominio imitador van a «Otros resultados», plegado y sin precio");
+assert(by("foreign")[1].price === "US$ 75 (precio informado por Google, confirmar en la tienda)" && by("unconfirmed")[0].price === null, "Precio en US$ se conserva (en los ocultos); el de moneda inválida («.») no se muestra");
+assert(by("others").map((x) => x.site).join() === "instagram.com,mercadolibre.com.uy.ofertas-termo.com" && by("others").every((x) => !x.shown && x.price === null && x.uruguay === null), "Instagram y el dominio imitador van a «Otros resultados», plegado y sin precio");
 assert(!c.some((x) => x.site === "enlacemalo.com.uy") && !(await page.evaluate((s) => document.querySelector(s).innerHTML.includes("javascript:"), FOTO)), "Un enlace javascript: que llegara del servidor no se muestra");
 assert(c.length === 11 && c.every((x) => x.link.startsWith("https://") && x.target === "_blank" && x.rel === "noopener noreferrer"), `Todos los enlaces son https, abren en pestaña nueva y llevan rel="noopener noreferrer" (${c.length})`);
 assert(c[0].img === THUMB && c[0].imgPolicy === "no-referrer" && c.filter((x) => x.img !== null).length === 1, "La miniatura de Google se muestra, sin referrer; la de otro origen no");
@@ -282,10 +304,11 @@ assert((await page.$("#mercado [data-ai-identify]")) === null && identify.length
 assert((await page.$(`${FOTO} [data-visual-recognized]`)) === null, "Habiendo resultados de Uruguay no se muestra «Google Lens lo reconoce como»");
 assert((await overflow()).length === 0, "Resultados a 1280 px: sin desborde horizontal");
 await shot("r13-visual-resultados-1280", 1280);
-await page.click(`${FOTO} details[data-visual-group="abroad"] summary`);
+await page.click(`${FOTO} details[data-hidden-foreign] summary`);
 await sleep(200);
 c = await cards();
-assert(c.filter((x) => x.group === "abroad").every((x) => x.shown), "Al abrir «Otros países» se ven sus resultados");
+assert(c.filter((x) => x.group === "foreign").every((x) => x.shown), "«Ver» despliega los resultados ocultos");
+assert(webCalls.length === 0, "Con 3 o más resultados visibles de Uruguay no se lanza la búsqueda por nombre");
 await page.setViewport({ width: 390, height: 844 });
 await sleep(400);
 const o390 = await overflow();
@@ -336,6 +359,27 @@ assert(/^Nombre sugerido por IA a partir de la foto: «Termo Stanley Classic 1 l
 assert((await page.$("#mercado [data-ai-identify]")) === null && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 3, "Los resultados de la foto siguen a la vista; con el nombre ya puesto, el botón de la IA no hace falta");
 assert((await page.$(`${FOTO} [data-visual-recognized]`)) === null, "Con algún resultado de Uruguay no se muestra «Google Lens lo reconoce como»");
 assert(queries.length === 2, "El nombre automático no dispara ninguna búsqueda en Mercado Libre");
+const AUTO = `${FOTO} [data-auto-web]`;
+const autoCards = () => page.$$eval(`${AUTO} [data-web-seller]`, (els) => els.map((e) => e.getAttribute("data-web-seller")).join());
+await page.waitForSelector(`${AUTO} [data-web-seller]`, { timeout: 10000 }).catch(() => null);
+assert(webCalls.length === 1 && JSON.stringify(webCalls[0]) === JSON.stringify({ query: IDENTIFIED.name }), `Con el nombre de la IA se lanza sola una búsqueda por nombre, una vez (${JSON.stringify(webCalls)})`);
+assert((await textOf(`${AUTO} h3`)).toLowerCase() === "búsqueda por nombre en google uruguay (nombre sugerido por ia)", "Sus resultados van en la misma pantalla, rotulados «Búsqueda por nombre en Google Uruguay (nombre sugerido por IA)»");
+assert((await autoCards()) === "ferreteria.com.uy,bazar.com.uy,tiendaejemplo.com", `Ahí se muestran solo las tiendas de Uruguay: ni Amazon, ni el .com.ar, ni la sin confirmar (${await autoCards()})`);
+assert(/3 tiendas de Uruguay para «Termo Stanley Classic 1 litro»\. El resto de los resultados está en la vista «En la web \(Uruguay\)»\./.test(await textOf(`${AUTO} [role='status']`)), "Dice cuántas tiendas encontró y dónde está el resto");
+assert(visualCalls.length === visualBefore + 1 && identify.length === aiCalls + 1, "Completar con la búsqueda por nombre no gasta otra búsqueda visual ni otra llamada a la IA");
+await retype("Termo Stanley edición especial");
+await sleep(900);
+assert(webCalls.length === 1 && (await page.$(AUTO)) !== null, "Editar el nombre no vuelve a lanzar la búsqueda sola");
+await click("^En la web \\(Uruguay\\)$");
+await sleep(200);
+const webPanel = "#mercado #photo-panel-web";
+assert((await page.$$eval(`${webPanel} [data-web-seller]`, (e) => e.length)) === 6 && (await textOf(`${webPanel} details[data-hidden-foreign] summary`)) === "Se ocultaron 2 resultados de otros países. Ver", "La vista «En la web (Uruguay)» muestra esa misma búsqueda, también con los del exterior ocultos");
+await page.click("#mercado [data-web-search]");
+await sleep(700);
+assert(webCalls.length === 2 && webCalls[1].query === "Termo Stanley edición especial", "Con el nombre editado hay que tocar el botón: ahí sí busca");
+await click("^Según la foto$");
+await sleep(200);
+assert((await page.$(AUTO)) === null, "Al buscar otro nombre a mano, el bloque «nombre sugerido por IA» ya no se muestra con resultados que no son suyos");
 
 // --- Resultados solo del exterior: «Google Lens lo reconoce como» ---
 aiCalls = identify.length;
@@ -345,8 +389,60 @@ assert(/No encontré esta foto en sitios de Uruguay/.test(await textOf(`${FOTO} 
 assert((await page.$eval(`${FOTO} [data-visual-recognized]`, (el) => el.textContent.replace(/\s+/g, " ").trim()).catch(() => null)) === "Google Lens lo reconoce como: Artemide Nessino Table Lamp", "Debajo de los grupos aparece «Google Lens lo reconoce como: …»");
 assert(await page.evaluate((sel) => { const line = document.querySelector(`${sel} [data-visual-recognized]`); const groups = [...document.querySelectorAll(`${sel} [data-visual-group]`)]; return !!line && groups.length === 2 && groups.every((g) => g.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING) && line.querySelector("a, button") === null; }, FOTO), "Ese renglón va después de los grupos y es solo texto: no es un botón ni un enlace");
 assert(identify.length === aiCalls + 1 && (await nameValue()) === IDENTIFIED.name && /Nombre sugerido por IA a partir de la foto/.test(await aiNote()), "Con 0 resultados de Uruguay el nombre lo pone la IA, no el texto de Lens");
-assert(queries.length === 2 && webCalls.length === 0, "«Lo reconoce como» es informativo: no se busca nada con ese texto");
+assert(queries.length === 2 && !webCalls.some((b) => /Artemide/.test(b?.query ?? "")), "«Lo reconoce como» es informativo: no se busca nada con ese texto");
 await shot("r13-visual-exterior-1280", 1280);
+
+// --- La lámpara: todo del exterior, cero de Uruguay, y se completa con la búsqueda por nombre ---
+aiCalls = identify.length;
+let webBefore = webCalls.length;
+await searchPhoto("lamp", `${FOTO} [data-visual-results]`);
+await waitAi();
+await page.waitForSelector(`${AUTO} [data-web-seller]`, { timeout: 10000 }).catch(() => null);
+c = await cards();
+assert(c.filter((x) => x.group === "ml_uy" || x.group === "uy_stores").length === 0 && /No encontré esta foto en sitios de Uruguay/.test(await textOf(`${FOTO} [data-visual-results] [role='status']`)), "La lámpara deja cero resultados visibles de Uruguay");
+assert(c.filter((x) => x.group === "foreign").map((x) => x.site).join() === "walmart.com,amazon.com,amazon.es,etsy.com,1stdibs.com,temu.com" && c.filter((x) => x.group === "foreign").every((x) => !x.shown) && (await hiddenLine()) === "Se ocultaron 6 resultados de otros países. Ver", `Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs y Temu quedan ocultos (${await hiddenLine()})`);
+assert(c.filter((x) => x.group === "unconfirmed").map((x) => x.site).join() === "vntg.com" && c.filter((x) => x.group === "others").map((x) => x.site).join() === "instagram.com" && c.every((x) => x.price === null), "VNTG queda «Sin confirmar», Instagram en «Otros resultados», y Walmart con «$» sigue sin precio");
+assert((await page.$eval(`${FOTO} [data-visual-recognized]`, (el) => el.textContent.replace(/\s+/g, " ").trim()).catch(() => null)) === "Google Lens lo reconoce como: Artemide Nessino Table Lamp Orange", "«Google Lens lo reconoce como» usa también los títulos ocultos");
+assert(identify.length === aiCalls + 1 && webCalls.length === webBefore + 1 && webCalls.at(-1).query === IDENTIFIED.name && (await autoCards()) === "ferreteria.com.uy,bazar.com.uy,tiendaejemplo.com", "Dispara la IA y, con su nombre, la búsqueda por nombre: aparecen tiendas de Uruguay");
+assert((await overflow()).length === 0, "Lámpara con búsqueda por nombre a 1280 px: sin desborde horizontal");
+await shot("r13-visual-lampara-1280", 1280);
+
+// --- Límite de uso de la búsqueda web: no se insiste, queda el botón ---
+webMode = "rate";
+webBefore = webCalls.length;
+await searchPhoto("lamp", `${FOTO} [data-visual-results]`);
+await waitAi();
+await page.waitForSelector(`${AUTO} [data-auto-web-error]`, { timeout: 10000 }).catch(() => null);
+await sleep(1500);
+assert(webCalls.length === webBefore + 1 && (await page.$eval(`${AUTO} [data-auto-web-error]`, (el) => el.getAttribute("data-auto-web-error")).catch(() => null)) === "RATE_LIMITED" && /Llegaste al límite de 5 usos por minuto/.test(await textOf(AUTO)), "En el límite de uso la búsqueda no corre: se muestra el aviso y no se reintenta sola");
+assert(/^Buscar por nombre$/i.test(await textOf(`${AUTO} [data-auto-web-manual]`)) && (await autoCards()) === "", "Queda el botón manual «Buscar por nombre»");
+webMode = "ok";
+await page.click(`${AUTO} [data-auto-web-manual]`);
+await page.waitForSelector(`${AUTO} [data-web-seller]`, { timeout: 10000 }).catch(() => null);
+assert(webCalls.length === webBefore + 2 && (await autoCards()).startsWith("ferreteria.com.uy"), "Con el botón manual se busca cuando el usuario quiere");
+
+// --- Un solo intento: si la búsqueda por nombre falla, no se repite sola ---
+webMode = "unavailable";
+webBefore = webCalls.length;
+await searchPhoto("lamp", `${FOTO} [data-visual-results]`);
+await waitAi();
+await page.waitForSelector(`${AUTO} [data-auto-web-error]`, { timeout: 10000 }).catch(() => null);
+await sleep(1500);
+assert(webCalls.length === webBefore + 1 && /La búsqueda web no respondió/.test(await textOf(AUTO)) && (await visible(`${AUTO} [data-auto-web-manual]`)), "Si la búsqueda por nombre falla: un solo intento, aviso y botón manual");
+webMode = "ok";
+
+// --- Nombre escrito por el usuario: la IA no lo pisa y la búsqueda por nombre no se lanza ---
+await searchPhoto("timeout", `${FOTO} [data-visual-error]`);
+await retype("mi lámpara naranja");
+aiCalls = identify.length;
+webBefore = webCalls.length;
+visualMode = "lamp";
+await page.click(`${FOTO} [data-visual-retry]`);
+await page.waitForSelector(`${FOTO} [data-visual-results]`, { timeout: 10000 }).catch(() => null);
+await waitAi();
+await sleep(1200);
+assert(identify.length === aiCalls + 1 && (await nameValue()) === "mi lámpara naranja" && /Nombre sugerido por IA a partir de la foto: «Termo Stanley Classic 1 litro»/.test(await aiNote()), "Con un nombre ya escrito, la IA lo propone pero no lo pisa");
+assert(webCalls.length === webBefore && (await page.$(AUTO)) === null, "Con el nombre editado por el usuario la búsqueda por nombre no se lanza sola");
 
 // --- Sin ninguna coincidencia: mensaje propio y nombre automático ---
 aiCalls = identify.length;
@@ -359,24 +455,29 @@ assert(identify.length === aiCalls + 1 && (await nameValue()) === IDENTIFIED.nam
 // --- Si la IA automática falla, queda el botón manual ---
 identifyMode = "fail";
 aiCalls = identify.length;
+const webBeforeFail = webCalls.length;
 await searchPhoto("abroadOnly", `${FOTO} [data-visual-results]`);
 await page.waitForSelector("#mercado [data-photo-error]", { timeout: 10000 }).catch(() => null);
+assert(webCalls.length === webBeforeFail && (await page.$(AUTO)) === null, "Si la IA falla no hay nombre: la búsqueda por nombre no se lanza");
 assert(identify.length === aiCalls + 1 && (await nameValue()) === "" && (await page.$("#mercado [data-ai-name-note]")) === null && /La IA no pudo analizar la foto/.test(await textOf("#mercado [data-photo-error]")), "Si la IA falla, el nombre queda vacío y se avisa");
 assert(/^Identificar nombre con IA \(gratis\)$/i.test(await textOf("#mercado [data-ai-identify]")) && (await page.$$eval(`${FOTO} [data-visual-match]`, (e) => e.length)) === 3, "Queda el botón manual «Identificar nombre con IA (gratis)» y los resultados siguen ahí");
 identifyMode = "ok";
 await click("Identificar nombre con IA");
 await waitAi();
+await sleep(900);
+assert(webCalls.length === webBeforeFail && (await page.$(AUTO)) === null, "Pedir la IA con el botón no lanza la búsqueda por nombre: queda para el botón de la vista web");
 assert(identify.length === aiCalls + 2 && (await nameValue()) === IDENTIFIED.name && !(await visible("#mercado [data-photo-error]")), "Con el botón manual se reintenta la IA y el aviso se va");
 
 // --- Errores: mensaje claro, IA y botones gratuitos de Google ---
 const errorCase = async (mode, code, re, retry, label) => {
   const aiBeforeCase = identify.length;
+  const webBeforeCase = webCalls.length;
   await searchPhoto(mode, `${FOTO} [data-visual-error]`);
   const text = await textOf(`${FOTO} [data-visual-error]`);
   assert((await errorBox()) === `${code}|alert|${retry ? "con-reintento" : "sin-reintento"}` && re.test(text), `${label} (${text.slice(0, 60)}…)`);
   assert((await visible("#mercado [data-ai-identify]")) && (await nameValue()) === "" && (await visible("#mercado img[data-photo-preview]")), `${label.split(":")[0]}: se ofrece «Identificar nombre con IA», el nombre queda para escribirlo y la foto sigue cargada`);
   assert(!/apify|token|HTTP|50[234]|404|stack|FUNCTION_INVOCATION/i.test(text), `${label.split(":")[0]}: el aviso no nombra a Apify ni expone detalles internos`);
-  assert(identify.length === aiBeforeCase, `${label.split(":")[0]}: la IA no corre sola`);
+  assert(identify.length === aiBeforeCase && webCalls.length === webBeforeCase, `${label.split(":")[0]}: ni la IA ni la búsqueda por nombre corren solas`);
 };
 await errorCase("notConfigured", "VISUAL_SEARCH_NOT_CONFIGURED", /La búsqueda visual no está configurada en el servidor\./, false, "Sin configurar: aviso claro, sin reintentar");
 assert(/Escribí el nombre del producto para armar la búsqueda/.test(await textOf(FOTO)) && (await page.$$eval(`${FOTO} a[data-google]`, (a) => a.length)) === 0, "Sin nombre, los botones de Google piden que lo escribas");
