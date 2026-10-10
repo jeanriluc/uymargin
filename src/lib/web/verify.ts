@@ -112,10 +112,14 @@ export function isBlockedIp(ip: string): boolean {
     if (zeros(12, 16) || (zeros(12, 15) && b[15] === 1)) return true; // :: y ::1
     return blockedIpv4(b.slice(12, 16));
   }
+  // IPv4 traducida (::ffff:0:a.b.c.d): lleva una IPv4 adentro. Se bloquea entera, sea cual sea.
+  if ((zeros(0, 8) && b[8] === 0xff && b[9] === 0xff && b[10] === 0 && b[11] === 0) || (zeros(0, 6) && b[6] === 0xff && b[7] === 0xff && b[8] === 0 && b[9] === 0)) return true;
   if (b[0] === 0 && b[1] === 0x64 && b[2] === 0xff && b[3] === 0x9b) return true;
+  if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0 && b[3] === 0) return true; // 2001::/32, Teredo: túnel hacia una IPv4
   if (b[0] === 0x20 && b[1] === 0x02) return true;
   if ((b[0] & 0xfe) === 0xfc) return true; // fc00::/7, privadas
   if (b[0] === 0xfe && (b[1] & 0xc0) === 0x80) return true; // fe80::/10, enlace local
+  if (b[0] === 0xfe && (b[1] & 0xc0) === 0xc0) return true; // fec0::/10, locales al sitio (en desuso)
   if (b[0] === 0xff) return true; // multidifusión
   if (b[0] === 0x20 && b[1] === 0x01 && b[2] === 0x0d && b[3] === 0xb8) return true; // documentación
   return false;
@@ -345,7 +349,12 @@ export function findUruguaySignals(html: string, pageUrl: string): UruguaySignal
 // Página activa, caída, parqueada, protegida o agotada
 // ------------------------------------------------------------------
 
-const NOT_FOUND = /\b404\b|pagina no encontrada|no se encontro la pagina|pagina no existe|no existe\b|page not found|not found\b|pagina inexistente/;
+/** Un título de error empieza con el código: "404", "Error 404", "404 - Página no encontrada". "Termo 404 ml" no. */
+const NOT_FOUND_CODE = /^(?:error\s*)?(?:404|410)\b/;
+/** Frases de error completas. Palabras sueltas como "no existe" o "not found" no alcanzan. */
+const NOT_FOUND_PHRASE = /pagina no encontrada|(?:la |esta )?pagina no existe|no se encontro la pagina|page not found|this page could not be found|pagina inexistente/;
+/** Un título o encabezado de error es corto: en uno largo, esas palabras suelen hablar del producto. */
+const NOT_FOUND_MAX_LENGTH = 60;
 const PARKED = /dominio (?:esta )?en venta|este dominio (?:esta|se encuentra) (?:en venta|a la venta|disponible)|domain (?:is|may be) for sale|buy this domain|this domain is (?:for sale|parked)|domain parking|parked (?:free|domain)|sedoparking|hugedomains|afternic|make an offer on this domain/;
 const ROBOT_WALL = /just a moment\.\.\.|checking your browser|attention required|cf-chl-|challenge-platform|verify(?:ing)? (?:that )?you are (?:a )?human|are you a robot|no soy un robot|captcha|access denied|pardon our interruption|px-captcha|request unsuccessful\. incapsula/;
 const PARKING_HOSTS = /(?:^|\.)(?:sedo\.com|sedoparking\.com|dan\.com|hugedomains\.com|afternic\.com|bodis\.com|parkingcrew\.net|above\.com|undeveloped\.com)$/;
@@ -361,10 +370,16 @@ export function looksLikeRobotWall(html: string): boolean {
   return ROBOT_WALL.test(titles) || (html.length < 20_000 && ROBOT_WALL.test(plain(html)));
 }
 
-/** ¿La página, aunque responda bien, dice que no existe? Se mira el título y los encabezados, no todo el texto. */
+/**
+ * ¿La página, aunque responda bien, dice que no existe? Se miran solo el <title>, los <h1> y los <h2>, y solo
+ * si son cortos. Tiene que ser una forma de error completa: empezar con 404 o 410, o ser una frase como
+ * "página no encontrada".
+ */
 export function looksLikeNotFound(html: string): boolean {
-  const heads = [...innerOf(html, "title"), ...innerOf(html, "h1"), ...innerOf(html, "h2")].map((t) => plain(visibleText(t)).slice(0, 200));
-  return heads.some((t) => NOT_FOUND.test(t));
+  const heads = [...innerOf(html, "title"), ...innerOf(html, "h1"), ...innerOf(html, "h2")]
+    .map((t) => plain(visibleText(t)).replace(/^[^a-z0-9]+/, "").trim())
+    .filter((t) => t.length > 0 && t.length <= NOT_FOUND_MAX_LENGTH);
+  return heads.some((t) => NOT_FOUND_CODE.test(t) || NOT_FOUND_PHRASE.test(t));
 }
 
 /** ¿Es una página de dominio en venta o estacionado? */
