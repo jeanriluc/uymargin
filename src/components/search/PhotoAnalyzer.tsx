@@ -3,7 +3,7 @@ import { AlertCircle, Camera, Globe, ImagePlus, Loader2, ScanSearch, Search, Spa
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
 import { WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
-import { VisualMatchesPanel, needsAiFallback, useVisualSearch } from "@/components/search/VisualMatches";
+import { VisualMatchesPanel, needsAiFallback, needsAutoName, useVisualSearch } from "@/components/search/VisualMatches";
 import { VISUAL_MESSAGES } from "@/lib/photo/visual";
 import {
   CONFIDENCE_PHRASES,
@@ -163,14 +163,21 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     const turn = turnRef.current;
     setError(null);
     setNotice(null);
-    const data = await visual.search(photo.blob);
-    if (turn !== turnRef.current || !data?.suggestedName) return;
+    const end = await visual.search(photo.blob);
+    if (turn !== turnRef.current || !end) return;
+    const suggested = end.status === "done" ? end.data.suggestedName : "";
     // Si ya hay un nombre escrito (por ejemplo, al reintentar), no se pisa.
-    setName((current) => (current.trim() ? current : data.suggestedName));
+    if (suggested) setName((current) => (current.trim() ? current : suggested));
+    // Con poco o nada de Uruguay, el nombre se le pide a la IA sin esperar: es gratis y no gasta otra búsqueda visual.
+    if (needsAutoName(end)) void analyze(suggested);
   }
 
-  /** Identificación con IA: paso secundario, para cuando la búsqueda visual no alcanza. */
-  async function analyze() {
+  /**
+   * Identificación con IA: paso secundario, para cuando la búsqueda visual no alcanza. Con el botón, el nombre
+   * de la IA reemplaza al que haya. Cuando corre sola (`replaceable` definido), solo reemplaza un campo vacío
+   * o el nombre que había propuesto la búsqueda visual: lo que escribió el usuario no se toca.
+   */
+  async function analyze(replaceable?: string) {
     if (!photo || phase !== "idle") return;
     const turn = turnRef.current;
     const controller = new AbortController();
@@ -197,7 +204,9 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
       const parsed = parseIdentification(JSON.stringify(data));
       if (!parsed.ok) return setError(PHOTO_MESSAGES.invalidAnswer);
       setResult(parsed.value);
-      setName(parsed.value.name);
+      const aiName = parsed.value.name;
+      if (!aiName) return;
+      setName((current) => (replaceable === undefined || !current.trim() || current === replaceable ? aiName : current));
     } catch {
       if (turn !== turnRef.current) return;
       if (controller.signal.aborted) return;
@@ -364,7 +373,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
               <div className="flex flex-wrap items-center gap-3">
                 <p role="status" className="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-200">
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Buscando dónde se vende…
+                  {VISUAL_MESSAGES.searching}
                 </p>
                 <button type="button" onClick={visual.cancel} className={SECONDARY_BUTTON}>
                   Cancelar
@@ -468,6 +477,12 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                   </div>
                 </div>
 
+                {result?.isProduct && (
+                  <p data-ai-name-note className="text-[11px] font-semibold text-zinc-600 dark:text-zinc-400">
+                    {VISUAL_MESSAGES.aiName}: «{result.name}».
+                  </p>
+                )}
+
                 {result?.isProduct && result.alternatives.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -545,7 +560,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                     </div>
                   ) : offerAi ? (
                     <div className="flex flex-wrap items-center gap-2" data-ai-offer>
-                      <button type="button" onClick={analyze} disabled={busy} className={SECONDARY_BUTTON} data-ai-identify>
+                      <button type="button" onClick={() => void analyze()} disabled={busy} className={SECONDARY_BUTTON} data-ai-identify>
                         <Sparkles className="size-3.5" aria-hidden />
                         <span>Identificar nombre con IA (gratis)</span>
                       </button>
