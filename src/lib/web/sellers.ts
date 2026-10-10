@@ -57,6 +57,8 @@ export interface WebSeller {
   international: boolean;
   /** "other": sitios que claramente no son tiendas (redes, enciclopedias, diarios, blogs). */
   kind: "store" | "other";
+  /** Permiso firmado para pedirle al servidor que verifique este sitio (/api/verify-sites). Solo en tiendas que se muestran. */
+  verifyToken?: string;
 }
 
 export interface WebSellersResponse {
@@ -78,6 +80,11 @@ function clean(value: unknown, max: number): string {
     .trim()
     .slice(0, max)
     .trim();
+}
+
+/** Permiso firmado tal como lo entrega el servidor, o undefined si no tiene la forma esperada. */
+export function cleanVerifyToken(value: unknown): string | undefined {
+  return typeof value === "string" && value.length <= 2000 && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value) ? value : undefined;
 }
 
 /** Consulta limpia, o null si no sirve. */
@@ -370,6 +377,11 @@ export function buildWebSellers(raw: RawSearchResult[]): WebSeller[] {
     .map(({ seller }) => seller);
 }
 
+/** ¿Este resultado se puede mandar a verificar? Tiendas que se muestran: ni del exterior ni sitios que no venden. */
+export function isVerifiableSeller(seller: WebSeller): boolean {
+  return seller.kind === "store" && !isForeignSite(seller.site);
+}
+
 /** Tiendas que van en la lista principal: de Uruguay, confirmadas o probables. */
 export function isMainSeller(seller: WebSeller): boolean {
   return seller.kind === "store" && !seller.international && seller.uruguay !== "no_confirmado";
@@ -396,6 +408,7 @@ export function parseWebSellersResponse(data: unknown): WebSellersResponse | nul
       why: clean(e.why, WEB_LIMITS.descriptionMax),
       ...classifyUruguay(site, e.uruguay === "probable" || e.uruguay === "confirmado"),
       kind: e.kind === "other" || isNonStore(site, url) ? "other" : "store",
+      ...(cleanVerifyToken(e.verifyToken) ? { verifyToken: cleanVerifyToken(e.verifyToken) } : {}),
     });
   }
   const searchQueries = Array.isArray(d.searchQueries) ? d.searchQueries.map((q) => clean(q, 200)).filter(Boolean).slice(0, 3) : [];

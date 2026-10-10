@@ -5,6 +5,7 @@
  * el servidor, la pantalla y los tests.
  */
 import {
+  cleanVerifyToken,
   isForeignSite,
   isInternationalStore,
   isNonStore,
@@ -295,6 +296,13 @@ export interface VisualMatch {
   uruguay: "confirmado" | "probable" | null;
   price: VisualPrice | null;
   thumbnail: string | null;
+  /** Permiso firmado para pedirle al servidor que verifique este sitio (/api/verify-sites). */
+  verifyToken?: string;
+}
+
+/** ¿Este resultado se puede mandar a verificar? Mercado Libre Uruguay, tiendas de Uruguay y sin confirmar. */
+export function isVerifiableMatch(match: VisualMatch): boolean {
+  return match.group === "ml_uy" || match.group === "uy_stores" || match.group === "unconfirmed";
 }
 
 /** Valida un resultado y lo clasifica. Lo usan el servidor y la pantalla, así los dos deciden lo mismo. */
@@ -511,7 +519,8 @@ export function parseVisualResponse(data: unknown): VisualSearchResponse | null 
       price: typeof price?.amount === "number" ? price.amount : null,
       currency: price?.currency === "UYU" || price?.currency === "USD" ? price.currency : null,
     });
-    if (match) results.push(match);
+    const token = cleanVerifyToken(e.verifyToken);
+    if (match) results.push(token && isVerifiableMatch(match) ? { ...match, verifyToken: token } : match);
   }
   const inUruguay = results.filter((m) => m.group === "ml_uy" || m.group === "uy_stores").length;
   return {
