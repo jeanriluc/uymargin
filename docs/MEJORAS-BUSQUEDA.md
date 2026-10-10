@@ -431,7 +431,7 @@ Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo q
 ## Cómo funciona
 
 1. La foto se achica en el navegador igual que antes (1024 px, JPEG) y se manda a `POST /api/visual-search`.
-2. El servidor valida tipo, tamaño (3 MB) y firma de bytes, y llama al actor de Apify `johnvc/google-lens-api` con `search_type: "visual_matches"`, 50 resultados, país `uy`, idioma `es`. Una sola llamada, 45 s de espera máxima, sin reintentos. El token (`APIFY_TOKEN`, el mismo de la ronda 12) va solo en `Authorization: Bearer`.
+2. El servidor valida tipo, tamaño (3 MB) y firma de bytes, y llama al actor de Apify `johnvc/google-lens-api` con `search_type: "visual_matches"`, 50 resultados, país `uy`, idioma `es`. Una sola llamada, 55 s de espera máxima (eran 45 s; ver "Lo que se vio con fotos reales"), sin reintentos. El token (`APIFY_TOKEN`, el mismo de la ronda 12) va solo en `Authorization: Bearer`.
 3. Cada resultado se valida (`safeHttpsUrl`), no se repite una dirección y quedan como mucho 2 por dominio. Después se agrupa:
    - **Mercado Libre Uruguay** (`mercadolibre.com.uy`): bloque propio. Muestra 2 y dice cuántas publicaciones encontró en total.
    - **Tiendas de Uruguay**: los `.uy` ("confirmado") y las tiendas `.com` cuyo precio viene en pesos uruguayos o cuyo resultado nombra a Uruguay ("probable"). Primero las que traen precio.
@@ -440,7 +440,9 @@ Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo q
 4. **Precio.** Se muestra solo si `price` es un número y `currency` es `UYU`, `US$` o `USD`, con el rótulo "precio informado por Google, confirmar en la tienda". No entra en ningún cálculo.
 5. **Nombre sugerido.** Sale del título más repetido entre las publicaciones de Mercado Libre Uruguay (se miran todas, no solo las 2 que se muestran), sin "| MercadoLibre", "Cuotas sin interés", "Envío gratis" ni emojis. Si ninguno se repite, gana el que más palabras comparte con los demás. Si no hay publicaciones de Mercado Libre, sale de las tiendas de Uruguay. Queda en el campo editable.
 6. **«Analizar en Radar»** busca ese nombre con el Radar de siempre: los precios reales salen de ahí. La vista «En la web (Uruguay)» de la ronda 12 sigue disponible con ese mismo nombre.
-7. **«Identificar nombre con IA (gratis)»** (Gemini, ronda 11) aparece solo si la búsqueda visual falla, no hay crédito o hay menos de 3 resultados de Uruguay.
+7. **Nombre automático con IA.** Si la búsqueda termina con menos de 3 resultados de Uruguay (incluso con 0), la pantalla llama sola a `/api/identify-product` (Gemini, ronda 11, gratis) con la misma foto y precarga el nombre. No gasta otra búsqueda visual. La pantalla aclara "Nombre sugerido por IA a partir de la foto". Si ya habías escrito un nombre, no se pisa.
+8. **«Identificar nombre con IA (gratis)»**, el botón manual, queda para cuando la búsqueda visual falla por otro motivo (tiempo, crédito, servicio caído) o cuando la IA automática falló.
+9. **«Google Lens lo reconoce como: …»** Si hay resultados de otros países pero ninguno de Uruguay, debajo de los grupos se muestra el título limpio más repetido entre las tiendas de cualquier país. Es solo informativo: no se busca nada con ese texto.
 
 ## Privacidad
 
@@ -453,7 +455,8 @@ Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo q
 
 - **≈ US$ 0,015 por foto** (dato de la prueba manual). Con el tope de 15 fotos por día por usuario, el máximo es ≈ US$ 0,23 por usuario por día.
 - Límite de uso propio, scope `visual`: **3 por minuto y 15 por día** por usuario. No hizo falta migración: `uymargin_rate_hit` recibe el scope como texto y la tabla no lo restringe.
-- Memoria de respuestas por hash de la foto: 30 minutos, 50 entradas. Repetir la misma foto no paga de nuevo ni gasta un uso. También se recuerda "sin coincidencias". Es por instancia: en Vercel no se comparte y se pierde al reiniciarse.
+- Memoria de respuestas por hash de la foto: 30 minutos, 50 entradas. Repetir la misma foto no paga de nuevo ni gasta un uso. **Solo se guardan las respuestas con resultados**: ni las de 0 resultados ni los errores. Es por instancia: en Vercel no se comparte y se pierde al reiniciarse.
+- El nombre automático con IA gasta un uso del límite de la identificación por foto (5 por minuto, 40 por día), que es aparte del de la búsqueda visual.
 - **Si se agota el crédito de Apify**, el endpoint responde `VISUAL_SEARCH_NO_CREDIT` y la pantalla avisa "Se agotó el crédito del servicio de búsqueda visual". Siguen funcionando la identificación con IA, los botones gratuitos de Google y el Radar. La búsqueda web de la ronda 12 usa el mismo crédito, así que se corta junto con esta.
 
 ## Errores
@@ -462,14 +465,26 @@ Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo q
 |---|---|---|
 | `VISUAL_SEARCH_NOT_CONFIGURED` | Falta `APIFY_TOKEN` o Apify lo rechaza (401) | No |
 | `VISUAL_SEARCH_NO_CREDIT` | Apify responde 402 o un error de límite de uso | No |
-| `VISUAL_SEARCH_UNAVAILABLE` | Error de red, más de 45 s, 5xx, respuesta con otra forma, o el dataset trae un item `{resultType, errorMessage}` (la corrida termina como SUCCEEDED pero falló) | Sí, a mano |
-| `VISUAL_SEARCH_NO_MATCHES` | El dataset vino vacío o ningún enlace era seguro | No |
+| `VISUAL_SEARCH_TIMEOUT` | Pasaron 55 s sin respuesta, o Apify respondió 408 o 504. Mensaje: "La búsqueda visual tardó demasiado" | Sí, a mano |
+| `VISUAL_SEARCH_UNAVAILABLE` | Error de red, 5xx, respuesta con otra forma, o el dataset trae un item `{resultType, errorMessage}` (la corrida termina como SUCCEEDED pero falló). Mensaje: "La búsqueda visual no respondió en este momento" | Sí, a mano |
+| `VISUAL_SEARCH_NO_MATCHES` | El dataset vino vacío o ningún enlace era seguro. Mensaje: "Google Lens no encontró coincidencias para esa foto". La IA propone el nombre sola | No |
+
+Si Vercel corta la función antes de que responda (504 sin cuerpo JSON), la pantalla lo trata como `VISUAL_SEARCH_TIMEOUT`.
 
 En todos se ofrece la identificación con IA, el campo para escribir el nombre y los botones de Google. El mensaje crudo del actor nunca se muestra ni se registra.
 
+## Lo que se vio con fotos reales (prueba de Jean en la vista previa)
+
+- **Con foto en base64 el actor tarda ≈ 40 s; para productos que no se venden en Uruguay Lens reconoce el producto pero devuelve resultados del exterior.**
+- Con una URL pública el mismo actor tardaba ≈ 10 s. La app manda base64 porque la foto no se guarda en ningún lado.
+- Con 45 s de espera a veces se cortaba antes de que el actor terminara, y **la corrida de Apify se cobra igual**. Por eso la espera pasó a 55 s, que es casi todo lo que dejan los 60 s de la función de Vercel. No hay otro límite menor en el camino: ni el navegador ni el servidor ponen otro tiempo máximo. El margen es de 5 s para el control de acceso, el contador de uso y la respuesta.
+- Una lámpara (Artemide Nesso/Nessino) devolvió 50 resultados, todos del exterior. Una picadora devolvió 0 resultados a los 32 s.
+- Mientras busca, la pantalla dice "Buscando… puede tardar hasta 1 minuto".
+
 ## Lo que NO se probó
 
-- **Solo se probó con un producto de marca (termo Stanley).** Con productos genéricos (sin marca visible) los resultados pueden ser parecidos pero no idénticos, y el nombre sugerido puede ser el de otro producto. Por eso el nombre queda editable y la pantalla lo aclara.
+- **Solo se probó con un producto de marca (termo Stanley)** antes de la prueba de arriba. Con productos genéricos (sin marca visible) los resultados pueden ser parecidos pero no idénticos, y el nombre sugerido puede ser el de otro producto. Por eso el nombre queda editable y la pantalla lo aclara.
+- **El fixture de la lámpara es una reconstrucción.** `scripts/fixtures/apify_google_lens_lampara.json` tiene los ocho sitios de la respuesta real (Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs, VNTG, Instagram, Temu) y el precio de Walmart, pero los títulos, las direcciones y la moneda de Walmart (`$`) están escritos a mano. Con moneda `$` el precio no se muestra; si el actor informa `US$` o `USD`, sí.
 - **Yo no llamé a Apify.** El formato de entrada y de salida sale de la prueba manual de Jean. El fixture (`scripts/fixtures/apify_google_lens.json`) es una muestra recortada de esa respuesta real: 10 de 35 resultados, solo con `title`, `source`, `url`, `price` y `currency`.
 - **El campo `thumbnail` no está en la muestra.** No sé qué dominio usa el actor. Si no es uno de Google, las miniaturas no se van a ver (y no se rompe nada).
 - **La búsqueda de punta a punta desde la vista previa**, con el token de Vercel: cuánto tarda y cuánto cuesta de verdad.
@@ -477,8 +492,8 @@ En todos se ofrece la identificación con IA, el campo para escribir el nombre y
 
 ## Evidencia
 
-- `scripts/verify_visual.ts`: 221 casos con `fetch` simulado. Parser y clasificación con la muestra real, item de error, moneda inválida, enlaces inseguros, dominios imitadores, duplicados y límite por dominio, nombre sugerido, memoria por hash, cada código de error, y que ni el token ni la imagen (ni su hash) aparecen en logs o respuestas.
-- `scripts/e2e_visual.mjs`: 76 casos en Chrome con la API simulada, incluidos el aviso de privacidad, los cuatro grupos, los precios, las miniaturas, «Analizar en Radar», el botón de la IA y cada error.
+- `scripts/verify_visual.ts`: 248 casos con `fetch` simulado. Incluye la espera de 55 s, los tres mensajes (tiempo agotado, servicio caído, 0 resultados), que el 0 resultados y los errores no se guardan en la memoria, cuándo corre sola la IA y el texto "lo reconoce como" con la muestra de la lámpara. Parser y clasificación con la muestra real, item de error, moneda inválida, enlaces inseguros, dominios imitadores, duplicados y límite por dominio, nombre sugerido, memoria por hash, cada código de error, y que ni el token ni la imagen (ni su hash) aparecen en logs o respuestas.
+- `scripts/e2e_visual.mjs`: 99 casos en Chrome con la API simulada, incluidos el nombre automático con IA, el renglón "Google Lens lo reconoce como", el aviso de privacidad, los cuatro grupos, los precios, las miniaturas, «Analizar en Radar», el botón de la IA y cada error.
 - `scripts/e2e_photo.mjs` (62) y `scripts/e2e_web.mjs` (61) se adaptaron al flujo nuevo: ahí la búsqueda visual siempre falla y el nombre sale de la IA.
 
 ## Qué puede salir mal
@@ -487,6 +502,9 @@ En todos se ofrece la identificación con IA, el campo para escribir el nombre y
 - **Un precio en pesos de otro país con moneda mal informada.** Solo se cree en `UYU`, `US$` y `USD`; si Google informa `UYU` para un precio que no lo es, se mostraría mal. Por eso el rótulo pide confirmar en la tienda.
 - **"El título más repetido" rara vez se repite tal cual.** En la práctica gana el más representativo, que puede ser demasiado genérico o demasiado largo para el Radar. Se corrige a mano.
 - **Términos de uso.** Igual que en la ronda 12b: Apify obtiene los resultados leyendo Google.
+
+- **El margen de tiempo es chico.** Si el actor tarda más de 55 s se pierde lo pagado. Mandar la foto por URL pública bajaría la espera a ≈ 10 s, pero obliga a guardar la foto en algún lado: es una decisión de privacidad, no está hecha.
+- **"Lo reconoce como" puede ser largo o impreciso.** Es un título entero de una tienda, no un nombre corto.
 
 **Valor 5 · Confianza 3 · Riesgo 3.** El riesgo sube porque la foto ahora sale a un tercero más y cada uso cuesta más que una búsqueda web.
 
