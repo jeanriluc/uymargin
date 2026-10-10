@@ -1,0 +1,75 @@
+{
+  "_nota": "Muestra recortada de una respuesta real del actor de Apify johnvc/google-lens-api (search_type visual_matches, país uy, idioma es) para la foto de un termo Stanley: son 10 de los 35 resultados, en el orden en que se pasaron. De cada item se guardan solo title, source, url, price y currency, tal como vinieron (incluida la moneda inválida \".\"). Los demás campos del actor (resultType, searchType, queryImage, position, thumbnail, image, imageWidth, imageHeight, date, inStock, rating, reviewCount) no están en la muestra.",
+  "items": [
+    {
+      "title": "Termo STANLEY CLASSIC LEGENDARY BOTTLE 1.0 QT 0.94 L – Stanley Tienda Oficial",
+      "source": "stanley1913.uy",
+      "url": "https://stanley1913.uy/producto/termo-stanley-classic-legendary-bottle-1-1-qt-1-0l/",
+      "price": 3722,
+      "currency": "UYU"
+    },
+    {
+      "title": "Stanley Termo Classic Original",
+      "source": "Mercado Libre Uruguay",
+      "url": "https://articulo.mercadolibre.com.uy/MLU-1489106628-stanley-termo-classic-original-_JM",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Termo Stanley Classic Legendary Bottle 1.0 Qt De Acero Inox. | MercadoLibre",
+      "source": "Mercado Libre Uruguay",
+      "url": "https://www.mercadolibre.com.uy/termo-stanley-classic-legendary-bottle-10-qt-de-acero-inox/up/MLUU2680513921",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Termo Stanley Classic 1l 2 Picos Original Y Cebador 20% Off | MercadoLibre",
+      "source": "Mercado Libre",
+      "url": "https://www.mercadolibre.com.ar/termo-stanley-classic-1l-2-picos-original-y-cebador-20-off/up/MLAU308241883",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Stanley rojo sin asa Rojo 591 ml – Matesuru",
+      "source": "Matesuru",
+      "url": "https://matesuru.com/producto/stanley-rojo-sin-asa-rojo-591-ml",
+      "price": 2850,
+      "currency": "UYU"
+    },
+    {
+      "title": "Termo Stanley 1L Linea Classic - Verde — Electroventas",
+      "source": "Electroventas",
+      "url": "https://electroventas.com.uy/catalogo/termo-stanley-1l-linea-classic-verde_ZGC-001_VE",
+      "price": 3205,
+      "currency": "UYU"
+    },
+    {
+      "title": "Termo Stanley Classic 950ml SILVER - Yerbas Calzada",
+      "source": "Yerbas Calzada",
+      "url": "https://yerbascalzada.com/productos/termo-stanley-classic-950ml-silver/",
+      "price": 159500,
+      "currency": "."
+    },
+    {
+      "title": "Termo Stanley Classic Legendary | 1 QT (946ml)",
+      "source": "Stanley Venezuela",
+      "url": "https://stanley1913.com.ve/products/termo-stanley-classic-legendary-1-qt-946ml",
+      "price": 75,
+      "currency": "US$"
+    },
+    {
+      "title": "Termo Stanley original🤩 Pedime el tuyo al md🛍️",
+      "source": "Instagram",
+      "url": "https://www.instagram.com/p/DWhZ0jYEQIq/",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Stanley Isolierflasche 1 L ab 59,95 € (Oktober 2026)",
+      "source": "Idealo",
+      "url": "https://www.idealo.de/preisvergleich/OffersOfProduct/5444562_-isolierflasche-1-l-stanley-1913.html",
+      "price": null,
+      "currency": null
+    }
+  ]
+}

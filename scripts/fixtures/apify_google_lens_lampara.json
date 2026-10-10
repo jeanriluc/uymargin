@@ -1,0 +1,61 @@
+{
+  "_nota": "Muestra de 8 filas armada a partir de la respuesta real del actor johnvc/google-lens-api para la foto de una lámpara (Artemide Nesso/Nessino), que devolvió 50 resultados y ninguno de Uruguay. Los ocho sitios, su orden y el único precio (Walmart, 34) son los de esa respuesta. Los títulos, las direcciones y la moneda de Walmart (\"$\") están RECONSTRUIDOS A MANO: no son el texto literal del actor, porque de esa respuesta solo se anotaron los sitios y el precio. Sirve para probar el caso «Lens reconoce el producto pero todo es del exterior», no como registro fiel de la respuesta.",
+  "items": [
+    {
+      "title": "Mushroom Table Lamp Orange Nessino Style - Walmart.com",
+      "source": "Walmart",
+      "url": "https://www.walmart.com/ip/mushroom-table-lamp-orange/1000000001",
+      "price": 34,
+      "currency": "$"
+    },
+    {
+      "title": "Amazon.com: Artemide Nessino Table Lamp Orange",
+      "source": "Amazon.com",
+      "url": "https://www.amazon.com/Artemide-Nessino-Table-Lamp-Orange/dp/B000000001",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Artemide Nessino Lámpara de mesa naranja : Amazon.es: Iluminación",
+      "source": "Amazon.es",
+      "url": "https://www.amazon.es/Artemide-Nessino-lampara-mesa-naranja/dp/B000000002",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Vintage Artemide Nesso Table Lamp by Giancarlo Mattioli - Etsy",
+      "source": "Etsy",
+      "url": "https://www.etsy.com/listing/1000000003/vintage-artemide-nesso-table-lamp",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Artemide Nessino Table Lamp by Giancarlo Mattioli | 1stDibs",
+      "source": "1stDibs",
+      "url": "https://www.1stdibs.com/furniture/lighting/table-lamps/artemide-nessino-table-lamp/id-f_1000000004/",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Artemide Nesso Table Lamp – VNTG",
+      "source": "VNTG",
+      "url": "https://www.vntg.com/1000000005/artemide-nesso-table-lamp/",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Lámpara hongo naranja 🍄 disponible",
+      "source": "Instagram",
+      "url": "https://www.instagram.com/p/C0000000006/",
+      "price": null,
+      "currency": null
+    },
+    {
+      "title": "Mushroom Table Lamp Orange - Temu",
+      "source": "Temu",
+      "url": "https://www.temu.com/mushroom-table-lamp-orange-g-1000000007.html",
+      "price": null,
+      "currency": null
+    }
+  ]
+}

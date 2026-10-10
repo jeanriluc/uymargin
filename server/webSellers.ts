@@ -45,7 +45,7 @@ export type FetchLike = (
 ) => Promise<{ status: number; json(): Promise<unknown> }>;
 
 /** Tipos de error de Apify que significan "no hay crédito o se llegó al límite de uso de la cuenta". */
-const NO_CREDIT_TYPES = /not-enough-usage|usage-limit|limit-reached|monthly-usage|failed-to-charge|payment-required|insufficient-(?:credit|funds|usage)/i;
+export const NO_CREDIT_TYPES = /not-enough-usage|usage-limit|limit-reached|monthly-usage|failed-to-charge|payment-required|insufficient-(?:credit|funds|usage)/i;
 
 /** Una sola consulta a Google Uruguay, una página, sin guardar el HTML. */
 export function searchInput(searchQuery: string) {

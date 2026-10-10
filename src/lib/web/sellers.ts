@@ -169,6 +169,43 @@ export function isInternationalStore(host: string): boolean {
   return !isUruguayDomain(host) && INTERNATIONAL.test(host);
 }
 
+// ------------------------------------------------------------------
+// Sitios del exterior que no se muestran
+// ------------------------------------------------------------------
+
+/**
+ * Terminaciones de dominio de otros países. Un resultado cuyo dominio termina así no se muestra en la lista:
+ * queda detrás de "Se ocultaron N resultados de otros países". Único lugar donde se cambia; lo usan la
+ * búsqueda visual y "En la web (Uruguay)".
+ */
+export const FOREIGN_SUFFIXES: readonly string[] = [
+  ".com.mx", ".mx", ".cl", ".com.ar", ".ar", ".com.br", ".br", ".bn", ".es", ".us", ".it", ".fr",
+  ".com.co", ".com.pe", ".pe", ".com.py", ".py", ".com.ve", ".ve", ".de", ".uk", ".co.uk", ".pt", ".ca", ".au", ".in", ".cn", ".jp",
+];
+
+/** Sitios del exterior con dominio genérico: el dominio o cualquier subdominio. */
+export const FOREIGN_SITES: readonly string[] = [
+  "etsy.com", "walmart.com", "wayfair.com", "temu.com", "aliexpress.com", "alibaba.com", "1stdibs.com", "falabella.com",
+  "mercadolibre.com.ar", "mercadolibre.com.mx", "mercadolibre.cl", "mercadolibre.com.br",
+  // Las demás tiendas globales que ya se conocían (INTERNATIONAL_BRANDS).
+  "shein.com", "banggood.com", "dhgate.com", "wish.com", "made-in-china.com",
+];
+
+/** Marcas que se ocultan con cualquier terminación: amazon.com, amazon.es, ebay.co.uk, idealo.de… */
+export const FOREIGN_BRANDS: readonly string[] = ["amazon", "ebay", "idealo"];
+const FOREIGN_BRAND = new RegExp(`(?:^|\\.)(?:${FOREIGN_BRANDS.join("|")})\\.(?:[a-z]{2,3}|com?\\.[a-z]{2})$`);
+
+/**
+ * ¿El sitio es del exterior y no se muestra? Un .uy (incluye mercadolibre.com.uy) nunca se oculta, esté en
+ * la lista que esté.
+ */
+export function isForeignSite(host: string): boolean {
+  if (isUruguayDomain(host)) return false;
+  if (FOREIGN_SUFFIXES.some((suffix) => host.endsWith(suffix))) return true;
+  if (FOREIGN_SITES.some((site) => host === site || host.endsWith(`.${site}`))) return true;
+  return FOREIGN_BRAND.test(host);
+}
+
 /**
  * Dominio que lleva adentro la terminación de otro ("mercadolibre.com.uy.otracosa.com"): es la forma
  * típica de imitar a un sitio conocido. No se le cree nada de lo que diga la fuente.

@@ -417,3 +417,117 @@ Con el tope de 20 búsquedas por día por usuario, el máximo es de unos US$ 0,0
 1. Hacer una búsqueda desde la vista previa y mirar que aparezcan las tiendas.
 2. Mirar en el panel de Apify cuánto costó esa búsqueda y cuánto tardó.
 3. Probar con dos o tres productos distintos, sobre todo genéricos, para ver cuánto ruido trae la consulta sin comillas.
+
+---
+
+# Ronda 13: búsqueda visual en «Por foto» (Google Lens)
+
+Rama `ronda-13-busqueda-visual`, creada desde la punta de `ronda-12-web-uruguay` porque reutiliza su código y el PR #11 todavía no está en `main`.
+
+## Por qué
+
+Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo que hace falta es subir la foto y ver dónde se vende ese producto en Uruguay y a qué precio. Ahora el paso principal es una búsqueda visual inversa (Google Lens) y la IA queda como plan B.
+
+## Cómo funciona
+
+1. La foto se achica en el navegador igual que antes (1024 px, JPEG) y se manda a `POST /api/visual-search`.
+2. El servidor valida tipo, tamaño (3 MB) y firma de bytes, y llama al actor de Apify `johnvc/google-lens-api` con `search_type: "visual_matches"`, 50 resultados, país `uy`, idioma `es`. Una sola llamada, 55 s de espera máxima (eran 45 s; ver "Lo que se vio con fotos reales"), sin reintentos. El token (`APIFY_TOKEN`, el mismo de la ronda 12) va solo en `Authorization: Bearer`.
+3. Cada resultado se valida (`safeHttpsUrl`), no se repite una dirección y quedan como mucho 2 por dominio. Después se agrupa:
+   - **Mercado Libre Uruguay** (`mercadolibre.com.uy`): bloque propio. Muestra 2 y dice cuántas publicaciones encontró en total.
+   - **Tiendas de Uruguay**: los `.uy` ("confirmado") y las tiendas `.com` cuyo precio viene en pesos uruguayos o cuyo resultado nombra a Uruguay ("probable"). Primero las que traen precio.
+   - **Otros países o sin confirmar**: `.ar`, `.br`, `.cl`, `.py`, `.ve`, `.mx` y demás países, tiendas globales, y las `.com` sin ninguna señal de Uruguay. Plegado.
+   - **Otros resultados**: redes sociales, comparadores (Idealo y similares), sitios del Estado, blogs, diarios y dominios que imitan a otro. Plegado y sin precio.
+4. **Precio.** Uruguay publica en pesos y en dólares, y se reconocen las dos monedas: dólares (`USD`, `US$`, `U$S`, `U$D`, o escrito junto al número, como "US$ 75") y pesos uruguayos (`UYU`, `$U`, `UYU$`). Un `$` suelto se toma como pesos uruguayos solo si el sitio es `.uy` (incluye Mercado Libre Uruguay); en cualquier otro dominio es ambiguo y no se muestra. Monedas vacías o raras (`.`) se descartan. Se muestra "$ 3.722" o "US$ 75", cada precio en la moneda en que vino, sin convertir, con el rótulo "precio informado por Google, confirmar en la tienda". No entra en ningún cálculo. Un precio en dólares no cuenta como señal de Uruguay; el precio en pesos uruguayos, "Uruguay", "Montevideo" y "envíos a todo el país" sí.
+5. **Nombre sugerido.** Sale del título más repetido entre las publicaciones de Mercado Libre Uruguay (se miran todas, no solo las 2 que se muestran), sin "| MercadoLibre", "Cuotas sin interés", "Envío gratis" ni emojis. Si ninguno se repite, gana el que más palabras comparte con los demás. Si no hay publicaciones de Mercado Libre, sale de las tiendas de Uruguay. Queda en el campo editable.
+6. **«Analizar en Radar»** busca ese nombre con el Radar de siempre: los precios reales salen de ahí. La vista «En la web (Uruguay)» de la ronda 12 sigue disponible con ese mismo nombre.
+7. **Nombre automático con IA.** Si la búsqueda termina con menos de 3 resultados de Uruguay (incluso con 0), la pantalla llama sola a `/api/identify-product` (Gemini, ronda 11, gratis) con la misma foto y precarga el nombre. No gasta otra búsqueda visual. La pantalla aclara "Nombre sugerido por IA a partir de la foto". Si ya habías escrito un nombre, no se pisa.
+8. **«Identificar nombre con IA (gratis)»**, el botón manual, queda para cuando la búsqueda visual falla por otro motivo (tiempo, crédito, servicio caído) o cuando la IA automática falló.
+9. **«Google Lens lo reconoce como: …»** Si hay resultados de otros países pero ninguno de Uruguay, debajo de los grupos se muestra el título limpio más repetido entre las tiendas de cualquier país. Es solo informativo: no se busca nada con ese texto.
+
+## Sitios del exterior ocultos y búsqueda por nombre
+
+Reemplaza a los grupos del punto 3 de arriba.
+
+- **Lista única** en `src/lib/web/sellers.ts` (`FOREIGN_SUFFIXES`, `FOREIGN_SITES`, `FOREIGN_BRANDS`, `isForeignSite`), usada por la búsqueda visual y por «En la web (Uruguay)». Se oculta el dominio y cualquier subdominio:
+  - Terminaciones: `.com.mx`, `.mx`, `.cl`, `.com.ar`, `.ar`, `.com.br`, `.br`, `.bn`, `.es`, `.us`, `.it`, `.fr`, `.com.co`, `.com.pe`, `.pe`, `.com.py`, `.py`, `.com.ve`, `.ve`, `.de`, `.uk`, `.co.uk`, `.pt`, `.ca`, `.au`, `.in`, `.cn`, `.jp`.
+  - Sitios: `etsy.com`, `walmart.com`, `wayfair.com`, `temu.com`, `aliexpress.com`, `alibaba.com`, `1stdibs.com`, `falabella.com`, `mercadolibre.com.ar`, `mercadolibre.com.mx`, `mercadolibre.cl`, `mercadolibre.com.br`, y las tiendas globales que ya estaban (`shein.com`, `banggood.com`, `dhgate.com`, `wish.com`, `made-in-china.com`).
+  - Con cualquier terminación: `amazon.*`, `ebay.*`, `idealo.*`.
+  - **Un `.uy` nunca se oculta**, tampoco `mercadolibre.com.uy`.
+- **Qué se ve.** Mercado Libre Uruguay y Tiendas de Uruguay, a la vista. Debajo, una línea chica "Se ocultaron N resultados de otros países" con "Ver", cerrada por defecto; sin ocultados no aparece. Después, plegados: "Sin confirmar" (tiendas `.com` sin señal de Uruguay que no están en la lista, y países que no están en la lista) y "Otros resultados" (redes y sitios que no son tiendas).
+- **El nombre sugerido y "Google Lens lo reconoce como"** siguen usando todos los títulos, incluidos los ocultos.
+- **Completar con Uruguay.** Si quedan menos de 3 resultados visibles de Uruguay, la IA propone el nombre sola (como antes) y, con ese nombre, se lanza sola una búsqueda por nombre (`/api/web-sellers`, la misma de «En la web (Uruguay)»). Sus tiendas de Uruguay se muestran en la misma vista, bajo "Búsqueda por nombre en Google Uruguay (nombre sugerido por IA)". Reglas: un solo intento por foto y sin reintento automático; no se lanza si la IA falló, si el nombre quedó vacío o si en el campo hay un nombre escrito por el usuario; editar el nombre después no la repite. Si se llegó al límite de uso de `web` (5 por minuto, 20 por día) el servidor no busca nada: se muestra el aviso y un botón manual.
+- **Costo.** Una foto con poco de Uruguay ahora puede gastar dos búsquedas pagas de Apify (la visual y la de nombre) y un uso de la IA.
+
+## Privacidad
+
+- La pestaña muestra siempre: "La foto se envía a un servicio externo de búsqueda visual (Apify / Google Lens). UyMargin no la guarda." Antes la foto solo iba a Gemini; ahora va a Apify y, si se pide la IA, también a Gemini.
+- La foto no se escribe en disco ni en Supabase y no aparece en ningún log. Del pedido solo queda en memoria un SHA-256 de los bytes, que es la clave de la memoria de respuestas.
+- El servidor nunca visita los enlaces de los resultados.
+- **Miniaturas.** El proyecto no tiene una política CSP, así que las imágenes externas no están bloqueadas y no hubo que aflojar nada. Se muestran solo las miniaturas servidas por Google (`gstatic.com`, `googleusercontent.com`, `ggpht.com`), con `referrerPolicy="no-referrer"` y carga diferida. Una miniatura de cualquier otro origen se omite. Mostrar una miniatura implica que el navegador de quien usa la app le pide esa imagen a Google.
+
+## Costo y límites
+
+- **≈ US$ 0,015 por foto** (dato de la prueba manual). Con el tope de 15 fotos por día por usuario, el máximo es ≈ US$ 0,23 por usuario por día.
+- Límite de uso propio, scope `visual`: **3 por minuto y 15 por día** por usuario. No hizo falta migración: `uymargin_rate_hit` recibe el scope como texto y la tabla no lo restringe.
+- Memoria de respuestas por hash de la foto: 30 minutos, 50 entradas. Repetir la misma foto no paga de nuevo ni gasta un uso. **Solo se guardan las respuestas con resultados**: ni las de 0 resultados ni los errores. Es por instancia: en Vercel no se comparte y se pierde al reiniciarse.
+- El nombre automático con IA gasta un uso del límite de la identificación por foto (5 por minuto, 40 por día), que es aparte del de la búsqueda visual.
+- **Si se agota el crédito de Apify**, el endpoint responde `VISUAL_SEARCH_NO_CREDIT` y la pantalla avisa "Se agotó el crédito del servicio de búsqueda visual". Siguen funcionando la identificación con IA, los botones gratuitos de Google y el Radar. La búsqueda web de la ronda 12 usa el mismo crédito, así que se corta junto con esta.
+
+## Errores
+
+| Código | Cuándo | Reintentar |
+|---|---|---|
+| `VISUAL_SEARCH_NOT_CONFIGURED` | Falta `APIFY_TOKEN` o Apify lo rechaza (401) | No |
+| `VISUAL_SEARCH_NO_CREDIT` | Apify responde 402 o un error de límite de uso | No |
+| `VISUAL_SEARCH_TIMEOUT` | Pasaron 55 s sin respuesta, o Apify respondió 408 o 504. Mensaje: "La búsqueda visual tardó demasiado" | Sí, a mano |
+| `VISUAL_SEARCH_UNAVAILABLE` | Error de red, 5xx, respuesta con otra forma, o el dataset trae un item `{resultType, errorMessage}` (la corrida termina como SUCCEEDED pero falló). Mensaje: "La búsqueda visual no respondió en este momento" | Sí, a mano |
+| `VISUAL_SEARCH_NO_MATCHES` | El dataset vino vacío o ningún enlace era seguro. Mensaje: "Google Lens no encontró coincidencias para esa foto". La IA propone el nombre sola | No |
+
+Si Vercel corta la función antes de que responda (504 sin cuerpo JSON), la pantalla lo trata como `VISUAL_SEARCH_TIMEOUT`.
+
+En todos se ofrece la identificación con IA, el campo para escribir el nombre y los botones de Google. El mensaje crudo del actor nunca se muestra ni se registra.
+
+## Lo que se vio con fotos reales (prueba de Jean en la vista previa)
+
+- **Con foto en base64 el actor tarda ≈ 40 s; para productos que no se venden en Uruguay Lens reconoce el producto pero devuelve resultados del exterior.**
+- Con una URL pública el mismo actor tardaba ≈ 10 s. La app manda base64 porque la foto no se guarda en ningún lado.
+- Con 45 s de espera a veces se cortaba antes de que el actor terminara, y **la corrida de Apify se cobra igual**. Por eso la espera pasó a 55 s, que es casi todo lo que dejan los 60 s de la función de Vercel. No hay otro límite menor en el camino: ni el navegador ni el servidor ponen otro tiempo máximo. El margen es de 5 s para el control de acceso, el contador de uso y la respuesta.
+- Una lámpara (Artemide Nesso/Nessino) devolvió 50 resultados, todos del exterior. Una picadora devolvió 0 resultados a los 32 s.
+- Mientras busca, la pantalla dice "Buscando… puede tardar hasta 1 minuto".
+
+## Lo que NO se probó
+
+- **Solo se probó con un producto de marca (termo Stanley)** antes de la prueba de arriba. Con productos genéricos (sin marca visible) los resultados pueden ser parecidos pero no idénticos, y el nombre sugerido puede ser el de otro producto. Por eso el nombre queda editable y la pantalla lo aclara.
+- **El fixture de la lámpara es una reconstrucción.** `scripts/fixtures/apify_google_lens_lampara.json` tiene los ocho sitios de la respuesta real (Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs, VNTG, Instagram, Temu) y el precio de Walmart, pero los títulos, las direcciones y la moneda de Walmart (`$`) están escritos a mano. Con moneda `$` el precio no se muestra; si el actor informa `US$` o `USD`, sí.
+- **Yo no llamé a Apify.** El formato de entrada y de salida sale de la prueba manual de Jean. El fixture (`scripts/fixtures/apify_google_lens.json`) es una muestra recortada de esa respuesta real: 10 de 35 resultados, solo con `title`, `source`, `url`, `price` y `currency`.
+- **El campo `thumbnail` no está en la muestra.** No sé qué dominio usa el actor. Si no es uno de Google, las miniaturas no se van a ver (y no se rompe nada).
+- **La búsqueda de punta a punta desde la vista previa**, con el token de Vercel: cuánto tarda y cuánto cuesta de verdad.
+- **Qué devuelve Apify exactamente cuando no hay crédito** con este actor. Se asumió lo mismo que en la ronda 12 (402 o un tipo de error de límite de uso).
+
+## Evidencia
+
+- `scripts/verify_visual.ts`: 333 casos con `fetch` simulado. Incluye la espera de 55 s, los tres mensajes (tiempo agotado, servicio caído, 0 resultados), que el 0 resultados y los errores no se guardan en la memoria, cuándo corre sola la IA y el texto "lo reconoce como" con la muestra de la lámpara. Parser y clasificación con la muestra real, item de error, moneda inválida, enlaces inseguros, dominios imitadores, duplicados y límite por dominio, nombre sugerido, memoria por hash, cada código de error, y que ni el token ni la imagen (ni su hash) aparecen en logs o respuestas.
+- `scripts/e2e_visual.mjs`: 127 casos en Chrome con la API simulada, incluidos el nombre automático con IA, el renglón "Google Lens lo reconoce como", el aviso de privacidad, los cuatro grupos, los precios, las miniaturas, «Analizar en Radar», el botón de la IA y cada error.
+- `scripts/e2e_photo.mjs` (62) y `scripts/e2e_web.mjs` (61) se adaptaron al flujo nuevo: ahí la búsqueda visual siempre falla y el nombre sale de la IA.
+
+## Qué puede salir mal
+
+- **Una tienda uruguaya con dominio `.com` y sin precio** queda en "Sin confirmar" (en la muestra le pasa a Yerbas Calzada, por la moneda inválida). Está plegado, no oculto.
+- **La lista del exterior puede ocultar algo útil**: una tienda con dominio `.es` o `.us` que envíe a Uruguay queda detrás de "Ver". Y `falabella.com` o `amazon.*` se ocultan aunque envíen.
+- **El nombre de la IA puede estar mal** y la búsqueda por nombre se paga igual.
+- **Un precio con la moneda mal informada.** Si Google informa `UYU` para un precio que no lo es, o un `.uy` publica en dólares con un `$` suelto, se mostraría mal (en ese segundo caso, como pesos). Por eso el rótulo pide confirmar en la tienda.
+- **"Envíos a todo el país" no dice qué país.** Una tienda `.com` de otro lado que lo diga entra como "probable". Las de dominio de otro país (`.ar`, `.cl`…) no entran nunca.
+- **"El título más repetido" rara vez se repite tal cual.** En la práctica gana el más representativo, que puede ser demasiado genérico o demasiado largo para el Radar. Se corrige a mano.
+- **Términos de uso.** Igual que en la ronda 12b: Apify obtiene los resultados leyendo Google.
+
+- **El margen de tiempo es chico.** Si el actor tarda más de 55 s se pierde lo pagado. Mandar la foto por URL pública bajaría la espera a ≈ 10 s, pero obliga a guardar la foto en algún lado: es una decisión de privacidad, no está hecha.
+- **"Lo reconoce como" puede ser largo o impreciso.** Es un título entero de una tienda, no un nombre corto.
+
+**Valor 5 · Confianza 3 · Riesgo 3.** El riesgo sube porque la foto ahora sale a un tercero más y cada uso cuesta más que una búsqueda web.
+
+## Qué revisar primero (ronda 13)
+
+1. Subir la foto del termo en la vista previa y comparar los grupos con los 35 resultados de la prueba manual.
+2. Mirar si se ven las miniaturas.
+3. Probar con un producto genérico y ver qué nombre propone.
+4. Mirar en Apify el costo y la duración de cada corrida.

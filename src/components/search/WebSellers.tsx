@@ -7,7 +7,9 @@ import {
   WEB_MESSAGES,
   googleSearchUrl,
   googleShoppingUrl,
+  isForeignSite,
   isMainSeller,
+  webQueryKey,
   parseWebSellersResponse,
   type UruguayStatus,
   type WebSeller,
@@ -77,14 +79,32 @@ export function useWebSellers() {
   return { state, search, cancel, reset };
 }
 
-const URUGUAY_STYLES: Record<UruguayStatus, string> = {
+export const URUGUAY_STYLES: Record<UruguayStatus, string> = {
   confirmado: "border-emerald-600/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
   probable: "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
   no_confirmado: "border-zinc-400/50 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 };
 
-const LINK_BUTTON =
+export const LINK_BUTTON =
   "inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer";
+
+/** Línea chica que guarda, plegados, los resultados de sitios del exterior. Sin ocultados no se muestra. */
+function HiddenForeign({ sellers }: { sellers: WebSeller[] }) {
+  if (sellers.length === 0) return null;
+  return (
+    <details data-hidden-foreign className="min-w-0">
+      <summary className="cursor-pointer text-[11px] text-zinc-600 dark:text-zinc-400">
+        {sellers.length === 1 ? "Se ocultó 1 resultado de otros países" : `Se ocultaron ${sellers.length} resultados de otros países`}.{" "}
+        <span className="font-bold underline underline-offset-2">Ver</span>
+      </summary>
+      <ul className="mt-3 grid min-w-0 gap-2.5 lg:grid-cols-2">
+        {sellers.map((seller) => (
+          <SellerCard key={seller.url} seller={seller} />
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 function SellerCard({ seller }: { seller: WebSeller }) {
   return (
@@ -119,6 +139,98 @@ function SellerCard({ seller }: { seller: WebSeller }) {
   );
 }
 
+/** Botones gratuitos de Google Uruguay para un nombre. No gastan nada: abren la búsqueda en otra pestaña. */
+export function GoogleLinks({ name }: { name: string }) {
+  const usable = name.trim().length >= WEB_LIMITS.queryMin;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gratis, en otra pestaña:</span>
+      {usable ? (
+        <>
+          <a href={googleSearchUrl(name)} target="_blank" rel="noopener noreferrer" data-google="search" className={LINK_BUTTON}>
+            <Globe className="size-3.5" aria-hidden />
+            <span>Buscar en Google Uruguay</span>
+            <span className="visually-hidden"> (se abre en otra pestaña)</span>
+          </a>
+          <a href={googleShoppingUrl(name)} target="_blank" rel="noopener noreferrer" data-google="shopping" className={LINK_BUTTON}>
+            <ShoppingCart className="size-3.5" aria-hidden />
+            <span>Google Shopping Uruguay</span>
+            <span className="visually-hidden"> (se abre en otra pestaña)</span>
+          </a>
+        </>
+      ) : (
+        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Escribí el nombre del producto para armar la búsqueda.</span>
+      )}
+    </div>
+  );
+}
+
+/** ¿El estado de la búsqueda web corresponde a este nombre? */
+function isSearchFor(state: WebSellersState, name: string): boolean {
+  const query = state.status === "done" ? state.data.query : state.status === "idle" ? null : state.query;
+  return query !== null && webQueryKey(query) === webQueryKey(name);
+}
+
+interface NameSearchResultsProps {
+  /** Nombre con el que se lanzó sola la búsqueda (el que propuso la IA). */
+  name: string;
+  state: WebSellersState;
+  /** Lanza a mano la búsqueda por nombre, con lo que haya en el campo. */
+  onSearch: () => void;
+  canSearch: boolean;
+}
+
+/**
+ * Búsqueda por nombre que se lanzó sola porque la foto trajo poco de Uruguay. Muestra, en la misma vista de
+ * la foto, solo las tiendas de Uruguay; el resto está en «En la web (Uruguay)». Nunca reintenta por su cuenta.
+ */
+export function NameSearchResults({ name, state, onSearch, canSearch }: NameSearchResultsProps) {
+  if (!isSearchFor(state, name)) return null;
+  const main = state.status === "done" ? state.data.results.filter((s) => !isForeignSite(s.site) && isMainSeller(s)) : [];
+  const rest = state.status === "done" ? state.data.results.length - main.length : 0;
+  return (
+    <section data-auto-web className="flex min-w-0 flex-col gap-2">
+      <h3 className="text-[11px] font-black uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+        Búsqueda por nombre en Google Uruguay (nombre sugerido por IA)
+      </h3>
+      {state.status === "loading" && (
+        <p role="status" className="flex items-center gap-2 text-xs font-bold text-zinc-800 dark:text-zinc-200">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Buscando «{name}» en Google Uruguay…
+        </p>
+      )}
+      {state.status === "error" && (
+        <div role="status" data-auto-web-error={state.code ?? "error"} className="flex flex-wrap items-center gap-2 text-xs text-zinc-700 dark:text-zinc-300">
+          <p className="min-w-0 flex-1 break-words">{state.message}</p>
+          {/* No se reintenta sola: si tiene sentido repetirla, queda el botón. */}
+          {(state.canRetry || state.code === "RATE_LIMITED") && (
+            <button type="button" onClick={onSearch} disabled={!canSearch} data-auto-web-manual className={LINK_BUTTON}>
+              Buscar por nombre
+            </button>
+          )}
+        </div>
+      )}
+      {state.status === "done" && (
+        <>
+          <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+            {main.length === 0
+              ? `La búsqueda de «${state.data.query}» no encontró tiendas de Uruguay.`
+              : `${main.length === 1 ? "1 tienda" : `${main.length} tiendas`} de Uruguay para «${state.data.query}».`}
+            {rest > 0 ? " El resto de los resultados está en la vista «En la web (Uruguay)»." : ""}
+          </p>
+          {main.length > 0 && (
+            <ul className="grid min-w-0 gap-2.5 lg:grid-cols-2">
+              {main.map((seller) => (
+                <SellerCard key={seller.url} seller={seller} />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 interface WebSellersPanelProps {
   /** Nombre que está en el campo: con él se arman los botones de Google. */
   name: string;
@@ -130,37 +242,20 @@ interface WebSellersPanelProps {
 
 /** Vista "En la web (Uruguay)". El botón que lanza la búsqueda está junto al nombre, en PhotoAnalyzer. */
 export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPanelProps) {
-  const usable = name.trim().length >= WEB_LIMITS.queryMin;
-  const results = state.status === "done" ? state.data.results : [];
+  const all = state.status === "done" ? state.data.results : [];
+  // Los sitios del exterior (lista de sellers.ts) no se muestran: quedan detrás de "Se ocultaron N".
+  const hidden = all.filter((s) => isForeignSite(s.site));
+  const results = all.filter((s) => !isForeignSite(s.site));
   const main = results.filter(isMainSeller);
   // Tiendas que no se pudo ubicar en Uruguay, y aparte lo que no es una tienda.
   const unconfirmed = results.filter((s) => s.kind === "store" && !isMainSeller(s));
   const nonStores = results.filter((s) => s.kind === "other");
-  const onlyInternational = unconfirmed.every((s) => s.international);
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">{WEB_MESSAGES.notice}</p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gratis, en otra pestaña:</span>
-        {usable ? (
-          <>
-            <a href={googleSearchUrl(name)} target="_blank" rel="noopener noreferrer" data-google="search" className={LINK_BUTTON}>
-              <Globe className="size-3.5" aria-hidden />
-              <span>Buscar en Google Uruguay</span>
-              <span className="visually-hidden"> (se abre en otra pestaña)</span>
-            </a>
-            <a href={googleShoppingUrl(name)} target="_blank" rel="noopener noreferrer" data-google="shopping" className={LINK_BUTTON}>
-              <ShoppingCart className="size-3.5" aria-hidden />
-              <span>Google Shopping Uruguay</span>
-              <span className="visually-hidden"> (se abre en otra pestaña)</span>
-            </a>
-          </>
-        ) : (
-          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Escribí el nombre del producto para armar la búsqueda.</span>
-        )}
-      </div>
+      <GoogleLinks name={name} />
 
       {state.status === "idle" && state.notice && (
         <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
@@ -206,10 +301,10 @@ export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPa
       {state.status === "done" && (
         <div className="flex min-w-0 flex-col gap-3" data-web-results>
           <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            {results.length === 0
+            {all.length === 0
               ? WEB_MESSAGES.empty
               : main.length === 0
-                ? `No encontré tiendas de Uruguay para «${state.data.query}». Mirá los otros resultados acá abajo.`
+                ? `No encontré tiendas de Uruguay para «${state.data.query}».${results.length > 0 ? " Mirá los otros resultados acá abajo." : ""}`
                 : `${main.length === 1 ? "1 resultado" : `${main.length} resultados`} de tiendas para «${state.data.query}».`}
           </p>
 
@@ -221,10 +316,12 @@ export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPa
             </ul>
           )}
 
+          <HiddenForeign sellers={hidden} />
+
           {unconfirmed.length > 0 && (
             <details data-web-others className="min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
               <summary className="cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                {onlyInternational ? "Internacionales" : "Internacionales y sin confirmar"}: confirmá que envían a Uruguay ({unconfirmed.length})
+                Sin confirmar: confirmá que envían a Uruguay ({unconfirmed.length})
               </summary>
               <ul className="mt-3 grid min-w-0 gap-2.5 lg:grid-cols-2">
                 {unconfirmed.map((seller) => (

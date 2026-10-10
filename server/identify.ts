@@ -96,7 +96,7 @@ function fail(res: Response, status: number, code: string, message: string) {
 const readImage = express.raw({ type: [...PHOTO_TYPES], limit: PHOTO_LIMITS.maxBytes });
 
 /** Tipo y tamaño declarados, antes de leer nada; después lee el cuerpo con el tope puesto. */
-function receiveImage(req: Request, res: Response, next: NextFunction) {
+export function receiveImage(req: Request, res: Response, next: NextFunction) {
   const declaredType = String(req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
   if (!isPhotoType(declaredType)) return fail(res, 415, "UNSUPPORTED_IMAGE", PHOTO_MESSAGES.type);
   const declaredSize = Number(req.headers["content-length"]);
