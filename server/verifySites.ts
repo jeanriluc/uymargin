@@ -202,12 +202,25 @@ export async function openPage(start: string, deps: NetDeps, options: { timeoutM
   if (!first) return { kind: "blocked" };
   let url = first;
   for (let hop = 0; ; hop++) {
+    // El DNS también entra en el límite de tiempo: corre contra lo que queda hasta el vencimiento.
+    const left = deadline - now();
+    if (left <= 0) return { kind: "timeout" };
     let ips: string[];
+    let dnsTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      ips = await deps.resolve(url.hostname);
+      const answer = await Promise.race([
+        deps.resolve(url.hostname),
+        new Promise<null>((resolve) => {
+          dnsTimer = setTimeout(() => resolve(null), left);
+        }),
+      ]);
+      if (answer === null) return { kind: "timeout" };
+      ips = answer;
     } catch (err) {
       const code = (err as { code?: string } | null)?.code;
       return code === "ENOTFOUND" || code === "ENODATA" ? { kind: "no_dns" } : { kind: "error" };
+    } finally {
+      clearTimeout(dnsTimer);
     }
     if (ips.length === 0) return { kind: "no_dns" };
     // Con una sola IP privada entre las respuestas alcanza para no abrir nada.
