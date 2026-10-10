@@ -444,6 +444,20 @@ Hasta la ronda 12 la foto solo servía para que la IA propusiera un nombre. Lo q
 8. **«Identificar nombre con IA (gratis)»**, el botón manual, queda para cuando la búsqueda visual falla por otro motivo (tiempo, crédito, servicio caído) o cuando la IA automática falló.
 9. **«Google Lens lo reconoce como: …»** Si hay resultados de otros países pero ninguno de Uruguay, debajo de los grupos se muestra el título limpio más repetido entre las tiendas de cualquier país. Es solo informativo: no se busca nada con ese texto.
 
+## Sitios del exterior ocultos y búsqueda por nombre
+
+Reemplaza a los grupos del punto 3 de arriba.
+
+- **Lista única** en `src/lib/web/sellers.ts` (`FOREIGN_SUFFIXES`, `FOREIGN_SITES`, `FOREIGN_BRANDS`, `isForeignSite`), usada por la búsqueda visual y por «En la web (Uruguay)». Se oculta el dominio y cualquier subdominio:
+  - Terminaciones: `.com.mx`, `.mx`, `.cl`, `.com.ar`, `.ar`, `.com.br`, `.br`, `.bn`, `.es`, `.us`, `.it`, `.fr`, `.com.co`, `.com.pe`, `.pe`, `.com.py`, `.py`, `.com.ve`, `.ve`, `.de`, `.uk`, `.co.uk`, `.pt`, `.ca`, `.au`, `.in`, `.cn`, `.jp`.
+  - Sitios: `etsy.com`, `walmart.com`, `wayfair.com`, `temu.com`, `aliexpress.com`, `alibaba.com`, `1stdibs.com`, `falabella.com`, `mercadolibre.com.ar`, `mercadolibre.com.mx`, `mercadolibre.cl`, `mercadolibre.com.br`, y las tiendas globales que ya estaban (`shein.com`, `banggood.com`, `dhgate.com`, `wish.com`, `made-in-china.com`).
+  - Con cualquier terminación: `amazon.*`, `ebay.*`, `idealo.*`.
+  - **Un `.uy` nunca se oculta**, tampoco `mercadolibre.com.uy`.
+- **Qué se ve.** Mercado Libre Uruguay y Tiendas de Uruguay, a la vista. Debajo, una línea chica "Se ocultaron N resultados de otros países" con "Ver", cerrada por defecto; sin ocultados no aparece. Después, plegados: "Sin confirmar" (tiendas `.com` sin señal de Uruguay que no están en la lista, y países que no están en la lista) y "Otros resultados" (redes y sitios que no son tiendas).
+- **El nombre sugerido y "Google Lens lo reconoce como"** siguen usando todos los títulos, incluidos los ocultos.
+- **Completar con Uruguay.** Si quedan menos de 3 resultados visibles de Uruguay, la IA propone el nombre sola (como antes) y, con ese nombre, se lanza sola una búsqueda por nombre (`/api/web-sellers`, la misma de «En la web (Uruguay)»). Sus tiendas de Uruguay se muestran en la misma vista, bajo "Búsqueda por nombre en Google Uruguay (nombre sugerido por IA)". Reglas: un solo intento por foto y sin reintento automático; no se lanza si la IA falló, si el nombre quedó vacío o si en el campo hay un nombre escrito por el usuario; editar el nombre después no la repite. Si se llegó al límite de uso de `web` (5 por minuto, 20 por día) el servidor no busca nada: se muestra el aviso y un botón manual.
+- **Costo.** Una foto con poco de Uruguay ahora puede gastar dos búsquedas pagas de Apify (la visual y la de nombre) y un uso de la IA.
+
 ## Privacidad
 
 - La pestaña muestra siempre: "La foto se envía a un servicio externo de búsqueda visual (Apify / Google Lens). UyMargin no la guarda." Antes la foto solo iba a Gemini; ahora va a Apify y, si se pide la IA, también a Gemini.
@@ -492,13 +506,15 @@ En todos se ofrece la identificación con IA, el campo para escribir el nombre y
 
 ## Evidencia
 
-- `scripts/verify_visual.ts`: 318 casos con `fetch` simulado. Incluye la espera de 55 s, los tres mensajes (tiempo agotado, servicio caído, 0 resultados), que el 0 resultados y los errores no se guardan en la memoria, cuándo corre sola la IA y el texto "lo reconoce como" con la muestra de la lámpara. Parser y clasificación con la muestra real, item de error, moneda inválida, enlaces inseguros, dominios imitadores, duplicados y límite por dominio, nombre sugerido, memoria por hash, cada código de error, y que ni el token ni la imagen (ni su hash) aparecen en logs o respuestas.
-- `scripts/e2e_visual.mjs`: 100 casos en Chrome con la API simulada, incluidos el nombre automático con IA, el renglón "Google Lens lo reconoce como", el aviso de privacidad, los cuatro grupos, los precios, las miniaturas, «Analizar en Radar», el botón de la IA y cada error.
+- `scripts/verify_visual.ts`: 333 casos con `fetch` simulado. Incluye la espera de 55 s, los tres mensajes (tiempo agotado, servicio caído, 0 resultados), que el 0 resultados y los errores no se guardan en la memoria, cuándo corre sola la IA y el texto "lo reconoce como" con la muestra de la lámpara. Parser y clasificación con la muestra real, item de error, moneda inválida, enlaces inseguros, dominios imitadores, duplicados y límite por dominio, nombre sugerido, memoria por hash, cada código de error, y que ni el token ni la imagen (ni su hash) aparecen en logs o respuestas.
+- `scripts/e2e_visual.mjs`: 127 casos en Chrome con la API simulada, incluidos el nombre automático con IA, el renglón "Google Lens lo reconoce como", el aviso de privacidad, los cuatro grupos, los precios, las miniaturas, «Analizar en Radar», el botón de la IA y cada error.
 - `scripts/e2e_photo.mjs` (62) y `scripts/e2e_web.mjs` (61) se adaptaron al flujo nuevo: ahí la búsqueda visual siempre falla y el nombre sale de la IA.
 
 ## Qué puede salir mal
 
-- **Una tienda uruguaya con dominio `.com` y sin precio** queda en "Otros países o sin confirmar" (en la muestra le pasa a Yerbas Calzada, por la moneda inválida). Está plegado, no oculto.
+- **Una tienda uruguaya con dominio `.com` y sin precio** queda en "Sin confirmar" (en la muestra le pasa a Yerbas Calzada, por la moneda inválida). Está plegado, no oculto.
+- **La lista del exterior puede ocultar algo útil**: una tienda con dominio `.es` o `.us` que envíe a Uruguay queda detrás de "Ver". Y `falabella.com` o `amazon.*` se ocultan aunque envíen.
+- **El nombre de la IA puede estar mal** y la búsqueda por nombre se paga igual.
 - **Un precio con la moneda mal informada.** Si Google informa `UYU` para un precio que no lo es, o un `.uy` publica en dólares con un `$` suelto, se mostraría mal (en ese segundo caso, como pesos). Por eso el rótulo pide confirmar en la tienda.
 - **"Envíos a todo el país" no dice qué país.** Una tienda `.com` de otro lado que lo diga entra como "probable". Las de dominio de otro país (`.ar`, `.cl`…) no entran nunca.
 - **"El título más repetido" rara vez se repite tal cual.** En la práctica gana el más representativo, que puede ser demasiado genérico o demasiado largo para el Radar. Se corrige a mano.
