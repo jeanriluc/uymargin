@@ -531,3 +531,87 @@ En todos se ofrece la identificación con IA, el campo para escribir el nombre y
 2. Mirar si se ven las miniaturas.
 3. Probar con un producto genérico y ver qué nombre propone.
 4. Mirar en Apify el costo y la duración de cada corrida.
+
+---
+
+# Ronda 14: verificar que las tiendas sean de Uruguay y estén activas
+
+Rama `ronda-14-verificar-sitios`, desde `main` con las rondas 12 y 13 ya mergeadas.
+
+## Por qué
+
+Hasta la ronda 13 solo se miraba el dominio y el texto de Google. Una tienda `.com` que vende en Uruguay quedaba en "Sin confirmar", y una página que ya no existe aparecía igual que las demás. Ahora el servidor abre cada resultado candidato y busca dos cosas: indicios de que la tienda es de Uruguay y si la página sigue activa.
+
+## Qué se verifica
+
+- Después de mostrar los resultados, la pantalla manda a verificar los candidatos visibles: hasta 8, primero Tiendas de Uruguay, después Sin confirmar y, si queda lugar, Mercado Libre Uruguay. Lo mismo en «En la web (Uruguay)» y en la búsqueda por nombre automática.
+- No se verifican los sitios de la lista del exterior (ronda 13) ni lo que no es tienda (redes, diarios).
+- Mientras corre, cada fila dice "Verificando…". Después: **Activa**, **Agotado** o **No se pudo verificar**. Las **Caída** pasan al bloque plegado "No disponibles".
+- Una tienda de "Sin confirmar" con indicios sube a "Tiendas de Uruguay" (confirmado o probable) y muestra una frase corta: "Uruguay: dirección en Montevideo, teléfono +598". Sin indicios, sigue en "Sin confirmar".
+- No se repite sola. Hay un botón "Verificar de nuevo".
+- Si falla, se llegó al límite o no está configurada, la lista queda como antes, con una línea "No se pudo verificar los sitios".
+
+## Señales de Uruguay
+
+- **Fuertes** (una alcanza para "confirmado"): datos estructurados schema.org con `addressCountry` UY/Uruguay o una localidad uruguaya; teléfono +598 (en el texto, en un enlace `tel:` o de WhatsApp); `<html lang>`, `og:locale` o `hreflang` es-UY; un departamento de Uruguay pegado a "Uruguay" ("Montevideo, Uruguay"); un RUT de 12 cifras.
+- **Medias** (solo con estas queda "probable"): precios en pesos uruguayos (`$U`, `UYU`); "Correo Uruguayo", "DAC", "Abitab", "RedPagos", "envíos a todo el país" o "envíos al interior"; "Montevideo" o "Uruguay" en el pie de página; enlaces a otros sitios `.uy`.
+- **No cuenta**: que el dominio sea `.com` ni que venda en dólares. El dólar no se mira.
+- Si la página del resultado no trae indicios, se abre la página de inicio del mismo sitio (y nada más: como mucho 2 pedidos por sitio).
+
+## Página activa
+
+- **Activa**: responde 2xx con HTML, sin saltar a otro dominio (se permiten `www.` y subdominios del mismo sitio).
+- **Caída**: 404, 410, 5xx, dominio que no resuelve, conexión rechazada, redirección a otro dominio, página de dominio "en venta" o estacionado, y páginas que responden bien pero dicen "404", "página no encontrada" o "no existe" en el título o los encabezados.
+- **No se pudo verificar**: 403, 429, pantalla de protección contra robots, tiempo agotado, contenido que no es HTML. No se trata como caída ni como "no es de Uruguay".
+- **Agotado**: los datos de producto dicen `OutOfStock`. Es una tienda viva con el producto agotado.
+- **Mercado Libre Uruguay**: su página no se abre nunca (bloquea robots). Si la dirección trae el id de la publicación o del producto, se consulta la API de Mercado Libre con el mismo acceso del Radar. Si no, queda "No se pudo verificar".
+
+## Protecciones de seguridad
+
+Abrir direcciones de terceros desde el servidor es la parte delicada:
+
+- **No recibe direcciones.** `/api/verify-sites` recibe permisos firmados (HMAC-SHA256 con `VERIFY_SECRET`) que el propio servidor entrega con cada resultado de `/api/visual-search` y `/api/web-sellers`. Cada permiso vale 30 minutos y solo para el usuario que hizo la búsqueda. Sin un permiso válido no se abre nada: el endpoint no sirve de proxy.
+- Solo `http` y `https`, puertos 80 y 443, nombres de dominio públicos (nunca una IP escrita, `localhost` ni nombres internos).
+- Se resuelve el DNS y se descartan las IPs privadas, locales, de enlace local y de metadatos (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16, 0.0.0.0, ::1, fc00::/7, fe80::/10 y las IPv4 escondidas dentro de una IPv6). La conexión va a la IP ya revisada, no a lo que responda el DNS después.
+- Como mucho 3 redirecciones, y cada salto pasa por lo mismo. Una redirección a otro dominio no se sigue.
+- 8 segundos y 400 KB por página (al llegar al tope se corta la lectura, también si el cuerpo venía comprimido). Solo HTML.
+- Sin cookies ni encabezados del usuario. User-Agent fijo: `UyMarginBot (+verificación de tiendas)`.
+- Hasta 4 páginas a la vez.
+- El contenido es un dato: no se ejecuta, no se guarda y no se registra. De cada página solo salen frases fijas ("teléfono +598") y nombres de una lista cerrada (los 19 departamentos); la pantalla las valida otra vez y las muestra como texto plano. En el log quedan solo cantidades.
+
+## Costo y límites
+
+- **No cuesta nada extra**: no usa Apify ni la IA. Es el propio servidor el que abre las páginas.
+- Límite de uso, scope `verify`: 6 por minuto y 60 por día por usuario. No hizo falta migración.
+- **No ve lo que carga JavaScript.** Se lee el HTML que entrega el servidor de la tienda. En una tienda que arma todo en el navegador puede no haber indicios, o no detectarse "agotado".
+- **Protección contra robots.** Muchas tiendas (Cloudflare y similares) le cierran la puerta a un robot: ahí queda "No se pudo verificar".
+- **Páginas de más de 400 KB**: se lee el comienzo. Los indicios del pie de página pueden quedar afuera.
+- Sin `VERIFY_SECRET` (mínimo 32 caracteres) no se firma ningún permiso y la verificación queda apagada.
+
+## Lo que NO se probó
+
+- **Ninguna página real.** Todos los tests usan DNS y pedidos simulados, más un servidor local de prueba para el corte por tamaño y por tiempo. Falta probar con tiendas reales desde la vista previa, con `VERIFY_SECRET` cargada en Vercel.
+- **La consulta a la API de Mercado Libre por publicación** (`/items/{id}`). El Radar usa otros endpoints; no sé si este responde con el acceso de la app. Si no responde, queda "No se pudo verificar", que es lo mismo que no intentarlo.
+- **Cuánto tarda de verdad** un lote de 8 sitios. El peor caso calculado es de unos 32 segundos.
+
+## Evidencia
+
+- `scripts/verify_sites.ts`: 336 casos. Cada señal fuerte y media, los tres resultados, cada caso de activa/caída/sin verificar/agotado, redirección a otro dominio, 200 que dice "404", IPs privadas en la dirección inicial, en una redirección (a 169.254.169.254 y a localhost) y por DNS, tope de tamaño, permisos inválidos, vencidos o de otro usuario, límite de uso, y que ni direcciones ni contenido quedan en logs.
+- Cuatro HTML de prueba en `scripts/fixtures/verify/`: una tienda con dirección en Montevideo y +598, un `.com` de EE.UU., una página parqueada y una pantalla contra robots.
+- `scripts/e2e_verify.mjs`: 41 casos en Chrome con la API simulada.
+
+## Qué puede salir mal
+
+- **Falsos "confirmado".** Un sitio internacional con una versión para Uruguay (`hreflang` es-UY) o que publica "Montevideo, Uruguay" en una lista de países queda confirmado aunque no tenga tienda acá.
+- **Falsos "caída".** Una tienda que cambió de dominio redirige a otro y queda como caída. Una tienda con el servidor momentáneamente caído (5xx) también.
+- **Una tienda puede ver al robot.** El User-Agent dice quién es. Si una tienda no quiere visitas automáticas, hay que respetar su `robots.txt`: hoy no se lee.
+- **El límite cuenta pedidos, no sitios.** Ver decisiones en el PR.
+
+**Valor 4 · Confianza 2 · Riesgo 3.** La confianza es baja porque no se probó contra ninguna tienda real; el riesgo es el de abrir páginas de terceros desde el servidor, acotado por las protecciones de arriba.
+
+## Qué revisar primero (ronda 14)
+
+1. Cargar `VERIFY_SECRET` en Vercel y volver a desplegar.
+2. Probar con el termo: ¿Matesuru y Yerbas Calzada suben a "Tiendas de Uruguay"?
+3. Mirar cuántas quedan en "No se pudo verificar" y cuánto tarda.
+4. Mirar si alguna publicación de Mercado Libre sale "Activa" (si no, la API no responde y da lo mismo).
