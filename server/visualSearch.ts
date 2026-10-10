@@ -5,6 +5,7 @@ import {
   VISUAL_LIMITS,
   VISUAL_MESSAGES,
   buildVisualMatches,
+  isVerifiableMatch,
   parseLensItems,
   type RawLensItem,
   type VisualSearchErrorCode,
@@ -169,8 +170,18 @@ export function createVisualSearchRoute(options: {
   lens: () => LensProvider | null;
   limiter: RequestHandler;
   cache?: VisualCache;
+  /** Firma el permiso para verificar una dirección (ronda 14). Devuelve null si la verificación no está configurada. */
+  sign?: (res: Response, url: string) => string | null;
 }): RequestHandler[] {
   const cache = options.cache ?? createVisualCache();
+  // El permiso es de cada usuario y vence: se agrega al responder, nunca queda en la memoria de respuestas.
+  const withTokens = (res: Response, value: VisualSummary): VisualSummary => ({
+    ...value,
+    results: value.results.map((match) => {
+      const token = isVerifiableMatch(match) ? options.sign?.(res, match.url) : null;
+      return token ? { ...match, verifyToken: token } : match;
+    }),
+  });
   const failWith = (res: Response, code: VisualSearchErrorCode) => fail(res, ERROR_RESPONSES[code].status, code, ERROR_RESPONSES[code].message);
 
   const prepare: RequestHandler = (req, res, next) => {
@@ -180,7 +191,7 @@ export function createVisualSearchRoute(options: {
     if (!sniffImageType(bytes)) return fail(res, 400, "NOT_AN_IMAGE", PHOTO_MESSAGES.type);
     const hash = imageHash(bytes);
     const hit = cache.get(hash);
-    if (hit) return res.json({ ok: true, ...hit, cached: true });
+    if (hit) return res.json({ ok: true, ...withTokens(res, hit), cached: true });
     res.locals.visual = { bytes, hash };
     return next();
   };
@@ -197,7 +208,7 @@ export function createVisualSearchRoute(options: {
       // Sin resultados no se guarda nada: otra foto del mismo producto, o un reintento, puede dar distinto.
       if (value.results.length === 0) return failWith(res, "VISUAL_SEARCH_NO_MATCHES");
       cache.set(hash, value);
-      return res.json({ ok: true, ...value, cached: false });
+      return res.json({ ok: true, ...withTokens(res, value), cached: false });
     } catch (err) {
       const known = err instanceof VisualSearchError ? err : null;
       console.error("[api/visual-search] la búsqueda falló:", known ? `${known.code} (${known.detail})` : "error inesperado");
