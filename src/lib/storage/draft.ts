@@ -1,4 +1,5 @@
 import type { AnalysisInputs } from "@/lib/finance/types";
+import { storableProductImage } from "@/lib/productImage";
 
 const STORAGE_KEY = "uymargin:draft:v1";
 
@@ -15,6 +16,8 @@ export function loadDraft(defaults: AnalysisInputs): AnalysisInputs {
     return {
       ...defaults,
       ...saved,
+      // Solo una dirección conocida; un borrador viejo sin el campo queda sin foto.
+      productImage: storableProductImage(saved.productImage),
       cost: { ...defaults.cost, ...saved.cost },
       freight: { ...defaults.freight, ...saved.freight },
       tax: { ...defaults.tax, ...saved.tax },
@@ -28,7 +31,7 @@ export function loadDraft(defaults: AnalysisInputs): AnalysisInputs {
 
 export function saveDraft(inputs: AnalysisInputs): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...inputs, productImage: storableProductImage(inputs.productImage) }));
   } catch {
     // Storage unavailable: the draft is simply not kept.
   }

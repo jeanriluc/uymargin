@@ -14,7 +14,8 @@ interface ExactOffersSectionProps {
   selection?: ExactSelection | null;
   /** Cotización en uso: los equivalentes y las estadísticas se calculan con la vigente. */
   rate: ExchangeRate | null;
-  onSimulate: (priceUyu: number, title: string) => void;
+  /** `image`: foto del producto de catálogo (null si no tiene). */
+  onSimulate: (priceUyu: number, title: string, image: string | null) => void;
   /** Si se pasa, elegir otro candidato lo resuelve quien usa la sección (p. ej. volver a auditar el enlace). */
   onChooseAlternative?: (candidate: CatalogCandidate) => void;
 }
@@ -423,7 +424,7 @@ export function ExactOffersSection({
                 key={card.key}
                 type="button"
                 disabled={card.value == null}
-                onClick={() => card.value != null && onSimulate(Math.round(card.value), match.title)}
+                onClick={() => card.value != null && onSimulate(Math.round(card.value), match.title, match.thumbnail ?? null)}
                 title={card.value != null ? "Simular con este precio de venta" : undefined}
                 className={`rounded-lg border p-3 text-left transition-colors enabled:cursor-pointer ${
                   card.key === "median"
@@ -556,7 +557,7 @@ export function ExactOffersSection({
                   uyu={uyu}
                   minUyu={stats?.min ?? null}
                   rate={rate}
-                  onSimulate={() => uyu !== null && onSimulate(Math.round(uyu), match.title)}
+                  onSimulate={() => uyu !== null && onSimulate(Math.round(uyu), match.title, match.thumbnail ?? null)}
                 />
               ))}
             </ol>

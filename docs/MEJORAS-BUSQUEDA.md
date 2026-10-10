@@ -636,3 +636,33 @@ Abrir direcciones de terceros desde el servidor es la parte delicada:
 
 - `scripts/verify_sites.ts`: 384 casos. Suma los títulos y encabezados que deben quedar activos y los que deben quedar caídos, las direcciones nuevas (y que `2606:4700:4700::1111` y `8.8.8.8` siguen permitidas), y un DNS que nunca responde, sin timers colgados.
 - **La verificación contra tiendas reales sigue sin probarse.**
+
+---
+
+# Ronda 15: foto del producto en el resumen, encabezado más limpio y caja USD/UYU más chica
+
+## Qué cambió
+
+1. **Foto del producto en el resumen.** El cuadro a la izquierda del nombre muestra la foto del producto cargado; sin foto, o si la imagen no carga, queda el icono de siempre. El cuadro mide lo mismo en los dos casos (`ProductThumb`). La foto es un dato nuevo de las entradas, `productImage` (dirección o `null`), que no entra a ningún cálculo.
+2. **De dónde sale la foto.** Radar: la tarjeta o el producto exacto que se elige con «Simular». Por enlace: el producto del enlace, el exacto o el similar elegido. Lote: el producto exacto de la fila o el primero que coincide. Auditorías de la nube: la miniatura que ya guardaban. Por foto: una miniatura de la foto del usuario, de 160 px como mucho, armada en el navegador.
+3. **Qué se muestra y qué se guarda** (`src/lib/productImage.ts`). Se muestran solo direcciones https de `mlstatic.com`, `gstatic.com`, `googleusercontent.com` y `ggpht.com` (con sus subdominios) o la miniatura local (`data:` JPEG o PNG). Se guarda solo la dirección: la foto del usuario nunca va al borrador, al historial, a la nube ni a ningún servidor, y dura lo que dura la sesión. Una entrada vieja sin el campo queda sin foto. No hay política CSP en `vercel.json` ni en `index.html`, así que no hubo que tocarla.
+4. **Cuándo se saca la foto.** «Nueva simulación», elegir un producto sin foto, cargar una entrada o auditoría sin foto, y buscar otro nombre en el Radar. Editar el nombre a mano, usar un precio de las estadísticas, armar un pack o ampliar la búsqueda la conservan.
+5. **Encabezado.** Sin el cuadro negro «UY»: queda el texto «UYMARGIN» (siempre visible), «MONTEVIDEO» desde 640 px y el subtítulo desde 1024 px. En 375 px mide 53 px de alto en una sola fila.
+6. **Caja USD/UYU.** Una fila de 32 px con la etiqueta y el valor lado a lado, campo de 40 a 44 px y botón de actualizar de 24 px. «Usar este valor» y «Cancelar» flotan debajo de la caja sin mover el encabezado; el valor tipeado sigue sin usarse hasta confirmar.
+
+## Decisiones
+
+- **En «Por foto» no hay una coincidencia para elegir.** Los resultados de la búsqueda visual y de la web no tienen botón para cargar el producto (sus precios son informativos). La foto del resumen es la del usuario y aparece al tocar «Analizar en Radar».
+- **El aviso «MLU en línea» pasa a verse desde 1280 px** (antes 1024) y el texto «Salir» desde 1024 px (antes 768), para que el subtítulo y la marca entren.
+- **La foto se saca al buscar, no al tipear** en el cuadro del Radar.
+
+## Evidencia
+
+- `scripts/verify_product_image.ts` (dentro de `npm test`): 82 casos de direcciones permitidas y descartadas, miniatura local, borrador y packs.
+- `scripts/e2e_summary.mjs` (navegador, API e imágenes simuladas): 113 casos. Con una carpeta como argumento saca las capturas en 375, 768 y 1280 px, claro y oscuro.
+
+## Lo que NO se probó
+
+- Con sesión iniciada (el botón «Salir» ocupa lugar en el encabezado): la prueba corre sin login y solo comprueba que sobra el espacio que ese botón necesita.
+- Fotos reales de Mercado Libre y de Google: las imágenes de la prueba son simuladas.
+- La miniatura de «Por foto» en un celular real (cámara, fotos HEIC).

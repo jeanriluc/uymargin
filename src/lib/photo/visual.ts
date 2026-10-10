@@ -4,6 +4,7 @@
  * cada resultado, decidir si un precio se puede mostrar y proponer un nombre. Sin DOM y sin Node: lo usan
  * el servidor, la pantalla y los tests.
  */
+import { isGoogleImageHost } from "../productImage.js";
 import {
   cleanVerifyToken,
   isForeignSite,
@@ -277,7 +278,7 @@ export function safeThumbnailUrl(value: unknown): string | null {
   const url = safeHttpsUrl(value);
   if (!url) return null;
   const host = new URL(url).hostname.toLowerCase();
-  return /(?:^|\.)(?:gstatic\.com|googleusercontent\.com|ggpht\.com)$/.test(host) ? url : null;
+  return isGoogleImageHost(host) ? url : null;
 }
 
 // ------------------------------------------------------------------

@@ -14,10 +14,10 @@ import {
   Share2,
   ShoppingBag,
   Store,
-  TrendingUp,
 } from "lucide-react";
 
 import { Header, type CloudStatus, type ConnectionStatus } from "@/components/layout/Header";
+import { ProductThumb } from "@/components/layout/ProductThumb";
 import { SearchPanel } from "@/components/search/SearchPanel";
 import { MarketSummary, type MarketState } from "@/components/search/MarketSummary";
 import { ExactOffersSection } from "@/components/search/ExactOffersSection";
@@ -40,6 +40,7 @@ import { historyStore, createEntryId, type HistoryEntry } from "@/lib/storage/hi
 import { loadDraft, saveDraft } from "@/lib/storage/draft";
 import { checkCloudConnection } from "@/lib/supabase";
 import { apiFetch } from "@/lib/api";
+import { displayableProductImage, storableProductImage } from "@/lib/productImage";
 import { useAuth } from "@/components/auth/AuthGate";
 import { parseManualPrices, computeMarketStats } from "@/lib/mlu/statistics";
 import { formatMoney, formatPct, formatRate, formatUyu } from "@/lib/format";
@@ -178,6 +179,8 @@ export default function App() {
           : 0;
     updateInputs({
       productName: audit.title,
+      // La foto que guardó la auditoría, si es de un host conocido; una auditoría vieja sin foto queda con el icono.
+      productImage: storableProductImage(audit.thumbnail),
       query: audit.title,
       ...(targetPrice > 0 ? { salePrice: targetPrice } : {}),
     });
@@ -292,8 +295,19 @@ export default function App() {
 
   // Handle Search in Mercado Libre Uruguay
   const searchAbortRef = useRef<AbortController | null>(null);
-  const handleSearch = async (query: string) => {
+  // Última búsqueda del Radar: buscar otra cosa (ni la misma búsqueda ni el producto cargado) saca la foto anterior.
+  const lastSearchRef = useRef<string | null>(null);
+  /**
+   * `photo`: foto que acompaña la búsqueda (la miniatura de «Por foto»); "keep" conserva la que hay
+   * (búsqueda ampliada del mismo producto). Sin indicarlo, la foto se saca si se busca otro nombre.
+   */
+  const handleSearch = async (query: string, photo?: string | null | "keep") => {
     if (!query) return;
+    if (photo !== "keep") {
+      if (photo !== undefined) updateInputs({ productImage: displayableProductImage(photo) });
+      else if (query !== lastSearchRef.current && query !== inputs.productName) updateInputs({ productImage: null });
+    }
+    lastSearchRef.current = query;
     // Una búsqueda nueva cancela la anterior: la respuesta vieja no pisa a la nueva.
     searchAbortRef.current?.abort();
     const controller = new AbortController();
@@ -362,6 +376,7 @@ export default function App() {
   const clearRadar = () => {
     searchAbortRef.current?.abort();
     searchAbortRef.current = null;
+    lastSearchRef.current = null;
     setSearchLoading(false);
     setMarketState({ status: "idle" });
     setStats(null);
@@ -419,7 +434,8 @@ export default function App() {
     const entry: HistoryEntry = {
       id: createEntryId(),
       savedAt: new Date().toISOString(),
-      inputs,
+      // La foto que subió el usuario no se guarda: solo la dirección de una foto de Mercado Libre o Google.
+      inputs: { ...inputs, productImage: storableProductImage(inputs.productImage) },
       market: liveStats
         ? {
             ...liveStats,
@@ -451,7 +467,8 @@ export default function App() {
   };
 
   const handleLoadEntry = (entry: HistoryEntry) => {
-    setInputs(entry.inputs);
+    // Una entrada vieja no trae foto: queda sin ella.
+    setInputs({ ...entry.inputs, productImage: storableProductImage(entry.inputs.productImage) });
     // El Radar no queda con la búsqueda anterior; después se cargan las estadísticas que guardó la entrada.
     clearRadar();
     if (entry.market) {
@@ -503,6 +520,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
     setInputs((prev) => ({
       ...prev,
       productName: "",
+      productImage: null,
       query: "",
       cost: { ...prev.cost, amount: 0 },
       freight: { ...prev.freight, amount: 0 },
@@ -591,9 +609,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
           <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-x-6 gap-y-4">
             {/* Left: Product & Sourcing */}
             <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
-              <div className="flex size-11 sm:size-14 shrink-0 items-center justify-center bg-black text-white dark:bg-white dark:text-black font-black text-lg shadow-sm">
-                <TrendingUp className="size-6 sm:size-7" />
-              </div>
+              <ProductThumb image={inputs.productImage} name={inputs.productName || inputs.query} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className="text-[11px] font-black uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
@@ -918,10 +934,10 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                         ? marketState.query
                         : null
                     }
-                    onSearch={(q) => {
-                      // La misma búsqueda del Radar, con el nombre que confirmó el usuario.
+                    onSearch={(q, photo) => {
+                      // La misma búsqueda del Radar, con el nombre que confirmó el usuario y la miniatura de su foto.
                       updateInputs({ query: q });
-                      handleSearch(q);
+                      handleSearch(q, photo);
                     }}
                   />
                 </Suspense>
@@ -933,7 +949,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 exact={exactBlock}
                 selection={exactSelection}
                 rate={currentRate}
-                onSimulate={(p) => updateInputs({ salePrice: p })}
+                onSimulate={(p, _title, image) => updateInputs({ salePrice: p, productImage: storableProductImage(image) })}
               />
             )}
 
@@ -945,11 +961,14 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
               source={marketSource}
               manualPrices={manualPrices}
               onManualPricesChange={handleManualPricesChange}
-              onSelectPrice={(p) => updateInputs({ salePrice: p })}
+              // Con `image` es una tarjeta de producto; sin ella es un precio de las estadísticas y la foto no cambia.
+              onSelectPrice={(p, image) =>
+                updateInputs({ salePrice: p, ...(image !== undefined ? { productImage: storableProductImage(image) } : {}) })
+              }
               onBroaden={(q) => {
                 // Búsqueda ampliada: la pide el usuario con el botón; el nombre buscado queda a la vista en el cuadro.
                 updateInputs({ query: q });
-                handleSearch(q);
+                handleSearch(q, "keep");
               }}
             />
           </div>
@@ -960,9 +979,9 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                 <UrlAnalyzer
                   exchangeRate={inputs.exchangeRate}
                   rate={currentRate}
-                  onSimulatePrice={(p, name) => {
-                    // No cambia de pestaña ni borra el análisis: carga el producto y vacía el Radar.
-                    updateInputs({ salePrice: p, productName: name, query: name });
+                  onSimulatePrice={(p, name, image) => {
+                    // No cambia de pestaña ni borra el análisis: carga el producto (con su foto, si tiene) y vacía el Radar.
+                    updateInputs({ salePrice: p, productName: name, query: name, productImage: storableProductImage(image) });
                     clearRadar();
                     scrollToSection("resultado");
                   }}
@@ -979,7 +998,7 @@ _Calculado con UyMargin - Analizador Mayorista Uruguay_`;
                   exchangeRate={inputs.exchangeRate}
                   onSimulateProduct={(simInputs) => {
                     // No cambia de pestaña ni borra el lote: carga el producto y vacía el Radar.
-                    updateInputs(simInputs);
+                    updateInputs({ ...simInputs, productImage: storableProductImage(simInputs.productImage) });
                     clearRadar();
                     scrollToSection("resultado");
                   }}

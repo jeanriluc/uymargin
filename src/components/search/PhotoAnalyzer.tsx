@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent, type Keybo
 import { AlertCircle, Camera, Globe, ImagePlus, Loader2, ScanSearch, Search, Sparkles, X } from "lucide-react";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
+import { LOCAL_THUMBNAIL_SIDE, isLocalThumbnail } from "@/lib/productImage";
 import { NameSearchResults, WebSellersPanel, useWebSellers, webCandidates } from "@/components/search/WebSellers";
 import { VisualMatchesPanel, needsAiFallback, needsAutoName, useVisualSearch, visualCandidates } from "@/components/search/VisualMatches";
 import { useSiteVerification } from "@/components/search/SiteVerification";
@@ -20,8 +21,11 @@ import {
 } from "@/lib/photo/identify";
 
 interface PhotoAnalyzerProps {
-  /** Busca en el Radar con el nombre confirmado. Es la misma búsqueda de la pestaña Radar MLU. */
-  onSearch: (name: string) => void;
+  /**
+   * Busca en el Radar con el nombre confirmado. Es la misma búsqueda de la pestaña Radar MLU.
+   * `photo`: miniatura de la foto del usuario, armada en el navegador, para el resumen. No se manda a ningún servidor.
+   */
+  onSearch: (name: string, photo: string | null) => void;
   searchLoading: boolean;
   /** Nombre de la última búsqueda del Radar que no encontró ningún producto, o null. */
   marketEmptyFor?: string | null;
@@ -39,6 +43,8 @@ interface Photo {
   url: string;
   width: number;
   height: number;
+  /** Miniatura chica para el resumen (data: JPEG). Queda en el navegador; null si no se pudo armar. */
+  thumb: string | null;
 }
 
 type Phase = "idle" | "preparing" | "analyzing";
@@ -53,6 +59,25 @@ const SECONDARY_BUTTON =
   "inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer disabled:opacity-40 disabled:pointer-events-none";
 const PRIMARY_BUTTON =
   "h-12 px-6 rounded-md bg-black hover:bg-zinc-800 text-white dark:bg-white dark:text-black dark:hover:bg-zinc-200 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm disabled:opacity-40 disabled:pointer-events-none active:scale-95 shrink-0";
+
+/** Miniatura de la foto para el resumen: como mucho 160 px de lado, JPEG. Si algo falla, no hay miniatura. */
+function localThumbnail(bitmap: ImageBitmap): string | null {
+  try {
+    const { width, height } = fitWithin(bitmap.width, bitmap.height, LOCAL_THUMBNAIL_SIDE);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || width === 0) return null;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const thumb = canvas.toDataURL("image/jpeg", 0.8);
+    return isLocalThumbnail(thumb) ? thumb : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Achica la foto en el navegador: lado mayor acotado y JPEG. De paso, la foto sale sin sus metadatos. */
 async function shrinkPhoto(file: Blob): Promise<Omit<Photo, "url">> {
@@ -70,7 +95,7 @@ async function shrinkPhoto(file: Blob): Promise<Omit<Photo, "url">> {
     ctx.drawImage(bitmap, 0, 0, width, height);
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", PHOTO_LIMITS.jpegQuality));
     if (!blob) throw new Error("toBlob");
-    return { blob, width, height };
+    return { blob, width, height, thumb: localThumbnail(bitmap) };
   } finally {
     bitmap.close();
   }
@@ -266,7 +291,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     // Cada vista busca solo en lo suyo, y solo cuando el usuario lo pide.
     if (view === "web") return void web.search(q);
     setLastMlSearch(q);
-    onSearch(q);
+    onSearch(q, photo?.thumb ?? null);
   }
 
   function openView(next: View) {

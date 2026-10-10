@@ -229,6 +229,8 @@ export function BatchAuditor({
       let reliability: MarketReliability | null = null;
       let broadenedQuery: string | null = null;
       let triedBroadened: string | null = null;
+      // Foto de la fila: la del producto exacto o la del primero que coincide. Sin dato de mercado, no hay.
+      let productImage: string | null = null;
 
       try {
         if (halted) throw new BatchHalted();
@@ -248,6 +250,8 @@ export function BatchAuditor({
         }
         if (data?.ok && data.stats && hasPrice(data)) {
           marketPriceUyu = Math.round(data.stats.median);
+          productImage =
+            data.exact?.match.thumbnail ?? (data.items ?? []).find((it) => it.match?.matches && it.thumbnail)?.thumbnail ?? null;
           sampleSize = data.stats.sampleSize;
           // Mismos precios con los que el servidor armó la mediana: los productos que coinciden, en pesos.
           const matching = (data.items ?? []).filter((it) => it.match?.matches);
@@ -286,6 +290,8 @@ export function BatchAuditor({
       const itemInputs: AnalysisInputs = {
         ...baseInputs,
         productName: item.name,
+        // Nunca la foto del producto que estaba en el simulador: la de la fila o ninguna.
+        productImage,
         query: item.name,
         cost: { amount: item.cost, currency: item.currency },
         salePrice: marketPriceUyu,
