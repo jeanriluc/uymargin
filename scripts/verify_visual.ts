@@ -17,6 +17,7 @@ import {
   lensInput,
 } from "../server/visualSearch";
 import type { FetchLike } from "../server/webSellers";
+import { isForeignSite } from "../src/lib/web/sellers";
 import { PHOTO_LIMITS } from "../src/lib/photo/identify";
 import {
   VISUAL_LIMITS,
@@ -26,6 +27,7 @@ import {
   cleanListingTitle,
   formatVisualPrice,
   isForeignDomain,
+  shouldAutoSearchByName,
   isVisualNonStore,
   mostRepeatedTitle,
   parseAmount,
@@ -137,16 +139,16 @@ async function main() {
   }
   // Una tienda .com en dólares: el precio se muestra, pero no la vuelve uruguaya.
   const usdStore = toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo IdeaPad 15", price: 899, currency: "U$S" }));
-  assert(usdStore?.group === "abroad" && usdStore.uruguay === null && usdStore.price !== null && formatVisualPrice(usdStore.price) === "US$ 899", "Tienda .com en dólares y sin mención de Uruguay: «Otros países o sin confirmar», con su precio en US$");
+  assert(usdStore?.group === "unconfirmed" && usdStore.uruguay === null && usdStore.price !== null && formatVisualPrice(usdStore.price) === "US$ 899", "Tienda .com en dólares y sin mención de Uruguay: «Sin confirmar», con su precio en US$");
   for (const title of ["Notebook Lenovo IdeaPad 15 - Envíos a todo Uruguay", "Notebook Lenovo en Montevideo", "Notebook Lenovo | Envíos a todo el país", "Notebook Lenovo. Envío a todo el país", "Notebook Lenovo - envios a todo el pais"]) {
     const m = toVisualMatch(item("https://tiendatech.com/notebook", { title, price: 899, currency: "U$S" }));
     assert(m?.group === "uy_stores" && m.uruguay === "probable" && m.price?.currency === "USD", `Tienda .com en dólares con «${title.slice(16)}»: Tiendas de Uruguay, «probable», precio en US$`);
   }
   assert(toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo", price: 35990, currency: "$U" }))?.group === "uy_stores", "El precio en pesos uruguayos sigue siendo una señal de Uruguay");
-  assert(toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo", price: 35990, currency: "$" }))?.group === "abroad", "Un «$» suelto en una .com no es señal de Uruguay (ni se muestra)");
+  assert(toVisualMatch(item("https://tiendatech.com/notebook", { title: "Notebook Lenovo", price: 35990, currency: "$" }))?.group === "unconfirmed", "Un «$» suelto en una .com no es señal de Uruguay (ni se muestra)");
   for (const url of ["https://tienda.com.ar/notebook", "https://www.mercadolibre.com.ar/notebook", "https://tienda.cl/notebook", "https://tienda.com.br/notebook"]) {
     const m = toVisualMatch(item(url, { title: "Notebook Lenovo - Envíos a todo el país, Montevideo, Uruguay", price: 35990, currency: "UYU" }));
-    assert(m?.group === "abroad" && m.uruguay === null, `${new URL(url).hostname}: un dominio de otro país nunca entra al grupo de Uruguay, diga lo que diga`);
+    assert(m?.group === "foreign" && m.uruguay === null, `${new URL(url).hostname}: un dominio de otro país nunca entra al grupo de Uruguay, diga lo que diga`);
   }
   const twoCurrencies = buildVisualMatches([
     item("https://pesos.com.uy/a", { price: 3722, currency: "$" }),
@@ -165,15 +167,18 @@ async function main() {
   assert(group("articulo.mercadolibre.com.uy") === "ml_uy" && group("mercadolibre.com.uy") === "ml_uy" && group("listado.mercadolibre.com.uy") === "ml_uy", "mercadolibre.com.uy y sus subdominios: bloque Mercado Libre Uruguay");
   assert(group("stanley1913.uy") === "uy_stores" && group("electroventas.com.uy") === "uy_stores" && classifyVisual("tienda.com.uy", "https://tienda.com.uy/p", no).uruguay === "confirmado", "Un .uy es una tienda de Uruguay confirmada");
   for (const host of ["mercadolibre.com.ar", "tienda.com.br", "falabella.cl", "tienda.com.py", "stanley1913.com.ve", "mercadolibre.com.mx", "tienda.de", "mercadolibre.com.co"]) {
-    assert(group(host, `https://${host}/p`, { uyuPrice: true, text: "envíos a Uruguay" }) === "abroad" && isForeignDomain(host), `${host}: otro país, aunque el resultado nombre a Uruguay`);
+    assert(group(host, `https://${host}/p`, { uyuPrice: true, text: "envíos a Uruguay" }) === "foreign" && isForeignDomain(host), `${host}: otro país, se oculta aunque el resultado nombre a Uruguay`);
   }
-  assert(group("amazon.com") === "abroad" && group("es.aliexpress.com") === "abroad", "Tiendas globales: no se dan por uruguayas");
+  for (const host of ["tienda.nl", "tienda.se", "tienda.com.bo", "tienda.kr"]) {
+    assert(group(host, `https://${host}/p`, { uyuPrice: true, text: "envíos a Uruguay" }) === "unconfirmed" && !isForeignSite(host), `${host}: país que no está en la lista; no se oculta, pero tampoco entra a Uruguay (queda «Sin confirmar»)`);
+  }
+  assert(group("amazon.com") === "foreign" && group("es.aliexpress.com") === "foreign", "Tiendas globales: se ocultan");
   assert(!isForeignDomain("tienda.com") && !isForeignDomain("tienda.co") && !isForeignDomain("tienda.io") && !isForeignDomain("tienda.uy") && !isForeignDomain("tienda.com.uy"), ".com, .co, .io y .uy no cuentan como «otro país»");
-  assert(group("yerbascalzada.com") === "abroad", "Una tienda .com sin ninguna señal de Uruguay queda en «Otros países o sin confirmar»");
+  assert(group("yerbascalzada.com") === "unconfirmed" && group("vntg.com") === "unconfirmed", "Una tienda .com sin ninguna señal de Uruguay y fuera de la lista del exterior queda en «Sin confirmar»");
   const probable = classifyVisual("matesuru.com", "https://matesuru.com/p", { uyuPrice: true, text: "" });
   assert(probable.group === "uy_stores" && probable.uruguay === "probable", "Una tienda .com con precio en pesos uruguayos entra como «probable», nunca «confirmado»");
   assert(group("tienda.com", "https://tienda.com/p", { uyuPrice: false, text: "Termo - Envíos a todo Uruguay" }) === "uy_stores" && group("tienda.com", "https://tienda.com/uy/termo") === "uy_stores", "También si el resultado nombra a Uruguay o la ruta es /uy/");
-  for (const host of ["instagram.com", "facebook.com", "youtube.com", "pinterest.com", "es.wikipedia.org", "idealo.de", "idealo.es", "kelkoo.com", "pricerunner.com", "gub.uy".replace("gub", "impo.gub"), "dgi.gub.uy", "usa.gov", "elpais.com.uy", "blog.tienda.com"]) {
+  for (const host of ["instagram.com", "facebook.com", "youtube.com", "pinterest.com", "es.wikipedia.org", "kelkoo.com", "pricerunner.com", "gub.uy".replace("gub", "impo.gub"), "dgi.gub.uy", "usa.gov", "elpais.com.uy", "blog.tienda.com"]) {
     assert(group(host, `https://${host}/p`, { uyuPrice: true, text: "Uruguay" }) === "others", `${host}: no es una tienda, va a «Otros resultados»`);
   }
   assert(isVisualNonStore("tienda.com.uy", "https://tienda.com.uy/blog/termos") && !isVisualNonStore("tienda.com.uy", "https://tienda.com.uy/termos"), "La ruta /blog/ también cuenta como «no es tienda»");
@@ -201,9 +206,10 @@ async function main() {
   assert(real.results.length === 10, "Los 10 resultados de la muestra se muestran (ningún dominio se repite más de dos veces)");
   assert(sites("ml_uy") === "articulo.mercadolibre.com.uy,mercadolibre.com.uy" && real.mlCount === 2, "Mercado Libre Uruguay: bloque propio con sus 2 publicaciones");
   assert(sites("uy_stores") === "stanley1913.uy,matesuru.com,electroventas.com.uy", `Tiendas de Uruguay: Stanley, Matesuru y Electroventas (${sites("uy_stores")})`);
-  assert(sites("abroad") === "mercadolibre.com.ar,yerbascalzada.com,stanley1913.com.ve", `Otros países o sin confirmar: Mercado Libre Argentina, Yerbas Calzada y Stanley Venezuela (${sites("abroad")})`);
-  assert(sites("others") === "instagram.com,idealo.de", "Otros resultados: Instagram e Idealo");
-  assert(real.results.map((m) => m.group).join() === "ml_uy,ml_uy,uy_stores,uy_stores,uy_stores,abroad,abroad,abroad,others,others", "Orden de los grupos: Mercado Libre, tiendas, otros países, otros");
+  assert(sites("foreign") === "mercadolibre.com.ar,stanley1913.com.ve,idealo.de", `Se ocultan por ser del exterior: Mercado Libre Argentina, Stanley Venezuela e Idealo (${sites("foreign")})`);
+  assert(sites("unconfirmed") === "yerbascalzada.com", "Sin confirmar: Yerbas Calzada (.com sin señal de Uruguay)");
+  assert(sites("others") === "instagram.com", "Otros resultados: Instagram");
+  assert(real.results.map((m) => m.group).join() === "ml_uy,ml_uy,uy_stores,uy_stores,uy_stores,unconfirmed,others,foreign,foreign,foreign", "Orden de los grupos: Mercado Libre, tiendas, sin confirmar, otros y, al final, los ocultos del exterior");
   const priceOf = (site: string) => {
     const m = real.results.find((x) => x.site === site);
     return m?.price ? formatVisualPrice(m.price) : null;
@@ -220,7 +226,9 @@ async function main() {
   const lamp = buildVisualMatches(lampParsed.ok ? lampParsed.items : []);
   const lampSites = (g: string) => lamp.results.filter((m) => m.group === g).map((m) => m.site).join();
   assert(lampParsed.ok && lamp.results.length === 8, "La muestra de la lámpara se lee entera: 8 resultados");
-  assert(lampSites("abroad") === "walmart.com,amazon.com,amazon.es,etsy.com,1stdibs.com,vntg.com,temu.com" && lampSites("others") === "instagram.com", `Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs, VNTG y Temu son «Otros países»; Instagram, «Otros resultados» (${lampSites("abroad")})`);
+  assert(lampSites("foreign") === "walmart.com,amazon.com,amazon.es,etsy.com,1stdibs.com,temu.com", `Walmart, Amazon.com, Amazon.es, Etsy, 1stDibs y Temu se ocultan por ser del exterior (${lampSites("foreign")})`);
+  assert(lampSites("unconfirmed") === "vntg.com" && lampSites("others") === "instagram.com", "VNTG (.com fuera de la lista) queda «Sin confirmar»; Instagram, en «Otros resultados»");
+  assert(lamp.results.filter((m) => m.group === "ml_uy" || m.group === "uy_stores").length === 0, "La lámpara deja cero resultados visibles de Uruguay");
   assert(lampSites("ml_uy") === "" && lampSites("uy_stores") === "" && lamp.uruguayCount === 0 && lamp.mlCount === 0, "Ningún resultado de Uruguay");
   assert(lamp.suggestedName === "", "Sin resultados de Uruguay no se propone un nombre para buscar: eso queda para la IA");
   assert(lamp.recognizedAs === "Artemide Nessino Table Lamp Orange", `«Lens lo reconoce como»: el título limpio más repetido entre todas las tiendas (${lamp.recognizedAs})`);
@@ -232,9 +240,22 @@ async function main() {
     assert(!wantsAutoName({ code }), `Con ${code ?? "un error sin código"} la IA no corre sola: queda el botón`);
   }
   assert(real.recognizedAs.length > 0 && !/mercado\s*libre/i.test(real.recognizedAs), "Con la muestra del termo también se calcula, aunque la pantalla solo lo muestra si no hay nada de Uruguay");
-  assert(buildVisualMatches([item("https://www.instagram.com/p/a/", { title: "Mirá esto" }), item("https://www.idealo.de/x", { title: "Lampe ab 59 €" })]).recognizedAs === "", "Redes y comparadores no cuentan para decir qué producto es");
+  assert(buildVisualMatches([item("https://www.instagram.com/p/a/", { title: "Mirá esto" }), item("https://www.kelkoo.com/x", { title: "Lampe ab 59 €" })]).recognizedAs === "", "Redes y comparadores no cuentan para decir qué producto es");
+  assert(buildVisualMatches([item("https://www.amazon.es/dp/1", { title: "Artemide Nessino : Amazon.es: Iluminación" }), item("https://www.etsy.com/listing/2", { title: "Artemide Nessino - Etsy", source: "Etsy" })]).recognizedAs === "Artemide Nessino", "Los títulos de los sitios ocultos sí cuentan para «lo reconoce como»");
   assert(cleanListingTitle("Amazon.com: Artemide Nessino Table Lamp Orange") === "Artemide Nessino Table Lamp Orange" && cleanListingTitle("Artemide Nessino Lámpara de mesa naranja : Amazon.es: Iluminación") === "Artemide Nessino Lámpara de mesa naranja", "Saca «Amazon.com:» del principio y «: Amazon.es: …» del final");
   assert(cleanListingTitle("Mushroom Table Lamp Orange - Walmart.com", "Walmart") === "Mushroom Table Lamp Orange" && cleanListingTitle("Vintage Artemide Nesso Table Lamp - Etsy", "Etsy") === "Vintage Artemide Nesso Table Lamp" && cleanListingTitle("Artemide Nesso | 1stDibs") === "Artemide Nesso", "Saca «- Walmart.com», «- Etsy» y «| 1stDibs»");
+
+  console.log("--- Completar con una búsqueda por nombre ---");
+  const auto = { automatic: true, aiName: "Lámpara Artemide Nessino", currentName: "", visualName: "", alreadyLaunched: false };
+  assert(wantsAutoName(lamp) && shouldAutoSearchByName(auto), "La lámpara (0 visibles de Uruguay) pide el nombre a la IA y, con ese nombre, dispara la búsqueda por nombre");
+  assert(shouldAutoSearchByName({ ...auto, currentName: "Termo de una tienda", visualName: "Termo de una tienda" }), "También si en el campo estaba el nombre que había propuesto la búsqueda visual (la IA lo reemplaza)");
+  assert(shouldAutoSearchByName({ ...auto, currentName: " Lámpara Artemide Nessino " }), "O si en el campo ya está el nombre de la IA");
+  assert(!wantsAutoName({ uruguayCount: 3 }) && !wantsAutoName(real), "Con 3 o más resultados visibles de Uruguay no se llama a la IA, así que no se dispara");
+  assert(!shouldAutoSearchByName({ ...auto, aiName: "" }) && !shouldAutoSearchByName({ ...auto, aiName: "  " }) && !shouldAutoSearchByName({ ...auto, aiName: "a" }), "Con el nombre vacío (o la IA sin nombre) no se dispara");
+  assert(!shouldAutoSearchByName({ ...auto, currentName: "mi lámpara naranja" }) && !shouldAutoSearchByName({ ...auto, currentName: "mi lámpara", visualName: "Otra cosa" }), "Si el usuario escribió otro nombre, no se dispara");
+  assert(!shouldAutoSearchByName({ ...auto, automatic: false }), "Si la IA se pidió con el botón, no se dispara sola: la búsqueda queda para el botón");
+  assert(!shouldAutoSearchByName({ ...auto, alreadyLaunched: true }), "Un solo intento por foto: si ya se lanzó, no se repite");
+  assert(RATE_RULES.web.scope === "web" && RATE_RULES.web.perMinute === 5 && RATE_RULES.web.perDay === 20, "La búsqueda por nombre gasta el límite de «web»: 5 por minuto y 20 por día");
 
   console.log("--- Duplicados, límite por dominio y orden ---");
   const repeated = buildVisualMatches([
@@ -296,7 +317,7 @@ async function main() {
     ],
   });
   assert(tampered !== null && tampered.results.length === 3 && !JSON.stringify(tampered).includes("javascript:"), "Un enlace javascript: que llegara del servidor no pasa");
-  assert(tampered?.results[0].group === "others" && tampered.results[0].price === null && tampered.results[1].group === "abroad" && tampered.results[1].price === null, "La pantalla vuelve a clasificar por el enlace: no le cree al grupo ni al precio que diga el servidor");
+  assert(tampered?.results[0].group === "others" && tampered.results[0].price === null && tampered.results[1].group === "foreign" && tampered.results[1].price === null, "La pantalla vuelve a clasificar por el enlace: no le cree al grupo ni al precio que diga el servidor");
   assert(tampered?.results[2].group === "uy_stores" && tampered.results[2].price === null && tampered.results[2].thumbnail === null && !("html" in (tampered.results[2] as object)), "Precio con otro tipo, miniatura de otro origen y campos de más: se descartan");
   assert(tampered?.suggestedName.length === 120 && !/\n/.test(tampered.suggestedName) && tampered.mlCount === 0 && tampered.uruguayCount === 1 && tampered.cached === false, "Nombre acotado y contadores saneados");
   assert(parseVisualResponse(null) === null && parseVisualResponse({ ok: true, results: "muchos" }) === null && parseVisualResponse({ ok: false, results: [] }) === null, "Una respuesta con otra forma se rechaza");
