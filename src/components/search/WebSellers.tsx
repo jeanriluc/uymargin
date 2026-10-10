@@ -77,13 +77,13 @@ export function useWebSellers() {
   return { state, search, cancel, reset };
 }
 
-const URUGUAY_STYLES: Record<UruguayStatus, string> = {
+export const URUGUAY_STYLES: Record<UruguayStatus, string> = {
   confirmado: "border-emerald-600/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
   probable: "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200",
   no_confirmado: "border-zinc-400/50 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 };
 
-const LINK_BUTTON =
+export const LINK_BUTTON =
   "inline-flex items-center justify-center gap-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white hover:bg-zinc-100 dark:bg-zinc-900 dark:hover:bg-zinc-800 px-3.5 py-2.5 text-xs font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer";
 
 function SellerCard({ seller }: { seller: WebSeller }) {
@@ -119,6 +119,32 @@ function SellerCard({ seller }: { seller: WebSeller }) {
   );
 }
 
+/** Botones gratuitos de Google Uruguay para un nombre. No gastan nada: abren la búsqueda en otra pestaña. */
+export function GoogleLinks({ name }: { name: string }) {
+  const usable = name.trim().length >= WEB_LIMITS.queryMin;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gratis, en otra pestaña:</span>
+      {usable ? (
+        <>
+          <a href={googleSearchUrl(name)} target="_blank" rel="noopener noreferrer" data-google="search" className={LINK_BUTTON}>
+            <Globe className="size-3.5" aria-hidden />
+            <span>Buscar en Google Uruguay</span>
+            <span className="visually-hidden"> (se abre en otra pestaña)</span>
+          </a>
+          <a href={googleShoppingUrl(name)} target="_blank" rel="noopener noreferrer" data-google="shopping" className={LINK_BUTTON}>
+            <ShoppingCart className="size-3.5" aria-hidden />
+            <span>Google Shopping Uruguay</span>
+            <span className="visually-hidden"> (se abre en otra pestaña)</span>
+          </a>
+        </>
+      ) : (
+        <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Escribí el nombre del producto para armar la búsqueda.</span>
+      )}
+    </div>
+  );
+}
+
 interface WebSellersPanelProps {
   /** Nombre que está en el campo: con él se arman los botones de Google. */
   name: string;
@@ -130,7 +156,6 @@ interface WebSellersPanelProps {
 
 /** Vista "En la web (Uruguay)". El botón que lanza la búsqueda está junto al nombre, en PhotoAnalyzer. */
 export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPanelProps) {
-  const usable = name.trim().length >= WEB_LIMITS.queryMin;
   const results = state.status === "done" ? state.data.results : [];
   const main = results.filter(isMainSeller);
   // Tiendas que no se pudo ubicar en Uruguay, y aparte lo que no es una tienda.
@@ -142,25 +167,7 @@ export function WebSellersPanel({ name, state, onCancel, onRetry }: WebSellersPa
     <div className="flex min-w-0 flex-col gap-3">
       <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">{WEB_MESSAGES.notice}</p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Gratis, en otra pestaña:</span>
-        {usable ? (
-          <>
-            <a href={googleSearchUrl(name)} target="_blank" rel="noopener noreferrer" data-google="search" className={LINK_BUTTON}>
-              <Globe className="size-3.5" aria-hidden />
-              <span>Buscar en Google Uruguay</span>
-              <span className="visually-hidden"> (se abre en otra pestaña)</span>
-            </a>
-            <a href={googleShoppingUrl(name)} target="_blank" rel="noopener noreferrer" data-google="shopping" className={LINK_BUTTON}>
-              <ShoppingCart className="size-3.5" aria-hidden />
-              <span>Google Shopping Uruguay</span>
-              <span className="visually-hidden"> (se abre en otra pestaña)</span>
-            </a>
-          </>
-        ) : (
-          <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Escribí el nombre del producto para armar la búsqueda.</span>
-        )}
-      </div>
+      <GoogleLinks name={name} />
 
       {state.status === "idle" && state.notice && (
         <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">

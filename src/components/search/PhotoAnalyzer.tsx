@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
-import { AlertCircle, Camera, Globe, ImagePlus, Loader2, Search, Sparkles, X } from "lucide-react";
+import { AlertCircle, Camera, Globe, ImagePlus, Loader2, ScanSearch, Search, Sparkles, X } from "lucide-react";
 import { StepHeader } from "@/components/ui/StepHeader";
 import { apiFetch } from "@/lib/api";
 import { WebSellersPanel, useWebSellers } from "@/components/search/WebSellers";
+import { VisualMatchesPanel, needsAiFallback, useVisualSearch } from "@/components/search/VisualMatches";
+import { VISUAL_MESSAGES } from "@/lib/photo/visual";
 import {
   CONFIDENCE_PHRASES,
   PHOTO_LIMITS,
@@ -24,10 +26,10 @@ interface PhotoAnalyzerProps {
   marketEmptyFor?: string | null;
 }
 
-/** Dónde se busca el nombre confirmado. */
-type View = "ml" | "web";
+/** "foto": lo que encontró la búsqueda visual. "web": búsqueda en Google Uruguay por el nombre. */
+type View = "foto" | "web";
 const VIEWS: { id: View; label: string }[] = [
-  { id: "ml", label: "Mercado Libre" },
+  { id: "foto", label: "Según la foto" },
   { id: "web", label: "En la web (Uruguay)" },
 ];
 
@@ -81,10 +83,12 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [view, setView] = useState<View>("ml");
+  const [view, setView] = useState<View>("foto");
   // Último nombre que se mandó al Radar desde acá: para saber si "sin resultados" habla de esta búsqueda.
   const [lastMlSearch, setLastMlSearch] = useState<string | null>(null);
   const web = useWebSellers();
+  const visual = useVisualSearch();
+  const visualStatus = visual.state.status;
 
   const fileInput = useRef<HTMLInputElement>(null);
   const cameraInput = useRef<HTMLInputElement>(null);
@@ -102,10 +106,10 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     []
   );
 
-  // Al llegar un producto, el foco va al nombre: es lo que hay que revisar antes de buscar.
+  // Al llegar resultados o un nombre de la IA, el foco va al nombre: es lo que hay que revisar antes de buscar.
   useEffect(() => {
-    if (result?.isProduct) nameInput.current?.focus({ preventScroll: true });
-  }, [result]);
+    if (visualStatus === "done" || result?.isProduct) nameInput.current?.focus({ preventScroll: true });
+  }, [visualStatus, result]);
 
   function replacePhoto(next: Photo | null) {
     if (photoUrlRef.current) URL.revokeObjectURL(photoUrlRef.current);
@@ -123,9 +127,10 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     setName("");
     setError(null);
     setNotice(null);
-    setView("ml");
+    setView("foto");
     setLastMlSearch(null);
     web.reset();
+    visual.reset();
   }
 
   async function choosePhoto(file: File | undefined) {
@@ -152,6 +157,19 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
     }
   }
 
+  /** Búsqueda visual: es el paso principal. Cada búsqueda se paga, así que solo corre cuando se la pide. */
+  async function findSellers() {
+    if (!photo || phase !== "idle" || visualStatus === "loading") return;
+    const turn = turnRef.current;
+    setError(null);
+    setNotice(null);
+    const data = await visual.search(photo.blob);
+    if (turn !== turnRef.current || !data?.suggestedName) return;
+    // Si ya hay un nombre escrito (por ejemplo, al reintentar), no se pisa.
+    setName((current) => (current.trim() ? current : data.suggestedName));
+  }
+
+  /** Identificación con IA: paso secundario, para cuando la búsqueda visual no alcanza. */
   async function analyze() {
     if (!photo || phase !== "idle") return;
     const turn = turnRef.current;
@@ -229,9 +247,12 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
   }
 
   const webLoading = web.state.status === "loading";
-  const suggestWeb = view === "ml" && !searchLoading && marketEmptyFor !== null && marketEmptyFor === lastMlSearch;
+  const suggestWeb = view === "foto" && !searchLoading && marketEmptyFor !== null && marketEmptyFor === lastMlSearch;
 
   const busy = phase !== "idle";
+  // Hay algo para mostrar junto al nombre: la búsqueda visual terminó (bien o mal) o la IA ya respondió.
+  const staged = visualStatus === "done" || visualStatus === "error" || result !== null;
+  const offerAi = needsAiFallback(visual.state) && !result;
   const details = result?.isProduct
     ? [result.brand ? `Marca: ${result.brand}` : null, result.category ? `Categoría: ${result.category}` : null, ...result.attributes].filter(
         (d): d is string => Boolean(d)
@@ -243,7 +264,11 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
       <StepHeader title="Buscar por foto" aside="Opcional" />
 
       <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
-        Subí una foto del producto: la IA propone un nombre, vos lo revisás y recién ahí se busca en Mercado Libre Uruguay.
+        Subí una foto del producto y mirá dónde se vende en Uruguay, según Google Lens. Después revisás el nombre y
+        analizás los precios reales de Mercado Libre en el Radar.{" "}
+        <strong data-visual-privacy className="font-bold text-zinc-800 dark:text-zinc-200">
+          {VISUAL_MESSAGES.privacy}
+        </strong>
       </p>
 
       <input
@@ -335,21 +360,21 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-3">
-            {phase === "analyzing" ? (
+            {visualStatus === "loading" ? (
               <div className="flex flex-wrap items-center gap-3">
                 <p role="status" className="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-200">
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Analizando…
+                  Buscando dónde se vende…
                 </p>
-                <button type="button" onClick={cancelAnalysis} className={SECONDARY_BUTTON}>
+                <button type="button" onClick={visual.cancel} className={SECONDARY_BUTTON}>
                   Cancelar
                 </button>
               </div>
-            ) : !result ? (
+            ) : !staged ? (
               <div className="flex flex-wrap items-center gap-2">
-                <button type="button" onClick={analyze} disabled={busy} className={PRIMARY_BUTTON}>
-                  <Sparkles className="size-4" aria-hidden />
-                  <span>Identificar producto</span>
+                <button type="button" onClick={findSellers} disabled={busy} className={PRIMARY_BUTTON} data-visual-search>
+                  <ScanSearch className="size-4" aria-hidden />
+                  <span>Buscar dónde se vende</span>
                 </button>
                 <button type="button" onClick={() => fileInput.current?.click()} className={SECONDARY_BUTTON}>
                   Cambiar foto
@@ -357,27 +382,19 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
               </div>
             ) : null}
 
+            {visual.state.status === "idle" && visual.state.notice && (
+              <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                {visual.state.notice}
+              </p>
+            )}
+
             {notice && (
               <p role="status" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 {notice}
               </p>
             )}
 
-            {result && !result.isProduct && (
-              <div
-                role="status"
-                data-photo-no-product
-                className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
-              >
-                <p className="font-bold">{PHOTO_MESSAGES.noProduct}</p>
-                {result.notes && <p className="mt-1 break-words">{result.notes}</p>}
-                <button type="button" onClick={() => fileInput.current?.click()} className={`${SECONDARY_BUTTON} mt-3`}>
-                  Subir otra foto
-                </button>
-              </div>
-            )}
-
-            {result?.isProduct && (
+            {staged && visualStatus !== "loading" && (
               <form onSubmit={handleSubmit} className="flex min-w-0 flex-col gap-3" data-photo-result>
                 <div
                   role="tablist"
@@ -414,13 +431,15 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                     >
                       Nombre para buscar (podés corregirlo)
                     </label>
-                    <span
-                      role="status"
-                      data-photo-confidence={result.confidence}
-                      className={`rounded border px-2 py-0.5 text-[11px] font-bold ${CONFIDENCE_STYLES[result.confidence]}`}
-                    >
-                      {CONFIDENCE_PHRASES[result.confidence]}
-                    </span>
+                    {result?.isProduct && (
+                      <span
+                        role="status"
+                        data-photo-confidence={result.confidence}
+                        className={`rounded border px-2 py-0.5 text-[11px] font-bold ${CONFIDENCE_STYLES[result.confidence]}`}
+                      >
+                        {CONFIDENCE_PHRASES[result.confidence]}
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-col gap-2.5 sm:flex-row">
                     <input
@@ -431,13 +450,14 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                       minLength={2}
                       maxLength={PHOTO_NAME_MAX}
                       value={name}
+                      placeholder="Escribí el nombre del producto"
                       onChange={(e) => setName(e.target.value)}
-                      className="h-12 w-full min-w-0 flex-1 rounded-md border border-zinc-400 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3.5 text-sm font-medium text-zinc-900 dark:text-zinc-100 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
+                      className="h-12 w-full min-w-0 shrink-0 sm:shrink sm:flex-1 rounded-md border border-zinc-400 dark:border-zinc-600 bg-white dark:bg-zinc-900 px-3.5 text-sm font-medium text-zinc-900 dark:text-zinc-100 outline-none transition-all hover:border-zinc-500 focus:border-black dark:focus:border-white focus:ring-1 focus:ring-black dark:focus:ring-white"
                     />
-                    {view === "ml" ? (
-                      <button type="submit" disabled={searchLoading || name.trim().length < 2} className={PRIMARY_BUTTON}>
+                    {view === "foto" ? (
+                      <button type="submit" disabled={searchLoading || name.trim().length < 2} className={PRIMARY_BUTTON} data-radar-search>
                         {searchLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Search className="size-4" aria-hidden />}
-                        <span>{searchLoading ? "Buscando..." : "Buscar en Mercado Libre"}</span>
+                        <span>{searchLoading ? "Buscando..." : "Analizar en Radar"}</span>
                       </button>
                     ) : (
                       <button type="submit" disabled={webLoading || name.trim().length < 2} className={PRIMARY_BUTTON} data-web-search>
@@ -448,7 +468,7 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                   </div>
                 </div>
 
-                {result.alternatives.length > 0 && (
+                {result?.isProduct && result.alternatives.length > 0 && (
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="mr-1 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                       O usá:
@@ -482,17 +502,24 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                   </ul>
                 )}
 
-                {result.notes && <p className="break-words text-xs text-zinc-600 dark:text-zinc-400">{result.notes}</p>}
+                {result?.isProduct && result.notes && <p className="break-words text-xs text-zinc-600 dark:text-zinc-400">{result.notes}</p>}
 
-                <div role="tabpanel" id="photo-panel-ml" aria-labelledby="photo-tab-ml" hidden={view !== "ml"} className="min-w-0">
+                <div
+                  role="tabpanel"
+                  id="photo-panel-foto"
+                  aria-labelledby="photo-tab-foto"
+                  hidden={view !== "foto"}
+                  className="flex min-w-0 flex-col gap-3"
+                >
                   <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Los resultados aparecen acá abajo, igual que en el Radar. Si corregís el nombre y buscás de nuevo, no se vuelve a usar la IA.
+                    «Analizar en Radar» busca ese nombre en Mercado Libre Uruguay y muestra los precios reales acá abajo, igual que
+                    en el Radar. Corregir el nombre y buscar de nuevo no gasta otra búsqueda visual ni usa la IA.
                   </p>
                   {suggestWeb && (
                     <div
                       role="status"
                       data-web-suggestion
-                      className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
                     >
                       <p className="min-w-0 flex-1 break-words">
                         Mercado Libre no tiene precios para «{marketEmptyFor}». Puede que se venda en otros sitios.
@@ -500,6 +527,44 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
                       <button type="button" onClick={() => openView("web")} className={SECONDARY_BUTTON}>
                         <Globe className="size-3.5" aria-hidden />
                         <span>Probá en la web de Uruguay</span>
+                      </button>
+                    </div>
+                  )}
+
+                  <VisualMatchesPanel name={name} state={visual.state} onRetry={() => void findSellers()} />
+
+                  {phase === "analyzing" ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <p role="status" className="flex items-center gap-2 text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                        Analizando…
+                      </p>
+                      <button type="button" onClick={cancelAnalysis} className={SECONDARY_BUTTON}>
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : offerAi ? (
+                    <div className="flex flex-wrap items-center gap-2" data-ai-offer>
+                      <button type="button" onClick={analyze} disabled={busy} className={SECONDARY_BUTTON} data-ai-identify>
+                        <Sparkles className="size-3.5" aria-hidden />
+                        <span>Identificar nombre con IA (gratis)</span>
+                      </button>
+                      <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                        {visualStatus === "done" ? "Hay pocos resultados de Uruguay: la IA puede proponer un nombre." : "La IA propone un nombre a partir de la foto."}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {result && !result.isProduct && (
+                    <div
+                      role="status"
+                      data-photo-no-product
+                      className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200"
+                    >
+                      <p className="font-bold">{PHOTO_MESSAGES.noProduct}</p>
+                      {result.notes && <p className="mt-1 break-words">{result.notes}</p>}
+                      <button type="button" onClick={() => fileInput.current?.click()} className={`${SECONDARY_BUTTON} mt-3`}>
+                        Subir otra foto
                       </button>
                     </div>
                   )}
@@ -526,9 +591,12 @@ export function PhotoAnalyzer({ onSearch, searchLoading, marketEmptyFor = null }
       )}
 
       <p className="mt-4 border-t border-zinc-100 dark:border-zinc-800/80 pt-3 text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
-        <strong className="font-bold">La IA puede equivocarse con productos genéricos. Revisá el nombre antes de buscar.</strong>{" "}
-        La foto se achica en tu navegador, se envía a Gemini (Google) solo para identificarla y UyMargin no la guarda. La
-        rentabilidad sale del costo que cargues y del semáforo de siempre.
+        <strong className="font-bold">
+          La búsqueda visual y la IA pueden equivocarse con productos genéricos. Revisá el nombre antes de buscar.
+        </strong>{" "}
+        La foto se achica en tu navegador antes de enviarse. Si usás «Identificar nombre con IA», también se envía a Gemini
+        (Google). Los precios de las tiendas los informa Google y no entran en ningún cálculo: la rentabilidad sale del costo
+        que cargues y del semáforo de siempre.
       </p>
     </div>
   );
