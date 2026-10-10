@@ -108,6 +108,12 @@ async function main() {
   for (const ip of ["::1", "::", "fc00::1", "fd12:3456:789a::1", "fe80::1", "febf::1", "ff02::1", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:169.254.169.254", "::ffff:a9fe:a9fe", "::127.0.0.1", "64:ff9b::a00:1", "2002:a00:1::1", "2001:db8::1", "[::1]", "fe80::1%eth0"]) {
     assert(isBlockedIp(ip), `IPv6 ${ip}: bloqueada`);
   }
+  for (const ip of ["2001::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2", "2001:0000:0a00:0001::1", "fec0::1", "fec0:0:0:1::5", "feff::1", "::ffff:0:10.0.0.1", "::ffff:0:127.0.0.1", "::ffff:0:169.254.169.254", "::ffff:0:8.8.8.8", "::ffff:0:a00:1", "0:0:0:ffff:0:a00:1:0"]) {
+    assert(isBlockedIp(ip), `IPv6 ${ip} (Teredo, local al sitio o IPv4 traducida): bloqueada`);
+  }
+  for (const ip of ["2606:4700:4700::1111", "8.8.8.8", "2001:4860:4860::8888", "2001:1::1", "2001:200::1", "fe00::1", "2800:a8::1"]) {
+    assert(!isBlockedIp(ip), `${ip}: sigue permitida`);
+  }
   for (const ip of ["93.184.216.34", "8.8.8.8", "172.15.0.1", "172.32.0.1", "192.167.1.1", "169.253.1.1", "100.63.0.1", "100.128.0.1", "200.40.30.20", "2606:4700:4700::1111", "2800:a8::1", "::ffff:8.8.8.8"]) {
     assert(!isBlockedIp(ip), `${ip}: pública, permitida`);
   }
@@ -211,10 +217,21 @@ async function main() {
   assert(judge(ok("", { status: 302, contentType: "", finalUrl: "https://www.hugedomains.com/domain_profile.cfm?d=tienda.com" })).reason === "dominio en venta" && isParkingHost("sedo.com") && isParkingHost("www.dan.com") && !isParkingHost("tienda.com"), "Redirección a un sitio de venta de dominios: dead, «dominio en venta»");
   assert(judge(ok(PARKED)).live === "dead" && judge(ok(PARKED)).reason === "dominio en venta" && looksParked(PARKED) && !looksParked(UY_STORE), "Página parqueada o «en venta» con 200: dead");
   assert(!judge(ok(PARKED)).readable && /Montevideo, Uruguay/.test(PARKED), "De una página parqueada no se sacan indicios, aunque nombre a Montevideo y Uruguay");
-  for (const text of ["<title>404</title><p>hola</p>", "<title>Tienda</title><h1>Página no encontrada</h1>", "<title>Tienda</title><h1>Error 404</h1>", "<title>Page not found - Shop</title>", "<title>Tienda</title><h2>El producto que buscás no existe</h2>", "<title>Tienda</title><h1>No se encontró la página</h1>"]) {
-    assert(judge(ok(`<html><head>${text}</head><body></body></html>`)).live === "dead" && looksLikeNotFound(text), `200 que dice que no existe (${text.replace(/<[^>]+>/g, " ").trim().slice(0, 40)}): dead`);
+  const titled = (title: string, body = "<h1>Termo de acero</h1>") => `<html><head><title>${title}</title></head><body>${body}</body></html>`;
+  for (const title of ["404", "Error 404", "404 - Página no encontrada", "Page not found", "Esta página no existe", "Error 410", "410 Gone", "ERROR 404 | Tienda", "Página no encontrada | Casa del Mate", "La página no existe", "No se encontró la página", "This page could not be found", "Página inexistente", "¡404! Ups"]) {
+    assert(looksLikeNotFound(titled(title)) && judge(ok(titled(title))).live === "dead", `200 con título «${title}»: Caída`);
   }
-  assert(judge(ok(page("<h1>Termo 404 ml</h1><p>Precio $ 404. No existe mejor termo.</p>").replace("<h1>Termo 404 ml</h1>", "<h1>Termo de acero</h1>"))).live === "alive", "Un «404» o «no existe» en el texto del producto (no en el título) no la da por caída");
+  assert(looksLikeNotFound(titled("Tienda", "<h1>Página no encontrada</h1>")) && judge(ok(titled("Tienda", "<h1>Página no encontrada</h1>"))).reason === "dice que no existe", "Un <h1> corto «Página no encontrada» con título genérico: Caída");
+  assert(looksLikeNotFound(titled("Tienda", "<h2>Error 404</h2>")) && looksLikeNotFound(titled("Tienda", "<h1> — 404 — </h1>")), "También en un <h2>, y con adornos antes del código");
+  for (const title of ["Termo 404 ml Stanley", "Not found what you need? Termo", "Si no existe tu talle, avisanos", "Termo Stanley 1.4 L | Tienda", "Peugeot 404 repuestos originales", "Modelo 410 de acero", "No existe mejor termo", "Lost & Found: termos usados", "Lo que no existe en otras tiendas", "Art. 4041 Termo"]) {
+    assert(!looksLikeNotFound(titled(title)) && judge(ok(titled(title))).live === "alive", `Título «${title}»: sigue Activa`);
+  }
+  for (const heading of ["Termo 404 ml Stanley", "Si no existe tu talle, avisanos", "Not found what you need? Termo"]) {
+    assert(!looksLikeNotFound(titled("Tienda", `<h1>${heading}</h1><h2>${heading}</h2>`)), `Encabezado «${heading}»: sigue Activa`);
+  }
+  const longTitle = "Página no encontrada es lo que vas a ver en otras tiendas cuando busques este termo";
+  assert(longTitle.length > 60 && !looksLikeNotFound(titled(longTitle)) && !looksLikeNotFound(titled("Tienda", `<h1>404 ${"x".repeat(70)}</h1>`)), "Un título o encabezado de más de 60 caracteres no se mira");
+  assert(!looksLikeNotFound(titled("Tienda", "<h1>Termo</h1><p>Error 404. Página no encontrada. Page not found.</p><h3>404</h3>")), "Fuera de <title>, <h1> y <h2> no se mira: ni párrafos ni <h3>");
   for (const status of [403, 429, 401]) assert(judge(ok(page("<p>Forbidden</p>"), { status })).live === "unknown" && judge(ok("", { status })).reason === "protección contra robots", `HTTP ${status}: unknown, no caída`);
   assert(judge(ok(ROBOTS)).live === "unknown" && judge(ok(ROBOTS, { status: 503 })).live === "unknown" && looksLikeRobotWall(ROBOTS) && !looksLikeRobotWall(UY_STORE), "Pantalla de protección contra robots (con 200 o con 503): unknown");
   assert(judge({ kind: "timeout" }).live === "unknown" && judge({ kind: "error" }).live === "unknown" && judge({ kind: "blocked" }).live === "unknown" && judge({ kind: "too_many_redirects" }).live === "unknown", "Timeout, error de red, dirección no permitida o demasiadas redirecciones: unknown");
@@ -273,6 +290,68 @@ async function main() {
   assert((await openPage("https://dnsraro.com/", n.net)).kind === "error", "DNS que falla por otro motivo: error (unknown), no caída");
   n = fakeNet({}, { "https://tienda.com/a": "ECONNREFUSED", "https://tienda.com/b": "TIMEOUT", "https://tienda.com/c": "ECONNRESET" });
   assert((await openPage("https://tienda.com/a", n.net)).kind === "refused" && (await openPage("https://tienda.com/b", n.net)).kind === "timeout" && (await openPage("https://tienda.com/c", n.net)).kind === "error", "Conexión rechazada, tiempo agotado y conexión cortada se distinguen");
+  // El DNS también cuenta para el límite de tiempo. Se cuentan los timers para ver que no quede ninguno colgado.
+  const realSet = globalThis.setTimeout;
+  const realClear = globalThis.clearTimeout;
+  const pending = new Set<unknown>();
+  const watchTimers = () => {
+    globalThis.setTimeout = ((fn: (...a: unknown[]) => void, ms?: number, ...args: unknown[]) => {
+      const id = realSet(() => {
+        pending.delete(id);
+        fn(...args);
+      }, ms);
+      pending.add(id);
+      return id;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = ((id?: Parameters<typeof clearTimeout>[0]) => {
+      pending.delete(id);
+      realClear(id);
+    }) as typeof clearTimeout;
+  };
+  const restoreTimers = () => {
+    globalThis.setTimeout = realSet;
+    globalThis.clearTimeout = realClear;
+  };
+  // Red instantánea, sin la pausa de 5 ms de fakeNet: acá los únicos timers son los de openPage.
+  const instant = (dnsError: boolean): NetDeps => ({
+    resolve: async () => {
+      if (dnsError) throw Object.assign(new Error("ENOTFOUND"), { code: "ENOTFOUND" });
+      return ["93.184.216.34"];
+    },
+    request: async () => ({ status: 200, contentType: "text/html", location: null, truncated: false, body: Buffer.from(UY_STORE) }),
+  });
+  n = fakeNet({}, { "https://tienda.com/p": html(UY_STORE) });
+  let dnsCalls = 0;
+  const hangingDns: NetDeps = { resolve: () => { dnsCalls++; return new Promise<string[]>(() => {}); }, request: n.net.request };
+  watchTimers();
+  let dnsOutcome: PageOutcome;
+  let dnsMs: number;
+  let pendingAfterHang: number;
+  let pendingAfterOk: number;
+  let pendingAfterDnsError: number;
+  let okOutcome: PageOutcome;
+  try {
+    const dnsStart = Date.now();
+    dnsOutcome = await openPage("https://tienda.com/p", hangingDns, { timeoutMs: 200 });
+    dnsMs = Date.now() - dnsStart;
+    pendingAfterHang = pending.size;
+    // Con un DNS normal, el timer de la carrera se limpia apenas responde (acá el límite es de un minuto).
+    okOutcome = await openPage("https://tienda.com/p", instant(false), { timeoutMs: 60_000 });
+    pendingAfterOk = pending.size;
+    await openPage("https://noexiste.com/", instant(true), { timeoutMs: 60_000 });
+    pendingAfterDnsError = pending.size;
+  } finally {
+    restoreTimers();
+  }
+  assert(dnsOutcome.kind === "timeout" && dnsCalls === 1 && n.opened.length === 0, "Un DNS que nunca responde: timeout, sin llegar a abrir nada");
+  assert(dnsMs >= 150 && dnsMs < 1500, `Vuelve dentro del límite de tiempo (${dnsMs} ms con un límite de 200)`);
+  assert(okOutcome.kind === "page" && pendingAfterHang === 0 && pendingAfterOk === 0 && pendingAfterDnsError === 0, `No queda ningún timer colgado: ni cuando gana el reloj, ni cuando el DNS responde, ni cuando falla (${pendingAfterHang}, ${pendingAfterOk}, ${pendingAfterDnsError})`);
+  assert(judgePage(dnsOutcome, "tienda.com").live === "unknown", "Ese caso queda «No se pudo verificar», no «Caída»");
+  let dnsClock = 0;
+  n = fakeNet({}, { "https://tienda.com/1": redirect("/2"), "https://tienda.com/2": html(UY_STORE) });
+  const slowBoth: NetDeps = { resolve: async (h) => { dnsClock += 5000; return n.net.resolve(h); }, request: async (t) => { dnsClock += 4000; return n.net.request(t); } };
+  assert((await openPage("https://tienda.com/1", slowBoth, { now: () => dnsClock })).kind === "timeout" && n.opened.length === 1 && n.resolved.length === 1, "El tiempo del DNS y el del pedido se suman: son 8 s en total por página");
+
   let clock = 0;
   n = fakeNet({}, { "https://tienda.com/1": redirect("/2"), "https://tienda.com/2": html(UY_STORE) });
   const slowNet: NetDeps = { resolve: n.net.resolve, request: async (t) => { clock += 9000; return n.net.request(t); } };
