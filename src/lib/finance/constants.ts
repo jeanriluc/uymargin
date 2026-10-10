@@ -85,6 +85,7 @@ export const ML_RATE_RANGES = {
 export function createDefaultInputs(): AnalysisInputs {
   return {
     productName: "",
+    productImage: null,
     query: "",
     cost: { amount: 0, currency: "USD" },
     freight: { amount: 0, currency: "UYU" },

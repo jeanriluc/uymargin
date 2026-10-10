@@ -61,6 +61,8 @@ export interface DirectChannelSettings {
 /** Full set of user inputs for one analysis. Serializable (stored in history). */
 export interface AnalysisInputs {
   productName: string;
+  /** Foto del producto para el resumen: dirección https de un host conocido, o null. No entra a ningún cálculo. */
+  productImage?: string | null;
   query: string;
   cost: Money;
   freight: Money;
