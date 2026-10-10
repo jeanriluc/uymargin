@@ -74,7 +74,8 @@ interface UrlAnalyzerProps {
   exchangeRate: number;
   /** Cotización en uso, con fecha y fuente, para mostrar equivalentes en pesos. */
   rate: ExchangeRate | null;
-  onSimulatePrice: (price: number, productName: string) => void;
+  /** `image`: foto del producto elegido (null si no tiene). */
+  onSimulatePrice: (price: number, productName: string, image: string | null) => void;
 }
 
 const SAMPLE_URLS = [
@@ -186,9 +187,9 @@ export function UrlAnalyzer({
     const c = convertToUyu(price, currency, rate);
     return c.status === "ok" ? Math.round(c.amountUyu) : null;
   };
-  const simulate = (price: number, currency: string, title: string) => {
+  const simulate = (price: number, currency: string, title: string, image: string | null) => {
     const uyu = uyuOf(price, currency);
-    if (uyu !== null) onSimulatePrice(uyu, title);
+    if (uyu !== null) onSimulatePrice(uyu, title, image);
   };
   // Mediana de las ofertas del producto exacto con la cotización vigente: referencia para marcar similares
   // con precio muy distinto. Es solo una marca: los similares no entran a ningún rango.
@@ -328,7 +329,7 @@ export function UrlAnalyzer({
                   <button
                     disabled={uyuOf(result.targetProduct.price, result.targetProduct.currency) === null}
                     onClick={() =>
-                      simulate(result.targetProduct.price, result.targetProduct.currency, result.targetProduct.title)
+                      simulate(result.targetProduct.price, result.targetProduct.currency, result.targetProduct.title, result.targetProduct.thumbnail ?? null)
                     }
                     className="inline-flex items-center gap-1.5 rounded-md bg-black text-white dark:bg-white dark:text-black px-3 py-1.5 text-xs font-black uppercase tracking-wider hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
                   >
@@ -476,7 +477,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
           <ExactOffersSection
             exact={result.exact}
             rate={rate}
-            onSimulate={(priceUyu, title) => onSimulatePrice(priceUyu, title)}
+            onSimulate={(priceUyu, title, image) => onSimulatePrice(priceUyu, title, image)}
             onChooseAlternative={(candidate) => handleAnalyze(candidate.permalink)}
           />
 
@@ -532,7 +533,7 @@ loading="lazy" decoding="async"                     src={result.targetProduct.th
                       key={item.id}
                       item={item}
                       rate={rate}
-                      onSimulate={(priceUyu) => onSimulatePrice(priceUyu, item.title)}
+                      onSimulate={(priceUyu, image) => onSimulatePrice(priceUyu, item.title, image)}
                       farFromMedian={similarIsFar(item)}
                     />
                   ))}

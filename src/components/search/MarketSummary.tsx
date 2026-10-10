@@ -25,7 +25,8 @@ interface MarketSummaryProps {
   source: "mlu" | "manual" | null;
   manualPrices: string;
   onManualPricesChange: (text: string) => void;
-  onSelectPrice: (price: number) => void;
+  /** `image`: foto del producto de la tarjeta elegida (null si no tiene). Sin indicar: precio de las estadísticas. */
+  onSelectPrice: (price: number, image?: string | null) => void;
   /** Buscar de nuevo con un nombre más corto. Solo se llama cuando el usuario toca el botón. */
   onBroaden?: (query: string) => void;
 }

@@ -8,8 +8,8 @@ interface CatalogProductCardProps {
   key?: string;
   item: MluItem;
   rate: ExchangeRate | null;
-  /** Recibe el precio en pesos con la cotización vigente. */
-  onSimulate: (priceUyu: number) => void;
+  /** Recibe el precio en pesos con la cotización vigente y la foto del producto (null si no tiene). */
+  onSimulate: (priceUyu: number, image: string | null) => void;
   /** Aclaración corta bajo el nombre (por ejemplo, qué le falta para coincidir con la búsqueda). */
   note?: string;
   /** Marca visible "precio muy distinto a la mediana" (ver isFarFromMedian). No excluye el producto de nada. */
@@ -133,7 +133,7 @@ export function CatalogProductCard({ item, rate, onSimulate, note, farFromMedian
             disabled={!canSimulate}
             onClick={() => {
               // El simulador trabaja en pesos: una publicación en dólares entra convertida.
-              if (conversion.status === "ok") onSimulate(Math.round(conversion.amountUyu));
+              if (conversion.status === "ok") onSimulate(Math.round(conversion.amountUyu), item.thumbnail ?? null);
             }}
             title={
               canSimulate
