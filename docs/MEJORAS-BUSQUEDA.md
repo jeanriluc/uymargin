@@ -615,3 +615,24 @@ Abrir direcciones de terceros desde el servidor es la parte delicada:
 2. Probar con el termo: ¿Matesuru y Yerbas Calzada suben a "Tiendas de Uruguay"?
 3. Mirar cuántas quedan en "No se pudo verificar" y cuánto tarda.
 4. Mirar si alguna publicación de Mercado Libre sale "Activa" (si no, la API no responde y da lo mismo).
+
+---
+
+# Ronda 14b: tres correcciones a la verificación de sitios
+
+## Qué cambió
+
+1. **Menos falsos "Caída".** `looksLikeNotFound` daba por caídas páginas activas con títulos como "Termo 404 ml Stanley", "Not found what you need? Termo" o encabezados como "Si no existe tu talle, avisanos". Ahora mira solo el `<title>`, los `<h1>` y los `<h2>`, y solo si el texto tiene como mucho 60 caracteres. Tiene que ser una forma de error completa: empezar con "404" o "error 404" (también 410), o ser una frase como "página no encontrada", "la página no existe", "esta página no existe", "no se encontró la página", "page not found", "this page could not be found" o "página inexistente". Así "404 - Página no encontrada" cuenta y "Termo 404 ml" no. Se sacaron los patrones sueltos `404`, `no existe` y `not found`.
+2. **Más direcciones bloqueadas.** `isBlockedIp` ahora bloquea también Teredo (`2001::/32`), las locales al sitio (`fec0::/10`) y las IPv4 traducidas (`::ffff:0:a.b.c.d`, enteras, sea cual sea la IPv4 de adentro).
+3. **El DNS entra en el límite de tiempo.** En `openPage`, la consulta de DNS corre contra lo que queda de los 8 segundos de la página. Si el DNS no responde, el resultado es "No se pudo verificar" (tiempo agotado), y el reloj se limpia en todos los casos.
+
+## Limitaciones conocidas (sin cambios de comportamiento)
+
+- **Una página del tipo "viajes a Montevideo, Uruguay" puede quedar como Uruguay confirmado.** Un departamento pegado a "Uruguay" cuenta como dirección aunque la página no sea de una tienda de acá.
+- **`es-UY` solo alcanza para "confirmado".** Un sitio internacional con una versión para Uruguay (`lang`, `og:locale` o `hreflang` es-UY) queda confirmado sin ningún otro indicio.
+- **Dos tiendas de una misma plataforma cuentan como el mismo sitio.** `sameSite` compara el dominio principal, así que `a.myshopify.com` y `b.myshopify.com` son "el mismo sitio": una redirección de una a la otra no se toma como salto a otro dominio.
+
+## Evidencia
+
+- `scripts/verify_sites.ts`: 384 casos. Suma los títulos y encabezados que deben quedar activos y los que deben quedar caídos, las direcciones nuevas (y que `2606:4700:4700::1111` y `8.8.8.8` siguen permitidas), y un DNS que nunca responde, sin timers colgados.
+- **La verificación contra tiendas reales sigue sin probarse.**
