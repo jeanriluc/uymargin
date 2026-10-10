@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ExternalLink } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { GoogleLinks, LINK_BUTTON, URUGUAY_STYLES } from "@/components/search/WebSellers";
+import { SiteStatus, VerificationNote, isDead, verifiedUruguay, type Verification, type VerifyCandidate } from "@/components/search/SiteVerification";
 import { URUGUAY_LABELS } from "@/lib/web/sellers";
 import {
   VISUAL_GROUP_LABELS,
@@ -100,7 +101,19 @@ export function useVisualSearch() {
   return { state, search, cancel, reset };
 }
 
-function MatchCard({ match }: { match: VisualMatch }) {
+/**
+ * Qué resultados se mandan a verificar, en orden: primero las tiendas de Uruguay y las sin confirmar, y si
+ * queda lugar, Mercado Libre Uruguay. Los ocultos del exterior y lo que no es tienda no se verifican.
+ */
+export function visualCandidates(data: VisualSearchResponse): VerifyCandidate[] {
+  const of = (group: VisualGroup) => data.results.filter((m) => m.group === group);
+  return [...of("uy_stores"), ...of("unconfirmed"), ...of("ml_uy")];
+}
+
+function MatchCard({ match, verification }: { match: VisualMatch; verification: Verification }) {
+  // Lo que encontró la verificación en la página manda sobre lo que se dedujo del dominio.
+  const verified = verifiedUruguay(verification, match.url);
+  const uruguay = match.group === "ml_uy" || match.group === "foreign" || match.group === "others" ? null : verified === "confirmado" ? "confirmado" : (match.uruguay ?? verified);
   const [thumbFailed, setThumbFailed] = useState(false);
   return (
     <li
@@ -122,9 +135,9 @@ function MatchCard({ match }: { match: VisualMatch }) {
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="min-w-0 break-all text-xs font-black text-zinc-900 dark:text-zinc-100">{match.site}</span>
-          {match.group === "uy_stores" && match.uruguay && (
-            <span data-visual-uruguay={match.uruguay} className={`rounded border px-2 py-0.5 text-[11px] font-bold ${URUGUAY_STYLES[match.uruguay]}`}>
-              {URUGUAY_LABELS[match.uruguay]}
+          {uruguay && (
+            <span data-visual-uruguay={uruguay} className={`rounded border px-2 py-0.5 text-[11px] font-bold ${URUGUAY_STYLES[uruguay]}`}>
+              {URUGUAY_LABELS[uruguay]}
             </span>
           )}
         </div>
@@ -135,6 +148,7 @@ function MatchCard({ match }: { match: VisualMatch }) {
             <span>({VISUAL_MESSAGES.priceNote})</span>
           </p>
         )}
+        <SiteStatus verification={verification} url={match.url} />
         <div className="mt-1 flex justify-end">
           <a
             href={match.url}
@@ -152,11 +166,11 @@ function MatchCard({ match }: { match: VisualMatch }) {
   );
 }
 
-function MatchList({ matches }: { matches: VisualMatch[] }) {
+function MatchList({ matches, verification }: { matches: VisualMatch[]; verification: Verification }) {
   return (
     <ul className="grid min-w-0 gap-2.5 lg:grid-cols-2">
       {matches.map((match) => (
-        <MatchCard key={match.url} match={match} />
+        <MatchCard key={match.url} match={match} verification={verification} />
       ))}
     </ul>
   );
@@ -169,10 +183,12 @@ interface VisualMatchesPanelProps {
   name: string;
   state: VisualState;
   onRetry: () => void;
+  /** Verificación de los sitios de esta lista (ronda 14). */
+  verification: Verification;
 }
 
 /** Resultados de la búsqueda visual, por grupo. El botón que la lanza y el de cancelar están en PhotoAnalyzer. */
-export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelProps) {
+export function VisualMatchesPanel({ name, state, onRetry, verification }: VisualMatchesPanelProps) {
   if (state.status === "error") {
     return (
       <div className="flex min-w-0 flex-col gap-3">
@@ -202,10 +218,14 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
   if (state.status !== "done") return null;
 
   const { results, mlCount, uruguayCount, recognizedAs } = state.data;
-  const of = (group: VisualGroup) => results.filter((m) => m.group === group);
+  // Las páginas caídas salen de sus grupos y van a "No disponibles".
+  const dead = results.filter((m) => isDead(verification, m.url));
+  const of = (group: VisualGroup) => results.filter((m) => m.group === group && !isDead(verification, m.url));
   const ml = of("ml_uy");
-  const stores = of("uy_stores");
-  const unconfirmed = of("unconfirmed");
+  // Una tienda "sin confirmar" sube a "Tiendas de Uruguay" si en su página hay indicios de Uruguay.
+  const promoted = of("unconfirmed").filter((m) => verifiedUruguay(verification, m.url) !== null);
+  const stores = [...of("uy_stores"), ...promoted];
+  const unconfirmed = of("unconfirmed").filter((m) => !promoted.includes(m));
   const others = of("others");
   // Sitios del exterior: no se muestran como grupo, quedan detrás de una línea que los despliega.
   const hidden = of("foreign");
@@ -226,7 +246,7 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
           <h3 className={HEADING}>
             {VISUAL_GROUP_LABELS.ml_uy} ({mlCount})
           </h3>
-          <MatchList matches={ml} />
+          <MatchList matches={ml} verification={verification} />
           <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
             {mlCount > ml.length ? `Se muestran ${ml.length} de ${mlCount} publicaciones. ` : ""}
             Para ver los precios reales de Mercado Libre, usá «Analizar en Radar».
@@ -239,9 +259,11 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
           <h3 className={HEADING}>
             {VISUAL_GROUP_LABELS.uy_stores} ({stores.length})
           </h3>
-          <MatchList matches={stores} />
+          <MatchList matches={stores} verification={verification} />
         </section>
       )}
+
+      <VerificationNote verification={verification} />
 
       {hidden.length > 0 && (
         <details data-visual-group="foreign" data-hidden-foreign className="min-w-0">
@@ -250,7 +272,7 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
             <span className="font-bold underline underline-offset-2">Ver</span>
           </summary>
           <div className="mt-3">
-            <MatchList matches={hidden} />
+            <MatchList matches={hidden} verification={verification} />
           </div>
         </details>
       )}
@@ -261,7 +283,16 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
             {VISUAL_GROUP_LABELS.unconfirmed}: no se sabe si venden en Uruguay ({unconfirmed.length})
           </summary>
           <div className="mt-3">
-            <MatchList matches={unconfirmed} />
+            <MatchList matches={unconfirmed} verification={verification} />
+          </div>
+        </details>
+      )}
+
+      {dead.length > 0 && (
+        <details data-unavailable className="min-w-0 rounded-lg border border-zinc-200 dark:border-zinc-800 p-3">
+          <summary className="cursor-pointer text-xs font-bold text-zinc-800 dark:text-zinc-200">No disponibles: la página ya no existe o está caída ({dead.length})</summary>
+          <div className="mt-3">
+            <MatchList matches={dead} verification={verification} />
           </div>
         </details>
       )}
@@ -272,7 +303,7 @@ export function VisualMatchesPanel({ name, state, onRetry }: VisualMatchesPanelP
             {VISUAL_GROUP_LABELS.others} ({others.length})
           </summary>
           <div className="mt-3">
-            <MatchList matches={others} />
+            <MatchList matches={others} verification={verification} />
           </div>
         </details>
       )}

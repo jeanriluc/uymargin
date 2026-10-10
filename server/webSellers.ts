@@ -4,6 +4,7 @@ import {
   buildSearchQuery,
   buildWebSellers,
   cleanWebQuery,
+  isVerifiableSeller,
   parseSearchItems,
   webQueryKey,
   type RawSearchResult,
@@ -166,14 +167,24 @@ export function createWebSellersRoute(options: {
   search: () => WebSearchProvider | null;
   limiter: RequestHandler;
   cache?: WebCache;
+  /** Firma el permiso para verificar una dirección (ronda 14). Devuelve null si la verificación no está configurada. */
+  sign?: (res: Response, url: string) => string | null;
 }): RequestHandler[] {
   const cache = options.cache ?? createWebCache();
+  // El permiso es de cada usuario y vence: se agrega al responder, nunca queda en la memoria de respuestas.
+  const withTokens = (res: Response, value: CachedAnswer): CachedAnswer => ({
+    ...value,
+    results: value.results.map((seller) => {
+      const token = isVerifiableSeller(seller) ? options.sign?.(res, seller.url) : null;
+      return token ? { ...seller, verifyToken: token } : seller;
+    }),
+  });
 
   const prepare: RequestHandler = (req, res, next) => {
     const query = cleanWebQuery(req.body?.query);
     if (!query) return fail(res, 400, "INVALID_QUERY", WEB_MESSAGES.query);
     const hit = cache.get(query);
-    if (hit) return res.json({ ok: true, ...hit, query, cached: true });
+    if (hit) return res.json({ ok: true, ...withTokens(res, hit), query, cached: true });
     res.locals.webQuery = query;
     return next();
   };
@@ -191,7 +202,7 @@ export function createWebSellersRoute(options: {
       // Solo la cantidad: ni la consulta ni los sitios quedan en el log.
       console.info(`[api/web-sellers] resultados: ${value.results.length}`);
       cache.set(query, value);
-      return res.json({ ok: true, ...value, cached: false });
+      return res.json({ ok: true, ...withTokens(res, value), cached: false });
     } catch (err) {
       const known = err instanceof WebSearchError ? err : null;
       console.error("[api/web-sellers] la búsqueda falló:", known ? `${known.code} (${known.detail})` : "error inesperado");

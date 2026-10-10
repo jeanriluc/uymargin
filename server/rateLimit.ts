@@ -23,6 +23,8 @@ export const RATE_RULES = {
   web: { scope: "web", perMinute: 5, perDay: 20 },
   // Búsqueda visual: cada foto es una búsqueda paga en Apify (≈ US$ 0,015), más cara que la búsqueda web.
   visual: { scope: "visual", perMinute: 3, perDay: 15 },
+  // Verificación de sitios: no cuesta plata, pero cada uso abre hasta 8 páginas de terceros desde el servidor.
+  verify: { scope: "verify", perMinute: 6, perDay: 60 },
 } as const satisfies Record<string, RateRule>;
 
 export interface RateCounts {

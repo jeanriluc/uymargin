@@ -10,6 +10,7 @@
     "api/identify-product.ts": { "maxDuration": 60 },
     "api/web-sellers.ts": { "maxDuration": 60 },
     "api/visual-search.ts": { "maxDuration": 60 },
+    "api/verify-sites.ts": { "maxDuration": 60 },
     "api/exchange-rate.ts": { "maxDuration": 30 },
     "api/tracking/check.ts": { "maxDuration": 10 }
   },

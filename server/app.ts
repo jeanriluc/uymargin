@@ -34,6 +34,7 @@ import { createAudit, deleteAudit, listAudits, supabaseRateStore, verifySupabase
 import { createGeminiIdentifier, createIdentifyRoute, type IdentifyModel } from "./identify.js";
 import { createApifySearcher, createWebSellersRoute, type WebSearchProvider } from "./webSellers.js";
 import { createApifyLens, createVisualSearchRoute, type LensProvider } from "./visualSearch.js";
+import { createMercadoLibreChecker, createVerifySigner, createVerifySitesRoute, type VerifySigner } from "./verifySites.js";
 
 dotenv.config();
 
@@ -1270,6 +1271,17 @@ Sé conciso, directo, amigable con terminología uruguaya ($U, e-factura, RUT, D
   }
 });
 
+// Permisos firmados para /api/verify-sites (server/verifySites.ts). Sin VERIFY_SECRET no se firma nada y la
+// verificación queda apagada; la clave se lee solo acá y nunca se registra ni se devuelve.
+let verifySigner: { secret: string; signer: VerifySigner } | null = null;
+function getVerifySigner(): VerifySigner | null {
+  const secret = (process.env.VERIFY_SECRET || "").trim();
+  if (secret.length < 32) return null;
+  if (verifySigner?.secret !== secret) verifySigner = { secret, signer: createVerifySigner(secret) };
+  return verifySigner.signer;
+}
+const signVerifyToken = (res: express.Response, url: string) => getVerifySigner()?.sign(url, requestUser(res).id) ?? null;
+
 // ------------------------------------------------------------------
 // 3b. Identificación de un producto por foto (server/identify.ts). Límite de uso propio, aparte del de las búsquedas.
 // ------------------------------------------------------------------
@@ -1295,6 +1307,7 @@ app.post(
   "/api/web-sellers",
   ...createWebSellersRoute({
     limiter: rateLimit(RATE_RULES.web),
+    sign: signVerifyToken,
     search: () => {
       // El token de Apify se lee solo acá y viaja solo en el encabezado Authorization (server/webSellers.ts).
       const token = (process.env.APIFY_TOKEN || "").trim();
@@ -1315,6 +1328,7 @@ app.post(
   "/api/visual-search",
   ...createVisualSearchRoute({
     limiter: rateLimit(RATE_RULES.visual),
+    sign: signVerifyToken,
     lens: () => {
       // El mismo token de Apify que la búsqueda web; viaja solo en el encabezado Authorization.
       const token = (process.env.APIFY_TOKEN || "").trim();
@@ -1324,6 +1338,21 @@ app.post(
       }
       return visualLens.lens;
     },
+  })
+);
+
+// ------------------------------------------------------------------
+// 3e. Verificación de sitios (server/verifySites.ts): ¿la tienda es de Uruguay y la página sigue activa?
+//     Solo abre direcciones que este servidor firmó para ese usuario. Límite de uso propio.
+// ------------------------------------------------------------------
+app.post(
+  "/api/verify-sites",
+  ...createVerifySitesRoute({
+    signer: getVerifySigner,
+    limiter: rateLimit(RATE_RULES.verify),
+    userId: (res) => requestUser(res).id,
+    // Mercado Libre no se abre como página: se consulta su API con el mismo acceso del Radar.
+    mercadoLibre: createMercadoLibreChecker({ token: getAppToken, fetch: (url, init) => fetch(url, init) }),
   })
 );
 
